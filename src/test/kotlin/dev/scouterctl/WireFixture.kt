@@ -1,0 +1,110 @@
+package dev.scouterctl
+
+import scouter.io.DataInputX
+import scouter.io.DataOutputX
+import scouter.lang.pack.*
+import scouter.lang.step.MessageStep
+import scouter.lang.step.SqlStep3
+import scouter.lang.step.Step
+import scouter.net.NetCafe
+import scouter.net.RequestCmd
+import scouter.net.TcpFlag
+import java.io.EOFException
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.SocketException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
+enum class Fault { NONE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT }
+
+class WireFixture(private val fault: Fault = Fault.NONE) : AutoCloseable {
+    private val server = ServerSocket(0, 8, InetAddress.getLoopbackAddress())
+    val port: Int = server.localPort
+    private val executor = Executors.newSingleThreadExecutor()
+    private var disconnected = false
+    private val future = executor.submit {
+        while (!server.isClosed) {
+            val socket = try { server.accept() } catch (_: SocketException) { break }
+            socket.use {
+                it.soTimeout = 5000
+                val input = DataInputX(java.io.BufferedInputStream(it.getInputStream()))
+                val output = DataOutputX(java.io.BufferedOutputStream(it.getOutputStream()))
+                check(input.readInt() == NetCafe.TCP_CLIENT)
+                try {
+                    while (true) {
+                        val command = input.readText()
+                        input.readLong()
+                        if (command != RequestCmd.LOGIN && fault == Fault.SESSION) {
+                            output.writeByte(TcpFlag.INVALID_SESSION.toInt()); output.flush(); break
+                        }
+                        when (command) {
+                            RequestCmd.LOGIN -> {
+                                val request = input.readMapPack()
+                                request.put("session", if (fault == Fault.AUTH) 0L else 123L)
+                                request.put("server_id", "fixture"); request.put("type", "guest")
+                                request.put("version", if (fault == Fault.VERSION) "2.8.1 test" else "2.21.3 test")
+                                request.put("timezone", "Coordinated Universal Time")
+                                send(output, request)
+                            }
+                            RequestCmd.OBJECT_LIST_REAL_TIME -> send(output, ObjectPack().apply {
+                                objHash = 42; objName = "/fixture"; objType = "java"; address = "private-address"
+                            })
+                            RequestCmd.TRANX_LOAD_TIME_GROUP_V2 -> {
+                                val request = input.readMapPack()
+                                val txid = request.getLong("txid")
+                                val start = if (txid == 0L) 0 else ids.indexOf(txid) + 1
+                                check(start >= 0)
+                                if (start > 0) check(request.getLong("lastBucketTime") == baseTime)
+                                if (fault == Fault.DISCONNECT && start > 0 && !disconnected) {
+                                    disconnected = true
+                                    break
+                                }
+                                val end = minOf(start + request.getInt("pageCount"), ids.size)
+                                for (index in start until end) send(output, XLogPack().apply {
+                                    this.txid = ids[index]; gxid = Long.MIN_VALUE + 1; caller = 9007199254740993L
+                                    objHash = 42; endTime = baseTime + index; elapsed = 30; service = 10
+                                    text1 = "secret-token"; ipaddr = byteArrayOf(127, 0, 0, 1)
+                                })
+                                if (fault != Fault.MISSING_META) send(output, MapPack().apply {
+                                    put("hasMore", end < ids.size)
+                                    put("lastXLogTime", if (fault == Fault.STALLED_CURSOR) 0L else baseTime)
+                                    put("lastTxid", if (fault == Fault.STALLED_CURSOR) 0L else ids[end - 1])
+                                    if (fault == Fault.INVALID_META) put("hasMore", "not-a-boolean")
+                                })
+                            }
+                            RequestCmd.TRANX_PROFILE -> {
+                                input.readMapPack()
+                                send(output, XLogProfilePack().apply {
+                                    profile = Step.toBytes(arrayOf(
+                                        MessageStep().apply { index = 1; message = "password=secret-token" },
+                                        SqlStep3().apply {
+                                            index = 2; hash = 123; elapsed = 7; error = 0; updated = 1
+                                            param = "password=secret-token"
+                                        },
+                                        SqlStep3().apply {
+                                            index = 3; hash = 456; elapsed = 11; error = -789; updated = -3
+                                            param = "password=secret-token"
+                                        }))
+                                })
+                            }
+                            else -> error("Unexpected or unsafe command: $command")
+                        }
+                        output.writeByte(TcpFlag.NoNEXT.toInt()); output.flush()
+                    }
+                } catch (_: EOFException) {
+                    // Client closes its connection after each command invocation.
+                }
+            }
+        }
+    }
+    override fun close() {
+        server.close()
+        try { future.get(10, TimeUnit.SECONDS) } finally { executor.shutdownNow() }
+    }
+    companion object {
+        val ids = listOf(9223372036854775804L, 9223372036854775805L, 9223372036854775806L)
+        const val baseTime = 1793491200000L // 2026-11-01T00:00:00Z
+        private fun send(out: DataOutputX, pack: Pack) { out.writeByte(TcpFlag.HasNEXT.toInt()); out.writePack(pack) }
+    }
+}
