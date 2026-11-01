@@ -1,108 +1,128 @@
 package dev.scouterctl
 
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.engine.spec.tempdir
+import io.kotest.matchers.booleans.shouldBeFalse
+import io.kotest.matchers.booleans.shouldBeTrue
+import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import kotlinx.serialization.json.*
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
-import kotlin.test.*
 
-class CliContractTest {
-    @TempDir lateinit var temp: Path
+class CliContractTest : FunSpec({
+    val window = listOf("--date", "20261101", "--from", "2026-11-01T00:00:00Z", "--to", "2026-11-01T00:01:00Z",
+        "--timezone", "UTC", "--object-hash", "42", "--page-size", "2")
 
-    @Test fun `profile preserves SQL outcomes while discovery and profile exclude credentials and free text`() {
+    test("profile preserves SQL outcomes while discovery and profile exclude credentials and free text") {
+        val cli = ContractCli(tempdir().toPath())
         WireFixture().use { server ->
-            val doctor = run(server.port, listOf("doctor"))
-            val objects = run(server.port, listOf("object", "list"))
-            val profile = run(server.port, listOf("profile", "get", "--date", "20261101", "--txid", WireFixture.ids[0].toString()))
-            assertEquals("guest", doctor.data()["group"]?.jsonPrimitive?.content)
-            assertEquals("/fixture", objects.events.single()["data"]!!.jsonArray.single().jsonObject["objName"]!!.jsonPrimitive.content)
+            val doctor = cli.run(server.port, listOf("doctor"))
+            val objects = cli.run(server.port, listOf("object", "list"))
+            val profile = cli.run(server.port, listOf("profile", "get", "--date", "20261101", "--txid", WireFixture.ids[0].toString()))
+            doctor.data()["group"]?.jsonPrimitive?.content shouldBe "guest"
+            objects.events.single()["data"]!!.jsonArray.single().jsonObject["objName"]!!.jsonPrimitive.content shouldBe "/fixture"
             val decoded = json.decodeFromJsonElement<ProfileRecord>(profile.data())
-            assertEquals(listOf(ProfileStep("MESSAGE", 1),
+            decoded.steps shouldContainExactly listOf(ProfileStep("MESSAGE", 1),
                 ProfileStep("SQL3", 2, SqlProfile(123, 7, 0, 1)),
-                ProfileStep("SQL3", 3, SqlProfile(456, 11, -789, -3))), decoded.steps)
+                ProfileStep("SQL3", 3, SqlProfile(456, 11, -789, -3)))
             listOf(doctor, objects, profile).forEach {
-                assertEquals(0, it.exit)
-                assertFalse(it.output.contains("secret-token"))
-                assertFalse(it.output.contains(scouter.util.CipherUtil.sha256("fixture-password")))
-                assertFalse(it.output.contains("private-address"))
-                assertFalse(it.output.contains("\"session\""))
-                assertEquals("", it.stderr)
+                it.exit shouldBe 0
+                it.output shouldNotContain "secret-token"
+                it.output shouldNotContain scouter.util.CipherUtil.sha256("fixture-password")
+                it.output shouldNotContain "private-address"
+                it.output shouldNotContain "\"session\""
+                it.stderr shouldBe ""
             }
         }
     }
 
-    @Test fun `paged JSONL preserves every 64 bit identifier and terminates once`() {
+    test("paged JSONL preserves every 64 bit identifier and terminates once") {
+        val cli = ContractCli(tempdir().toPath())
         WireFixture().use { server ->
-            val result = run(server.port, listOf("xlog", "search") + window)
-            assertEquals(0, result.exit)
-            assertEquals(listOf("start", "record", "record", "record", "complete"), result.events.map { it["type"]!!.jsonPrimitive.content })
+            val result = cli.run(server.port, listOf("xlog", "search") + window)
+            result.exit shouldBe 0
+            result.events.map { it["type"]!!.jsonPrimitive.content } shouldContainExactly
+                listOf("start", "record", "record", "record", "complete")
             val rows = result.events.filter { it["type"]?.jsonPrimitive?.content == "record" }.map { it["data"]!!.jsonObject }
-            assertEquals(WireFixture.ids.map(Long::toString), rows.map { it["txid"]!!.jsonPrimitive.content })
-            assertTrue(rows.all { it["txid"]!!.jsonPrimitive.isString && it["caller"]!!.jsonPrimitive.content == "9007199254740993" })
-            assertFalse(result.output.contains("secret-token"))
+            rows.map { it["txid"]!!.jsonPrimitive.content } shouldContainExactly WireFixture.ids.map(Long::toString)
+            rows.forEach {
+                it["txid"]!!.jsonPrimitive.isString.shouldBeTrue()
+                it["caller"]!!.jsonPrimitive.content shouldBe "9007199254740993"
+            }
+            result.output shouldNotContain "secret-token"
         }
     }
 
-    @Test fun `capture resumes without duplicates and refuses changed query or damaged data`() {
+    test("capture resumes without duplicates and refuses changed query or damaged data") {
+        val temp = tempdir().toPath()
+        val cli = ContractCli(temp)
         WireFixture().use { server ->
             val directory = temp.resolve("capture")
             val args = listOf("capture", "--directory", directory.toString(), "--max-pages", "1") + window
-            assertEquals(8, run(server.port, args).exit)
+            cli.run(server.port, args).exit shouldBe 8
             val changedQuery = args.toMutableList().apply { set(indexOf("--object-hash") + 1, "43") }
-            val changed = run(server.port, changedQuery + "--resume")
-            assertEquals(2, changed.exit)
-            assertEquals("Resume source or query differs from manifest", changed.events.single()["error"]!!.jsonObject["message"]!!.jsonPrimitive.content)
-            assertEquals(0, run(server.port, args + "--resume").exit)
+            val changed = cli.run(server.port, changedQuery + "--resume")
+            changed.exit shouldBe 2
+            changed.events.single()["error"]!!.jsonObject["message"]!!.jsonPrimitive.content shouldBe
+                "Resume source or query differs from manifest"
+            cli.run(server.port, args + "--resume").exit shouldBe 0
             val manifest = json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json")))
             val rows = manifest.files.flatMap { Files.readAllLines(directory.resolve(it.name)) }
                 .map { json.decodeFromString<XLogRecord>(it).txid }
-            assertEquals(WireFixture.ids.map(Long::toString), rows)
-            assertTrue(manifest.executionComplete)
-            assertEquals("unknown", manifest.sampling)
+            rows shouldContainExactly WireFixture.ids.map(Long::toString)
+            manifest.executionComplete.shouldBeTrue()
+            manifest.sampling shouldBe "unknown"
             Files.writeString(directory.resolve(manifest.files.first().name), "corrupted")
-            assertEquals(10, run(server.port, args + "--resume").exit)
+            cli.run(server.port, args + "--resume").exit shouldBe 10
         }
     }
 
-    @Test fun `wire failures never emit success completion`() {
-        val cases = mapOf(Fault.AUTH to 3, Fault.VERSION to 9, Fault.SESSION to 3,
-            Fault.MISSING_META to 6, Fault.INVALID_META to 6, Fault.STALLED_CURSOR to 6, Fault.DISCONNECT to 10)
-        cases.forEach { (fault, expectedExit) ->
-            WireFixture(fault).use { server ->
-                val result = run(server.port, listOf("xlog", "search") + window)
-                assertEquals(expectedExit, result.exit, fault.name)
-                assertEquals("error", result.events.last()["type"]!!.jsonPrimitive.content)
-                assertFalse(result.events.any { it["type"]?.jsonPrimitive?.content == "complete" })
+    mapOf(Fault.AUTH to 3, Fault.VERSION to 9, Fault.SESSION to 3,
+        Fault.MISSING_META to 6, Fault.INVALID_META to 6, Fault.STALLED_CURSOR to 6, Fault.DISCONNECT to 10)
+        .forEach { (fault, expectedExit) ->
+            test("wire failure $fault returns exit $expectedExit without success completion") {
+                val cli = ContractCli(tempdir().toPath())
+                WireFixture(fault).use { server ->
+                    val result = cli.run(server.port, listOf("xlog", "search") + window)
+                    result.exit shouldBe expectedExit
+                    result.events.last()["type"]!!.jsonPrimitive.content shouldBe "error"
+                    result.events.any { it["type"]?.jsonPrimitive?.content == "complete" }.shouldBeFalse()
+                }
             }
         }
-    }
 
-    @Test fun `interrupted capture retains checkpoint and resumes on new connection`() {
+    test("interrupted capture retains checkpoint and resumes on new connection") {
+        val temp = tempdir().toPath()
+        val cli = ContractCli(temp)
         val directory = temp.resolve("interrupted")
         WireFixture(Fault.DISCONNECT).use { server ->
             val args = listOf("capture", "--directory", directory.toString()) + window
-            assertEquals(10, run(server.port, args).exit)
+            cli.run(server.port, args).exit shouldBe 10
             val manifest = json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json")))
-            assertFalse(manifest.executionComplete)
-            assertEquals(2, manifest.files.sumOf { it.records })
-            assertEquals(0, run(server.port, args + "--resume").exit)
+            manifest.executionComplete.shouldBeFalse()
+            manifest.files.sumOf { it.records } shouldBe 2
+            cli.run(server.port, args + "--resume").exit shouldBe 0
             val resumed = json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json")))
-            assertEquals(3, resumed.files.sumOf { it.records })
-            assertTrue(resumed.executionComplete)
+            resumed.files.sumOf { it.records } shouldBe 3
+            resumed.executionComplete.shouldBeTrue()
         }
     }
 
-    @Test fun `page budget and invalid input have structured nonzero outcomes`() {
+    test("page budget and invalid input have structured nonzero outcomes") {
+        val cli = ContractCli(tempdir().toPath())
         WireFixture().use { server ->
-            assertEquals(8, run(server.port, listOf("xlog", "search", "--max-pages", "1") + window).exit)
-            assertEquals(2, run(server.port, listOf("xlog", "search") + window + listOf("--page-size", "0")).exit)
-            assertEquals(2, run(server.port, listOf("raw", "call")).exit)
+            cli.run(server.port, listOf("xlog", "search", "--max-pages", "1") + window).exit shouldBe 8
+            cli.run(server.port, listOf("xlog", "search") + window + listOf("--page-size", "0")).exit shouldBe 2
+            cli.run(server.port, listOf("raw", "call")).exit shouldBe 2
         }
     }
+})
 
-    private fun run(port: Int, args: List<String>): Outcome {
+private class ContractCli(private val temp: Path) {
+    fun run(port: Int, args: List<String>): Outcome {
         val stderr = Files.createTempFile(temp, "stderr", ".txt")
         val stdout = Files.createTempFile(temp, "stdout", ".jsonl")
         val process = ProcessBuilder(listOf(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
@@ -115,12 +135,9 @@ class CliContractTest {
             return Outcome(process.exitValue(), Files.readString(stdout), Files.readString(stderr))
         } finally { process.destroyForcibly() }
     }
-    private data class Outcome(val exit: Int, val output: String, val stderr: String) {
-        val events = output.lineSequence().filter { it.isNotBlank() }.map { json.parseToJsonElement(it).jsonObject }.toList()
-        fun data() = events.single()["data"]!!.jsonObject
-    }
-    companion object {
-        val window = listOf("--date", "20261101", "--from", "2026-11-01T00:00:00Z", "--to", "2026-11-01T00:01:00Z",
-            "--timezone", "UTC", "--object-hash", "42", "--page-size", "2")
-    }
+}
+
+private data class Outcome(val exit: Int, val output: String, val stderr: String) {
+    val events = output.lineSequence().filter { it.isNotBlank() }.map { json.parseToJsonElement(it).jsonObject }.toList()
+    fun data() = events.single()["data"]!!.jsonObject
 }
