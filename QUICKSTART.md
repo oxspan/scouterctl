@@ -1,4 +1,4 @@
-# scouterctl 0.0.0 — Quick start
+# scouterctl — Quick start
 
 A CLI for querying observability data from a Scouter Collector and exporting it as JSON/JSONL files. This is an initial POC release; commands and output formats may change.
 
@@ -7,11 +7,12 @@ A CLI for querying observability data from a Scouter Collector and exporting it 
 You need JDK 21 and access to a Scouter Collector running **2.21.3**. The Java runtime, Collector, and Agent are not included in the package. Extract the ZIP and start in the directory containing the executable JAR.
 
 ```sh
-java -jar scouterctl-0.0.0-all.jar --version
-java -jar scouterctl-0.0.0-all.jar --help
+SCOUTERCTL_JAR="scouterctl-$(cat version.txt)-all.jar"
+java -jar "$SCOUTERCTL_JAR" --version
+java -jar "$SCOUTERCTL_JAR" --help
 ```
 
-The version output is `scouterctl 0.0.0`. To verify the downloaded ZIP, place it alongside `SHA256SUMS` and run `sha256sum -c SHA256SUMS`.
+The version output matches the included `version.txt`. To verify the downloaded ZIP, place it alongside `SHA256SUMS` and run `sha256sum -c SHA256SUMS`.
 
 ## Connect and find a target
 
@@ -21,8 +22,8 @@ These examples use Bash. Replace `guest` with your Collector account. Supply the
 read -r -s -p 'Collector password: ' SCOUTERCTL_PASSWORD
 export SCOUTERCTL_PASSWORD
 
-java -jar scouterctl-0.0.0-all.jar doctor --user guest
-java -jar scouterctl-0.0.0-all.jar object list --user guest
+java -jar "$SCOUTERCTL_JAR" doctor --user guest
+java -jar "$SCOUTERCTL_JAR" object list --user guest
 ```
 
 The default address is `127.0.0.1:6100`. To connect to another server, add `--host` and `--port` to **each command**. The TCP connection has no built-in TLS; use a trusted network or an SSH/VPN tunnel.
@@ -32,14 +33,14 @@ The default address is `127.0.0.1:6100`. To connect to another server, add `--ho
 Run these commands with the password environment variable set. Replace the example object hash, date, time zone, and transaction ID with values from your environment.
 
 ```sh
-java -jar scouterctl-0.0.0-all.jar xlog search --user guest \
+java -jar "$SCOUTERCTL_JAR" xlog search --user guest \
   --object-hash 42 --date 20261102 --timezone Asia/Seoul \
   --from 2026-11-02T09:00:00+09:00 --to 2026-11-02T09:10:00+09:00
 
-java -jar scouterctl-0.0.0-all.jar profile get --user guest \
+java -jar "$SCOUTERCTL_JAR" profile get --user guest \
   --date 20261102 --txid 9223372036854775806
 
-java -jar scouterctl-0.0.0-all.jar capture --user guest \
+java -jar "$SCOUTERCTL_JAR" capture --user guest \
   --object-hash 42 --date 20261102 --timezone Asia/Seoul \
   --from 2026-11-02T09:00:00+09:00 --to 2026-11-02T09:10:00+09:00 \
   --directory ./incident-001

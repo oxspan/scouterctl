@@ -6,7 +6,10 @@ plugins {
     application
 }
 group = "dev.scouterctl"
-version = "0.0.0"
+version = providers.fileContents(layout.projectDirectory.file("version.txt")).asText.get().trim()
+require(version.toString().matches(Regex("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)"))) {
+    "version.txt must contain a release version (major.minor.patch)"
+}
 repositories { mavenCentral() }
 kotlin { jvmToolchain(21) }
 application { mainClass.set("dev.scouterctl.MainKt") }
@@ -87,7 +90,7 @@ val pocDist = tasks.register<Zip>("pocDist") {
     into("scouterctl-${project.version}") {
         from(tasks.named("fatJar"))
         from("QUICKSTART.md") { rename { "README.md" } }
-        from("CHANGELOG.md")
+        from("CHANGELOG.md", "version.txt")
         from("vendor") {
             include("README.md", "SCOUTER-LICENSE.txt")
             into("vendor")

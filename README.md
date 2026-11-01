@@ -2,7 +2,7 @@
 
 A CLI for querying observability data directly from a Scouter Collector and exporting it as JSON/JSONL. Find monitored applications, inspect transactions and profiles, and save data for a specific time range.
 
-The current version is **0.0.0 POC**. It provides read-only queries and exports. Commands and output formats may change in future versions.
+This project is an **early POC**. See [version.txt](version.txt) for the current source version. It provides read-only queries and exports. Commands and output formats may change in future versions.
 
 ## Features
 
@@ -31,8 +31,9 @@ Set `JAVA_HOME` to JDK 21, then run:
 
 ```sh
 ./gradlew test fatJar
-java -jar build/libs/scouterctl-0.0.0-all.jar --version
-java -jar build/libs/scouterctl-0.0.0-all.jar --help
+SCOUTERCTL_JAR="build/libs/scouterctl-$(cat version.txt)-all.jar"
+java -jar "$SCOUTERCTL_JAR" --version
+java -jar "$SCOUTERCTL_JAR" --help
 ```
 
 The executable JAR includes its required libraries. Run `./gradlew pocRelease` to create a ZIP package and `SHA256SUMS` in `build/distributions/`. If you are starting from the ZIP package, see the [quick start](QUICKSTART.md).
@@ -42,7 +43,7 @@ The executable JAR includes its required libraries. Run `./gradlew pocRelease` t
 The following examples use Bash. Supply the password through the `SCOUTERCTL_PASSWORD` environment variable.
 
 ```sh
-SCOUTERCTL_JAR=build/libs/scouterctl-0.0.0-all.jar
+SCOUTERCTL_JAR="build/libs/scouterctl-$(cat version.txt)-all.jar"
 read -r -s -p 'Collector password: ' SCOUTERCTL_PASSWORD
 export SCOUTERCTL_PASSWORD
 
@@ -118,4 +119,5 @@ unset SCOUTERCTL_PASSWORD
 
 - [Quick start](QUICKSTART.md)
 - [Changelog](CHANGELOG.md)
+- [Development and releases](CONTRIBUTING.md)
 - [Scouter protocol library provenance](vendor/README.md)
