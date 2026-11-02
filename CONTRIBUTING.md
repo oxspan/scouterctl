@@ -59,7 +59,7 @@ Choose one language; each template has headings and guidance only in that langua
 - [English template](.github/PULL_REQUEST_TEMPLATE/english.md)
 - [한국어 양식](.github/PULL_REQUEST_TEMPLATE/korean.md)
 
-On GitHub, select the base and compare branches **before** choosing a language. In the PR description, open **Preview** and click **English** or **한국어** in the default selection guide. These links keep the current branch comparison and load the selected template. Write your description afterward; switching languages reloads the form and can discard draft text. GitHub removes the template parameter when branches change, so select the language again if you change branches.
+On GitHub, select the base and compare branches **before** choosing a language. In the PR description, open **Preview** and click **English** or **한국어** in the default selection guide. These links keep the current branch comparison and load the selected template. Write your description afterward; switching languages reloads the form. If GitHub restores an edited draft instead of the template, open the language link in a new tab. GitHub removes the template parameter when branches change, so select the language again if you change branches.
 
 GitHub loads templates from the default branch (`master`). You can also load the desired local file directly, with `--base` set according to the branch rules above:
 
@@ -72,7 +72,7 @@ gh pr create --base develop --template .github/PULL_REQUEST_TEMPLATE/korean.md
 
 Keep the body concise: explain the problem, resulting behavior, actual validation, and compatibility risks. Report untested items explicitly. Documentation-only changes need documentation checks, not runtime tests. Include only information safe to publish. Templates are guidance, not an automated merge gate.
 
-GitHub에서 먼저 대상(base)·작업(compare) 브랜치를 선택하고, PR 본문의 **Preview** 탭에서 **English** 또는 **한국어**를 클릭해 주세요. 현재 브랜치를 유지한 채 선택한 언어의 양식만 불러옵니다. 본문은 언어 선택 후 작성하세요. 언어를 바꾸면 화면이 다시 열려 작성 중인 내용이 사라질 수 있습니다. 브랜치를 변경하면 GitHub가 언어 선택 값을 지우므로 언어를 다시 선택해 주세요.
+GitHub에서 먼저 대상(base)·작업(compare) 브랜치를 선택하고, PR 본문의 **Preview** 탭에서 **English** 또는 **한국어**를 클릭해 주세요. 현재 브랜치를 유지한 채 선택한 언어의 양식만 불러옵니다. 본문은 언어 선택 후 작성하세요. 언어를 바꾸면 화면이 다시 열립니다. 수정한 초안이 양식 대신 복원되면 언어 링크를 새 탭으로 열어 주세요. 브랜치를 변경하면 GitHub가 언어 선택 값을 지우므로 언어를 다시 선택해 주세요.
 
 웹 양식은 기본 브랜치(`master`)의 파일을 사용합니다. 위 명령으로 로컬 파일을 직접 선택할 수도 있습니다. `--base`는 위 브랜치 규칙에 맞게 지정하세요. 변경 이유·결과·실제 검증·호환성을 간결하게 적고 미검증 항목을 명시해 주세요. 문서만 바뀌었다면 문서 확인 결과만 적으면 됩니다. 공개 가능한 정보만 포함하며, 템플릿 자체가 병합을 자동으로 차단하지는 않습니다.
 
