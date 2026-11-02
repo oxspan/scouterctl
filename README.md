@@ -16,6 +16,7 @@ This project is an **early POC**. See [version.txt](version.txt) for the current
 | `capture --resume` | Resume an interrupted export from its saved checkpoint |
 | `capture --include-profiles` | Save XLogs and profiles in an offline v2 bundle; optionally include dictionary text |
 | `inspect` | Read a captured transaction without Collector access or credentials |
+| `inspect search` | Find slow/error/service requests in a v2 bundle with bounded results and summary counts |
 
 ## Requirements
 
@@ -115,6 +116,31 @@ Profile capture uses `scouterctl.capture/v2`. Each page stores XLogs, profile av
 - Updated pages use content-derived filenames so repairing a missing profile does not overwrite the old checkpoint's page. Unreferenced files left by retries or interruption are ignored and not automatically removed. Writes are not guaranteed durable during power loss.
 - Existing XLog-only captures remain v1. This POC's inspect supports v2 only; it does not migrate or overwrite a v1 capture.
 
+### Find requests in a saved bundle
+
+Search does not require a Collector connection or credentials:
+
+```sh
+# Slowest ten requests lasting at least 300 ms.
+java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles \
+  --min-elapsed-ms 300 --limit 10
+
+# Requests with a nonzero XLog error hash, including those without a profile.
+java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles --errors-only
+
+# Exact captured service name; use the name returned by a text-enabled search.
+java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles \
+  --service-name '/checkout<GET>' --include-text
+```
+
+Use a returned `records[].xlog.txid` with `inspect --txid ...` for SQL/error details. Search returns XLog metadata and profile availability, not full profiles. `--include-text` adds stored service dictionary entries. `--service-hash` works without text; `--service-name` requires both stored text and `--include-text`. Name matching is exact and case-sensitive, with no regex or substring matching. Unknown names cannot match a name filter and are counted in `summary.unknownServiceNames` across the capture. Hashes are not collision-free identities.
+
+Filters combine with AND. Results sort by request elapsed time descending, then end time ascending, then numeric transaction ID ascending. The default `--limit` is 20 (range 1..1000). `--min-elapsed-ms` is an inclusive, nonnegative request-duration threshold; it is not a SQL-duration filter. `--errors-only` uses the XLog error hash, not HTTP status or individual SQL errors.
+
+All referenced pages are validated and scanned even after the result limit is reached. Search holds one page and at most `limit` result records, plus transaction IDs for duplicate detection. The summary counts captured records/errors/missing profiles and matching records/errors, with total and maximum matched request duration. Summary values cover all matches, not only the returned top N. `truncated` indicates that the output limit omitted matches; it does not make a completed capture partial.
+
+An empty match set is a successful result, with zero matched total duration and null matched maximum. Partial paging, unavailable profiles, or a saved `lastFailure` returns data with exit `8`; otherwise search returns `0`. `captureExecutionComplete` describes captured paging, not traffic coverage. Source/query and unknown upstream coverage/sampling are preserved. Concurrent bundle modification is not supported. Search supports v2 only and does not accept `--txid` or `--resume`.
+
 Unset the password environment variable when you finish:
 
 ```sh
@@ -128,7 +154,7 @@ unset SCOUTERCTL_PASSWORD
 - Each query covers one date and one object. The start time is inclusive and the end time is exclusive: `[from,to)`.
 - `--timezone` must match the Collector's actual time zone.
 - `executionComplete` indicates that the requested execution has finished. It does not detect collection gaps or sampling, and does not guarantee coverage of all traffic.
-- The default page size is 1,000 records, with a maximum of 5,000. The default limit is 40 pages per execution.
+- Online XLog queries default to 1,000 records per page, with a maximum of 5,000. The default `--max-pages` is 40. Profile capture uses the smaller page limits described above; offline search uses `--limit` for returned records.
 
 ## Exit codes
 
@@ -148,7 +174,7 @@ unset SCOUTERCTL_PASSWORD
 
 - The Collector TCP connection has no built-in TLS. Use a trusted network or an SSH/VPN tunnel.
 - Profile requests are limited to 1,000 steps. Truncation detection and method-name resolution are not supported yet. Text resolution depends on the Collector's retained dictionaries; hashes are not collision-free identities.
-- Offline inspect currently selects one transaction by ID. Offline search, aggregation, and comparison are not implemented.
+- Offline search supports request filters, top N and summary counts/durations. Grouped aggregation, percentiles, SQL-level ranking and bundle comparison are not implemented.
 - File durability during power loss, load from long-running exports, Windows execution, and Native Image builds have not been validated.
 - Server configuration changes and administrative commands are not available.
 

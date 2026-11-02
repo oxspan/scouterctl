@@ -17,7 +17,7 @@ import java.util.concurrent.Callable
 import kotlin.system.exitProcess
 
 @Command(name = "scouterctl", mixinStandardHelpOptions = true, versionProvider = CliVersion::class,
-    description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect.",
+    description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search.",
         "Password: SCOUTERCTL_PASSWORD environment variable. TCP has no native TLS; use a trusted path."])
 class Cli : Callable<Int> {
     @Parameters(arity = "1..2", paramLabel = "COMMAND") lateinit var words: List<String>
@@ -38,14 +38,30 @@ class Cli : Callable<Int> {
     @Option(names = ["--include-profiles"], description = ["Capture profiles in a v2 offline bundle"]) var includeProfiles: Boolean = false
     @Option(names = ["--include-text"], description = ["Include potentially sensitive dictionary text in profile get, profile capture or inspect"])
     var includeText: Boolean = false
+    @Option(names = ["--limit"], description = ["inspect search: top 1..1000 requests by elapsed time; default 20"]) var limit: Int? = null
+    @Option(names = ["--min-elapsed-ms"], description = ["inspect search: inclusive minimum request duration"]) var minElapsedMs: Int? = null
+    @Option(names = ["--errors-only"], description = ["inspect search: nonzero XLog error hash"]) var errorsOnly: Boolean = false
+    @Option(names = ["--service-hash"], description = ["inspect search: exact service hash"]) var serviceHash: Int? = null
+    @Option(names = ["--service-name"], description = ["inspect search: exact stored name; requires --include-text"]) var serviceName: String? = null
 
     override fun call(): Int {
         try {
             val command = words.joinToString(" ")
-            if (command !in setOf("doctor", "object list", "xlog search", "profile get", "capture", "inspect")) invalid("Unknown command")
+            if (command !in setOf("doctor", "object list", "xlog search", "profile get", "capture", "inspect", "inspect search")) invalid("Unknown command")
+            if (command != "inspect search" && (limit != null || minElapsedMs != null || errorsOnly || serviceHash != null || serviceName != null)) {
+                invalid("Search filters require inspect search")
+            }
             if (includeProfiles && command != "capture") invalid("--include-profiles requires capture")
-            if (includeText && command !in setOf("profile get", "inspect") && !(command == "capture" && includeProfiles)) {
+            if (includeText && command !in setOf("profile get", "inspect", "inspect search") && !(command == "capture" && includeProfiles)) {
                 invalid("--include-text requires profile get, inspect or capture --include-profiles")
+            }
+            if (command == "inspect search") {
+                if (resume || txid != null) invalid("inspect search does not accept --resume or --txid")
+                val search = searchCapture(required(directory, "--directory"),
+                    EvidenceFilter(limit ?: 20, minElapsedMs ?: 0, errorsOnly, serviceHash, serviceName), includeText)
+                val complete = search.captureExecutionComplete && search.summary.unavailableProfiles == 0 && search.lastFailure == null
+                result(json.encodeToJsonElement(search), complete)
+                return if (complete) 0 else 8
             }
             if (command == "inspect") {
                 if (resume) invalid("--resume requires capture")

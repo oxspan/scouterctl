@@ -58,10 +58,15 @@ internal class EvidenceStore(private val directory: Path) {
         return records
     }
 
-    fun validate(manifest: EvidenceManifest) {
+    fun validate(manifest: EvidenceManifest) = forEachRecord(manifest) { }
+
+    fun forEachRecord(manifest: EvidenceManifest, consume: (EvidenceRecord) -> Unit) {
         val ids = mutableSetOf<String>()
         manifest.pages.indices.forEach { index ->
-            readPage(manifest, index).forEach { if (!ids.add(it.xlog.txid)) damaged() }
+            readPage(manifest, index).forEach {
+                if (!ids.add(it.xlog.txid)) damaged()
+                consume(it)
+            }
         }
     }
 

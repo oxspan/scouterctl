@@ -27,10 +27,9 @@ class SpringProfileTextCheck(private val cli: AgentCli, private val date: String
         }
         val sql = profile.steps.mapNotNull { it.sql }
         when (route) {
-            "/poc/sql", "/poc/app-error", "/poc/sql-error" -> {
+            "/poc/sql", "/poc/app-error", "/poc/sql-error", "/poc/slow-sql" -> {
                 val statement = sql.single()
-                val expected = if (route == "/poc/sql-error") "insert into fixture_rows(id, marker) values (?, ?)"
-                    else "select marker from fixture_rows where id = ?"
+                val expected = expectedSpringSql(route)
                 check(statement.statement == DictionaryText(statement.hash, expected))
                 if (route == "/poc/sql-error") check(statement.error == transaction.error)
                 else check(statement.error == null)
@@ -41,4 +40,10 @@ class SpringProfileTextCheck(private val cli: AgentCli, private val date: String
         check(!output.contains("\"param\"") && !output.contains("\"message\""))
         if (route == "/poc/sql") check(!output.contains("private-bind-marker"))
     }
+}
+
+internal fun expectedSpringSql(route: String): String = when (route) {
+    "/poc/sql-error" -> "insert into fixture_rows(id, marker) values (?, ?)"
+    "/poc/slow-sql" -> "call fixture_delay(?)"
+    else -> "select marker from fixture_rows where id = ?"
 }

@@ -64,6 +64,20 @@ java -jar "$SCOUTERCTL_JAR" inspect --directory ./incident-profiles \
 
 Replace the directory with the v2 bundle you created. Omit `--include-text` to exclude stored text from the output. Requesting text that was not stored returns `2`. Inspect verifies all referenced pages and returns `8` with data for partial captures or unavailable profiles. A missing transaction returns `7`; damaged files return `10`. It supports v2 only, with no implicit v1 migration.
 
+To find a transaction ID first, search the same bundle offline:
+
+```sh
+java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles \
+  --min-elapsed-ms 300 --limit 10
+java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles --errors-only
+java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles \
+  --service-name '/checkout<GET>' --include-text
+```
+
+Results contain `records[].xlog.txid`; pass one to `inspect --txid` for details. All filters combine with AND. Service names match exactly and require stored text plus `--include-text`; use `--service-hash` without text. Unknown names are counted separately and do not match name filters. Results sort by request duration descending, end time ascending, then numeric txid ascending. `--errors-only` means a nonzero XLog error hash, not HTTP status or SQL error classification.
+
+Search defaults to 20 results (limit 1..1000), scans and validates every referenced page, and summarizes all matches rather than only the displayed top N. `truncated` means the result limit omitted matches. Empty matches return an empty result. Partial captures, missing profiles or a saved failure return `8` with data; otherwise search returns `0`. No Collector account or connection is needed. Grouped aggregation and bundle comparison are not supported.
+
 Unset the password environment variable when you finish:
 
 ```sh
