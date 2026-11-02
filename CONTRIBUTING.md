@@ -52,11 +52,15 @@ For squash merges, use a Conventional Commit PR title with the Gitmoji **after**
 
 For promotion and synchronization PRs, use descriptive titles such as `chore: 🔀 Promote develop to master` and preserve the underlying commits with a merge commit. Keep automated release-please and Dependabot messages in their generated format. Do not rewrite published history solely to add Gitmoji.
 
-## Pull request descriptions
+## Pull request descriptions / PR 본문 작성
 
-Use the [PR template](.github/pull_request_template.md) to explain the problem, resulting behavior, actual validation, and compatibility risks. Keep small changes brief; documentation-only changes do not need runtime tests. Report checks that were not run explicitly. Include only information safe to publish.
+Use the bilingual [PR template](.github/pull_request_template.md). Write the body in English or Korean; translating it into both languages is not required. Explain the problem, resulting behavior, actual validation, and compatibility risks. Keep small changes brief; documentation-only changes do not need runtime tests. Report checks that were not run explicitly. Include only information safe to publish.
 
 GitHub automatically inserts the template once it is present on the default branch (`master`). Before that, copy it into the PR body or load it with `gh pr create --template .github/pull_request_template.md --base develop` for a feature PR. Follow the branch targets and title conventions above. This template is guidance, not an automated merge gate.
+
+[PR 템플릿](.github/pull_request_template.md)의 영어·한국어 안내를 참고해 본문은 편한 언어 하나로 작성해 주세요. 두 언어로 중복 작성할 필요는 없습니다. 변경 이유·결과·실제 검증·호환성에 필요한 내용을 간결하게 적고, 미검증 항목을 명시해 주세요. 문서만 바뀌었다면 실행 테스트 대신 문서 확인 결과를 적으면 됩니다. 공개 가능한 정보만 포함해 주세요.
+
+템플릿 자동 삽입은 기본 브랜치(`master`)에 반영된 뒤 적용됩니다. 그전에는 본문에 복사하거나 feature PR에서 `gh pr create --template .github/pull_request_template.md --base develop`로 불러오세요. 위의 브랜치·제목 규칙을 따르며, 템플릿 자체가 병합을 자동으로 차단하지는 않습니다.
 
 ## Release process
 
