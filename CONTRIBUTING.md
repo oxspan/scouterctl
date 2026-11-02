@@ -34,14 +34,23 @@ A separate `release/*` branch is unnecessary while promotion to `master` is foll
 
 ## Commit messages
 
-Use a Conventional Commit PR title for squash merges:
+Use one Unicode Gitmoji that matches the primary intent of each authored commit. Keep subjects concise and in English:
+
+- `✨ Add offline profile inspection`
+- `🐛 (capture): Preserve checkpoints on connection failure`
+- `♻️ Extract profile lookup orchestration`
+- `✅ Cover missing profile retries`
+- `📝 Document offline inspection`
+- `👷 Update package verification workflow`
+
+For squash merges, use a Conventional Commit PR title with the Gitmoji **after** the type prefix, such as `feat: ✨ Add offline profile inspection` or `fix(capture): 🐛 Preserve checkpoints on connection failure`. Use that title as the squash commit subject so release-please can still determine the version bump:
 
 - `fix: ...` for a patch release.
 - `feat: ...` for a minor release.
 - `feat!: ...` (or another type with `!`) for a breaking change. Before 1.0, breaking changes bump the minor version.
 - `test: ...`, `docs: ...`, `ci: ...`, and `chore: ...` do not trigger a release on their own.
 
-For promotion and synchronization PRs, use descriptive titles such as `chore: promote develop to master` and preserve the underlying commits with a merge commit.
+For promotion and synchronization PRs, use descriptive titles such as `chore: 🔀 Promote develop to master` and preserve the underlying commits with a merge commit. Keep automated release-please and Dependabot messages in their generated format. Do not rewrite published history solely to add Gitmoji.
 
 ## Release process
 
