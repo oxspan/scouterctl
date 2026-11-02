@@ -52,6 +52,12 @@ For squash merges, use a Conventional Commit PR title with the Gitmoji **after**
 
 For promotion and synchronization PRs, use descriptive titles such as `chore: 🔀 Promote develop to master` and preserve the underlying commits with a merge commit. Keep automated release-please and Dependabot messages in their generated format. Do not rewrite published history solely to add Gitmoji.
 
+## Pull request descriptions
+
+Use the [PR template](.github/pull_request_template.md) to explain the problem, resulting behavior, actual validation, and compatibility risks. Keep small changes brief; documentation-only changes do not need runtime tests. Report checks that were not run explicitly. Include only information safe to publish.
+
+GitHub automatically inserts the template once it is present on the default branch (`master`). Before that, copy it into the PR body or load it with `gh pr create --template .github/pull_request_template.md --base develop` for a feature PR. Follow the branch targets and title conventions above. This template is guidance, not an automated merge gate.
+
 ## Release process
 
 `version.txt` is the source of the build version. Gradle uses it for CLI output, artifact names, and packaged metadata. README examples read it rather than duplicating a version number.
