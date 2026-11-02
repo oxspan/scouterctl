@@ -20,6 +20,9 @@ class FixtureController(private val jdbc: JdbcTemplate) {
     @GetMapping("/poc/sql")
     fun sql(): String = jdbc.queryForObject("select marker from fixture_rows where id = ?", String::class.java, 1)!!
 
+    @GetMapping("/poc/slow-sql")
+    fun slowSql(): Int = jdbc.queryForObject("call fixture_delay(?)", Int::class.java, 350L)!!
+
     @GetMapping("/poc/app-error")
     fun applicationError(): String {
         sql()
@@ -33,6 +36,13 @@ class FixtureController(private val jdbc: JdbcTemplate) {
     }
 }
 
+object SlowQuery {
+    @JvmStatic fun delay(milliseconds: Long): Int {
+        Thread.sleep(milliseconds)
+        return 1
+    }
+}
+
 fun main(args: Array<String>) {
     val context = SpringApplication.run(SpringService::class.java,
         "--server.address=127.0.0.1", "--server.port=0", "--spring.main.banner-mode=off",
@@ -40,6 +50,7 @@ fun main(args: Array<String>) {
         "--spring.datasource.username=sa", "--spring.datasource.password=",
         "--server.error.include-message=never", "--server.error.include-stacktrace=never")
     val jdbc = context.getBean(JdbcTemplate::class.java)
+    jdbc.execute("create alias fixture_delay for 'dev.scouterctl.springfixture.SlowQuery.delay'")
     jdbc.execute("create table fixture_rows(id integer primary key, marker varchar(100))")
     jdbc.update("insert into fixture_rows(id, marker) values (?, ?)", 1, "private-bind-marker")
     val port = (context as ServletWebServerApplicationContext).webServer.port

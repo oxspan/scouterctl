@@ -16,9 +16,9 @@ internal class SpringOfflineCheck(private val work: Path) {
     fun verify() {
         val store = EvidenceStore(directory)
         val manifest = store.load()
-        check(manifest.complete && manifest.pages.sumOf { it.records } == 18)
+        check(manifest.complete && manifest.pages.sumOf { it.records } == 21)
         val rows = manifest.pages.flatMapIndexed { index, _ -> store.readPage(manifest, index) }
-        check(rows.map { it.xlog.txid }.toSet().size == 18)
+        check(rows.map { it.xlog.txid }.toSet().size == 21)
         rows.forEach { saved ->
             val txid = saved.xlog.txid
             val expected = json.parseToJsonElement(Files.readString(work.resolve("text-profile-$txid.jsonl"))).jsonObject["data"]!!
@@ -33,10 +33,11 @@ internal class SpringOfflineCheck(private val work: Path) {
             check(!structural.output.contains("private-bind-marker") && !structural.output.contains("private-application-error-marker"))
         }
         Files.writeString(work.resolve("offline-summary.json"), buildJsonObject {
-            put("inspectedTransactions", 18); put("textInspections", 18); put("structuralInspections", 18)
+            put("inspectedTransactions", 21); put("textInspections", 21); put("structuralInspections", 21)
             put("collectorStoppedBeforeInspect", true); put("credentialsProvided", false)
             put("resumedCapture", true); put("matchesOnlineProfiles", true)
         }.toString())
-        println("PASS: 18 captured profiles match online data after Collector shutdown; 36 offline inspections without credentials")
+        SpringSearchCheck(work, directory).verify()
+        println("PASS: 21 captured profiles match online data after Collector shutdown; 42 offline inspections without credentials")
     }
 }
