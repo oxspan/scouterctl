@@ -17,6 +17,7 @@ This project is an **early POC**. See [version.txt](version.txt) for the current
 | `capture --include-profiles` | Save XLogs and profiles in an offline v2 bundle; optionally include dictionary text |
 | `inspect` | Read a captured transaction without Collector access or credentials |
 | `inspect search` | Find slow/error/service requests in a v2 bundle with bounded results and summary counts |
+| `inspect summary` | Group captured requests by service with error and latency metrics and representative IDs |
 
 ## Requirements
 
@@ -155,6 +156,26 @@ Unset the password environment variable when you finish:
 unset SCOUTERCTL_PASSWORD
 ```
 
+## Service summaries from a saved capture
+
+```sh
+java -jar "$SCOUTERCTL_JAR" inspect summary --directory ./capture --include-text
+java -jar "$SCOUTERCTL_JAR" inspect summary --directory ./capture --sort elapsed --limit 10
+java -jar "$SCOUTERCTL_JAR" inspect summary --directory ./capture --sort requests
+# Use services[].slowest.txid or services[].slowestError.txid with the existing detail command:
+java -jar "$SCOUTERCTL_JAR" inspect --directory ./capture --txid '<TXID>' --include-text
+```
+
+`inspect summary` scans a v2 capture offline and groups by XLog `serviceHash` within the capture's source/object/time window. Each service includes `requests`, `errors`, `errorRate` (a fraction from 0 to 1), `elapsedTotalMs`, `averageElapsedMs`, `maxElapsedMs`, missing-profile/name counts and representative requests. Errors mean nonzero XLog error hashes, not HTTP status codes. Durations describe entire requests, not SQL durations. Every captured XLog counts, including separate Servlet error dispatches; these counts are not necessarily the number of incoming HTTP requests.
+
+`--sort errors` (default) orders by error count, then maximum duration, descending. `--sort elapsed` orders by maximum duration, then error count, descending. `--sort requests` orders by request count, then error count, descending. Ties use ascending numeric service hash. `--limit` returns the first 1..1000 services (default 20); global counts and per-service statistics still cover **all captured records**, not only the displayed services. No search filters are accepted, so the denominator cannot silently change. `truncated` describes the display limit, not missing capture data.
+
+`slowest` is the longest captured request, and `slowestError` is the longest errored request (null when there are no errors). Ties use ascending end time and numeric transaction ID. IDs remain strings. Each representative includes its profile availability; an unavailable profile still contributes its XLog metrics but may not supply SQL/error details. Service names require stored text and `--include-text`; hashes work without text. Conflicting stored names for one hash produce `nameConflict: true` and a null name. Hash collisions cannot be reliably disambiguated by this POC.
+
+The result explicitly says `basis: "captured-xlogs"` and preserves source, query, `upstreamCoverage`, `sampling`, capture completion and last failure. Unknown coverage/sampling remains unknown. These are **sample/capture statistics**, not whole-traffic rates or proof of capture completeness. An empty complete capture succeeds with no service rows. Incomplete paging, any missing profiles or a saved failure returns data with exit `8`. Invalid options return `2`; corrupt/duplicate records or negative durations return `10`. All pages are validated even when the display limit is reached.
+
+The scan retains one page, duplicate-detection IDs and one accumulator per service. At more than 10,000 distinct services it returns a structured error with exit `8` and **no partial aggregate**; use a smaller capture. Concurrent bundle modification is unsupported. Percentiles, SQL-level ranking and comparisons across captures are outside this POC.
+
 ## Saved connections and terminal input
 
 ```sh
@@ -202,7 +223,7 @@ For CI, use explicit endpoint flags or an isolated `SCOUTERCTL_CONFIG`, set the 
 
 - The Collector TCP connection has no built-in TLS. Use a trusted network or an SSH/VPN tunnel.
 - Profile requests are limited to 1,000 steps. Truncation detection and method-name resolution are not supported yet. Text resolution depends on the Collector's retained dictionaries; hashes are not collision-free identities.
-- Offline search supports request filters, top N and summary counts/durations. Grouped aggregation, percentiles, SQL-level ranking and bundle comparison are not implemented.
+- Offline search supports request filters, top N and summary counts/durations. Service summaries group captured XLogs by service hash. Percentiles, SQL-level ranking and bundle comparison are not implemented.
 - File durability during power loss, load from long-running exports, Windows execution, and Native Image builds have not been validated.
 - Server configuration changes and administrative commands are not available.
 
