@@ -30,6 +30,11 @@ fun verifyInitialConnection(work: Path, endpoint: Endpoint, password: String) {
     val empty = cli.run(listOf("object", "list") + flags, password)
     check(empty.events.single()["data"]!!.jsonArray.isEmpty()) { "Fresh Collector should have no Agent yet" }
     record("no-targets", empty, 0)
+    record("context-add", cli.run(listOf("context", "add", "--name", "spring") + flags, null), 0)
+    record("context-use", cli.run(listOf("context", "use", "--name", "spring"), null), 0)
+    record("context-login", cli.run(listOf("auth", "login", "--no-input"), password), 0)
+    record("context-objects", cli.run(listOf("object", "list", "--context", "spring"), password), 0)
+    check(!Files.readString(work.resolve("config.json")).contains(password))
     Files.writeString(work.resolve("connection-checks.json"), json.encodeToString(checks))
 
     val stdout = work.resolve("quickstart-shell.jsonl")
@@ -62,5 +67,5 @@ fun verifyInitialConnection(work: Path, endpoint: Endpoint, password: String) {
         check(events.first()["data"]!!.jsonObject["serverId"]!!.jsonPrimitive.content == "scouterctl-spring-smoke")
         check(events.last()["data"]!!.jsonArray.isEmpty())
     } finally { process.destroyForcibly() }
-    println("PASS: 8 initial connection cases and Bash quick start before Agent discovery")
+    println("PASS: 12 initial/saved connection cases and Bash quick start before Agent discovery")
 }

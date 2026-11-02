@@ -30,7 +30,7 @@ Runtime validation has been performed on Linux/WSL. Other Collector versions are
 
 ### Use a release package
 
-Download the ZIP and `SHA256SUMS` from the same [GitHub Release](https://github.com/oxspan/scouterctl/releases). Follow the [quick start](QUICKSTART.md) to verify/extract it, set the Collector TCP endpoint once, enter the password with hidden Bash input, and run `doctor` followed by `object list`. The packaged README contains the same instructions.
+Download the ZIP and `SHA256SUMS` from the same [GitHub Release](https://github.com/oxspan/scouterctl/releases). Follow the [quick start](QUICKSTART.md) to verify/extract it, set the Collector TCP endpoint once, use saved contexts or hidden Bash password input, and run `doctor` followed by `object list`. The packaged README contains the same instructions.
 
 `doctor` checks login and the supported version; a successful login does not imply that an Agent is connected. An empty object list is a successful result. The quick start includes recovery steps for missing input, DNS/TCP failures, rejected credentials, unsupported versions, and missing targets.
 
@@ -49,7 +49,7 @@ The executable JAR includes its required libraries. Run `./gradlew pocRelease` t
 
 ### Connect and find a target
 
-The following examples use Bash. Set the Collector TCP host, port, and account once; supply the password through `SCOUTERCTL_PASSWORD`. No connection settings or credentials are saved by the CLI.
+The following examples use Bash. Set the Collector TCP host, port, and account once; supply the password through `SCOUTERCTL_PASSWORD`. These explicit flags work without a saved context. Passwords and sessions are never saved by the CLI.
 
 ```sh
 SCOUTERCTL_JAR="build/libs/scouterctl-$(cat version.txt)-all.jar"
@@ -154,6 +154,26 @@ Unset the password environment variable when you finish:
 ```sh
 unset SCOUTERCTL_PASSWORD
 ```
+
+## Saved connections and terminal input
+
+```sh
+java -jar "$SCOUTERCTL_JAR" context add --name local --host 127.0.0.1 --port 6100 --user observer
+java -jar "$SCOUTERCTL_JAR" context list
+java -jar "$SCOUTERCTL_JAR" context use --name local
+java -jar "$SCOUTERCTL_JAR" auth login
+java -jar "$SCOUTERCTL_JAR" object list --interactive
+```
+
+`context add` saves the supplied host, port and account without connecting or selecting it. Names are unique; existing entries are not overwritten. `context use` selects an existing entry for subsequent commands. These local commands require explicit arguments and never prompt. `auth login` checks the selected Collector and credentials, then disconnects; it does **not** save a password or session. Each subsequent command needs `SCOUTERCTL_PASSWORD` or its own `--interactive` input.
+
+Selection order is `--context NAME`, then the saved current context. Explicit `--host`, `--port` and `--user` override individual saved values; absent values fall back to `127.0.0.1:6100`, with a user required. Supplying all three endpoint flags without `--context` bypasses the config entirely. A misspelled context or malformed config fails rather than silently connecting elsewhere. Offline `inspect` does not read this config.
+
+The file is `$XDG_CONFIG_HOME/scouterctl/config.json` (or `$HOME/.config/scouterctl/config.json`). Set `SCOUTERCTL_CONFIG` to use a different file. It contains a versioned JSON list of connection settings and the current selection; no passwords, password hashes or sessions. Writes use a lock and atomic replacement; a busy file returns exit `10`. New config files use owner-only permissions on POSIX filesystems. Back up the file before manual editing; removing an entry also requires clearing `current` if it selected that entry.
+
+Existing commands remain noninteractive by default. `auth login` and `--interactive` allow hidden input only when Java has a real console; `--no-input` always disables it. `SCOUTERCTL_PASSWORD` takes precedence and is never echoed. Redirected input/output cannot trigger a prompt or supply the password through stdin: missing input returns one JSON error with exit `2`. Prompts go to stderr, results remain JSON on stdout. Empty input or terminal EOF cancels with exit `2`; Ctrl+C terminates without saving credentials. There is no automatic retry or credential cache.
+
+For CI, use explicit endpoint flags or an isolated `SCOUTERCTL_CONFIG`, set the password through your secret mechanism, and pass `--no-input`. Contexts are local preferences, not an access-control boundary. TCP still has no native TLS.
 
 ## Output and query scope
 

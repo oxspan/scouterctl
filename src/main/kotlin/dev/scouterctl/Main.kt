@@ -6,6 +6,9 @@ import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
+import picocli.CommandLine.Mixin
+import picocli.CommandLine.Spec
+import picocli.CommandLine.Model.CommandSpec
 import java.io.IOException
 import java.net.SocketException
 import java.net.SocketTimeoutException
@@ -19,13 +22,14 @@ import kotlin.system.exitProcess
 @Command(name = "scouterctl", mixinStandardHelpOptions = true, versionProvider = CliVersion::class,
     description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search.",
         "Connect: doctor --host HOST --port PORT --user ACCOUNT, then object list with the same options.",
-        "Password: SCOUTERCTL_PASSWORD environment variable. TCP has no native TLS; use a trusted path."])
+        "Save/select connections: context add/list/use --name NAME. Check credentials: auth login.",
+        "Password: SCOUTERCTL_PASSWORD, or --interactive for hidden terminal input. Passwords are never saved.",
+        "TCP has no native TLS; use a trusted path."])
 class Cli : Callable<Int> {
     @Parameters(arity = "1..2", paramLabel = "COMMAND") lateinit var words: List<String>
-    @Option(names = ["--host"], defaultValue = "127.0.0.1") lateinit var host: String
-    @Option(names = ["--port"], defaultValue = "6100") var port: Int = 6100
-    @Option(names = ["--user"], description = ["Collector account; required except for offline inspect"]) var user: String? = null
-    @Option(names = ["--timeout-ms"], defaultValue = "5000") var timeoutMs: Int = 5000
+    @Mixin val connection = ConnectionOptions()
+    @Spec lateinit var spec: CommandSpec
+    @Option(names = ["--name"], description = ["Name for context add/use"]) var name: String? = null
     @Option(names = ["--date"]) var date: String? = null
     @Option(names = ["--from"]) var from: String? = null
     @Option(names = ["--to"]) var to: String? = null
@@ -48,7 +52,13 @@ class Cli : Callable<Int> {
     override fun call(): Int {
         try {
             val command = words.joinToString(" ")
-            if (command !in setOf("doctor", "object list", "xlog search", "profile get", "capture", "inspect", "inspect search")) invalid("Unknown command")
+            if (command in setOf("context add", "context list", "context use")) {
+                contextCommand(command)
+                return 0
+            }
+            if (name != null) invalid("--name requires context add/use")
+            if (command !in setOf("doctor", "auth login", "object list", "xlog search", "profile get", "capture", "inspect", "inspect search")) invalid("Unknown command")
+            if (command == "auth login") allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input"))
             if (command != "inspect search" && (limit != null || minElapsedMs != null || errorsOnly || serviceHash != null || serviceName != null)) {
                 invalid("Search filters require inspect search")
             }
@@ -80,24 +90,23 @@ class Cli : Callable<Int> {
             }
             if (command == "capture") required(directory, "--directory")
             if (includeProfiles && required(query, "query").pageSize > 100) invalid("Profile capture page-size must be 1..100")
-            val endpoint = Endpoint(host, port, required(user, "--user"), timeoutMs)
-            val password = System.getenv("SCOUTERCTL_PASSWORD")
-                ?: invalid("Set SCOUTERCTL_PASSWORD to your Collector password; see the quick start for hidden input")
+            val endpoint = connection.endpoint()
+            val password = connection.password(command == "auth login")
             CollectorSource.connect(endpoint, password).use { source ->
                 when (command) {
-                    "doctor" -> result(json.encodeToJsonElement(source.info))
+                    "doctor", "auth login" -> result(json.encodeToJsonElement(source.info))
                     "object list" -> result(json.encodeToJsonElement(source.objects()))
                     "profile get" -> result(json.encodeToJsonElement(source.profile(required(date, "--date"), required(txid, "--txid"), includeText)))
                     "xlog search" -> return stream(source, required(query, "query"))
                     "capture" -> {
                         if (includeProfiles) {
                             val manifest = captureEvidence(source, required(query, "query"),
-                                CaptureRequest(required(directory, "--directory"), resume, maxPages, "$host:$port", includeText))
+                                CaptureRequest(required(directory, "--directory"), resume, maxPages, "${endpoint.host}:${endpoint.port}", includeText))
                             result(json.encodeToJsonElement(manifest), manifest.complete)
                             return if (manifest.complete) 0 else 8
                         }
                         val manifest = capture(source, required(query, "query"),
-                            CaptureRequest(required(directory, "--directory"), resume, maxPages, "$host:$port"))
+                            CaptureRequest(required(directory, "--directory"), resume, maxPages, "${endpoint.host}:${endpoint.port}"))
                         result(json.encodeToJsonElement(manifest), manifest.executionComplete)
                         return if (manifest.executionComplete) 0 else 8
                     }
@@ -120,6 +129,29 @@ class Cli : Callable<Int> {
             return failure(CliFailure(ErrorCode.INVALID_ARGUMENT, "Invalid date or timestamp"))
         } catch (_: Exception) {
             return failure(CliFailure(ErrorCode.PROTOCOL_ERROR, "Response could not be decoded"))
+        }
+    }
+
+    private fun contextCommand(command: String) {
+        val allowed = when (command) {
+            "context add" -> setOf("--name", "--host", "--port", "--user", "--no-input")
+            "context use" -> setOf("--name", "--no-input")
+            else -> setOf("--no-input")
+        }
+        allowedOptions(allowed)
+        val store = ContextStore()
+        val config = when (command) {
+            "context add" -> store.add(required(name, "--name"), SavedConnection(
+                connection.host ?: "127.0.0.1", connection.port ?: 6100, required(connection.user, "--user")))
+            "context use" -> store.use(required(name, "--name"))
+            else -> store.read()
+        }
+        result(json.encodeToJsonElement(config))
+    }
+
+    private fun allowedOptions(allowed: Set<String>) {
+        if (spec.commandLine().parseResult.matchedOptions().any { it.longestName() !in allowed }) {
+            invalid("Option is not supported by this command; use --help")
         }
     }
 

@@ -40,7 +40,7 @@ export SCOUTERCTL_PASSWORD
 
 `doctor` returning `ok: true` and exit `0` confirms login and the supported Collector version. It does not confirm that an Agent is connected. `object list` returns `data[]`; choose the expected application with `alive: true` and copy its `objHash` for queries. An empty `data: []` with exit `0` is valid: confirm the Agent points to this Collector and is running, then repeat discovery.
 
-The CLI does not prompt or save credentials/connection settings. Missing input returns JSON and exit `2`, including when stdin is redirected. The hidden password prompt above belongs to Bash. The TCP connection has no built-in TLS; use a trusted network or an SSH/VPN tunnel.
+This explicit-flag flow needs no saved settings. Missing password input returns JSON and exit `2`, including when stdin is redirected. The hidden password prompt above belongs to Bash. The optional saved-context flow below uses the CLI terminal prompt. The TCP connection has no built-in TLS; use a trusted network or an SSH/VPN tunnel.
 
 ### If connection or discovery fails
 
@@ -53,6 +53,26 @@ The CLI does not prompt or save credentials/connection settings. Missing input r
 | Exit `0`, empty object list | Login worked, but no targets were reported. Check the Agent's Collector address and startup logs. |
 
 Messages suggest a next check, not a definitive network diagnosis. A timeout can occur after a connection was established. After correcting input or configuration, rerun `doctor`, then `object list`.
+
+## Saved connections and terminal input
+
+```sh
+java -jar "$SCOUTERCTL_JAR" context add --name local --host 127.0.0.1 --port 6100 --user observer
+java -jar "$SCOUTERCTL_JAR" context list
+java -jar "$SCOUTERCTL_JAR" context use --name local
+java -jar "$SCOUTERCTL_JAR" auth login
+java -jar "$SCOUTERCTL_JAR" object list --interactive
+```
+
+`context add` saves the supplied host, port and account without connecting or selecting it. Names are unique; existing entries are not overwritten. `context use` selects an existing entry for subsequent commands. These local commands require explicit arguments and never prompt. `auth login` checks the selected Collector and credentials, then disconnects; it does **not** save a password or session. Each subsequent command needs `SCOUTERCTL_PASSWORD` or its own `--interactive` input.
+
+Selection order is `--context NAME`, then the saved current context. Explicit `--host`, `--port` and `--user` override individual saved values; absent values fall back to `127.0.0.1:6100`, with a user required. Supplying all three endpoint flags without `--context` bypasses the config entirely. A misspelled context or malformed config fails rather than silently connecting elsewhere. Offline `inspect` does not read this config.
+
+The file is `$XDG_CONFIG_HOME/scouterctl/config.json` (or `$HOME/.config/scouterctl/config.json`). Set `SCOUTERCTL_CONFIG` to use a different file. It contains a versioned JSON list of connection settings and the current selection; no passwords, password hashes or sessions. Writes use a lock and atomic replacement; a busy file returns exit `10`. New config files use owner-only permissions on POSIX filesystems. Back up the file before manual editing; removing an entry also requires clearing `current` if it selected that entry.
+
+Existing commands remain noninteractive by default. `auth login` and `--interactive` allow hidden input only when Java has a real console; `--no-input` always disables it. `SCOUTERCTL_PASSWORD` takes precedence and is never echoed. Redirected input/output cannot trigger a prompt or supply the password through stdin: missing input returns one JSON error with exit `2`. Prompts go to stderr, results remain JSON on stdout. Empty input or terminal EOF cancels with exit `2`; Ctrl+C terminates without saving credentials. There is no automatic retry or credential cache.
+
+For CI, use explicit endpoint flags or an isolated `SCOUTERCTL_CONFIG`, set the password through your secret mechanism, and pass `--no-input`. Contexts are local preferences, not an access-control boundary. TCP still has no native TLS.
 
 ## Query and export
 
