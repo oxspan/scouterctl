@@ -16,13 +16,19 @@ import java.net.SocketException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-enum class Fault { NONE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT }
+enum class Fault {
+    NONE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT,
+    STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
+    TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
+    PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT,
+}
 
 class WireFixture(private val fault: Fault = Fault.NONE) : AutoCloseable {
     private val server = ServerSocket(0, 8, InetAddress.getLoopbackAddress())
     val port: Int = server.localPort
     private val executor = Executors.newSingleThreadExecutor()
     private var disconnected = false
+    private var profileMissed = false
     private val future = executor.submit {
         while (!server.isClosed) {
             val socket = try { server.accept() } catch (_: SocketException) { break }
@@ -74,9 +80,17 @@ class WireFixture(private val fault: Fault = Fault.NONE) : AutoCloseable {
                                 })
                             }
                             RequestCmd.TRANX_PROFILE -> {
-                                input.readMapPack()
-                                send(output, XLogProfilePack().apply {
-                                    profile = Step.toBytes(arrayOf(
+                                val request = input.readMapPack()
+                                if (fault == Fault.PROFILE_DISCONNECT && request.getLong("txid") == ids.last() && !disconnected) {
+                                    disconnected = true
+                                    break
+                                }
+                                val missing = request.getLong("txid") == ids[1] &&
+                                    (fault == Fault.PROFILE_MISSING || (fault == Fault.PROFILE_MISSING_ONCE && !profileMissed))
+                                if (missing) profileMissed = true else send(output, XLogProfilePack().apply {
+                                    profile = if (fault == Fault.MANY_SQL) Step.toBytes(Array(101) { number ->
+                                        SqlStep3().apply { index = number; hash = number }
+                                    }) else Step.toBytes(arrayOf(
                                         MessageStep().apply { index = 1; message = "password=secret-token" },
                                         SqlStep3().apply {
                                             index = 2; hash = 123; elapsed = 7; error = 0; updated = 1
@@ -87,6 +101,48 @@ class WireFixture(private val fault: Fault = Fault.NONE) : AutoCloseable {
                                             param = "password=secret-token"
                                         }))
                                 })
+                            }
+                            RequestCmd.XLOG_READ_BY_TXID -> {
+                                check(fault != Fault.STRUCTURAL_ONLY) { "Default profile must not fetch text context" }
+                                val request = input.readMapPack()
+                                check(request.getText("date") == "20261101")
+                                if (fault != Fault.XLOG_MISSING) send(output, XLogPack().apply {
+                                    txid = if (fault == Fault.XLOG_WRONG_ID) 99L else request.getLong("txid")
+                                    service = 10; error = -789
+                                })
+                            }
+                            RequestCmd.GET_TEXT_PACK -> {
+                                check(fault != Fault.STRUCTURAL_ONLY) { "Default profile must not query dictionaries" }
+                                val request = input.readMapPack()
+                                check(request.getText("date") == "20261101")
+                                val type = request.getText("type")
+                                val hashes = request.getList("hash")
+                                check(hashes.size() in 1..100)
+                                if (fault == Fault.TEXT_DISCONNECT) break
+                                if (fault == Fault.TEXT_SESSION) {
+                                    output.writeByte(TcpFlag.INVALID_SESSION.toInt()); output.flush(); break
+                                }
+                                if (fault == Fault.TEXT_PACK) send(output, MapPack()) else {
+                                    for (i in 0 until hashes.size()) {
+                                        val hash = hashes.getInt(i)
+                                        val value = when (type) {
+                                            "sql" -> if (fault == Fault.MANY_SQL) "statement $hash" else when (hash) {
+                                                123 -> "select marker from fixture where id = ?"
+                                                456 -> "insert into fixture(id) values (?)"
+                                                else -> error("Unexpected SQL hash")
+                                            }
+                                            "error" -> { check(hash == -789); "fixture duplicate key error" }
+                                            "service" -> { check(hash == 10); "/fixture<GET>" }
+                                            else -> error("Unexpected dictionary type")
+                                        }
+                                        if (fault == Fault.EMPTY_TEXT ||
+                                            (fault == Fault.MISSING_TEXT && type == "sql" && hash == 456)) continue
+                                        val pack = TextPack(if (fault == Fault.TEXT_WRONG_TYPE) "method" else type,
+                                            if (fault == Fault.TEXT_WRONG_HASH) -999 else hash, value)
+                                        send(output, pack)
+                                        if (fault == Fault.TEXT_DUPLICATE) send(output, pack)
+                                    }
+                                }
                             }
                             else -> error("Unexpected or unsafe command: $command")
                         }

@@ -18,10 +18,11 @@ class CliContractTest : FunSpec({
 
     test("profile preserves SQL outcomes while discovery and profile exclude credentials and free text") {
         val cli = ContractCli(tempdir().toPath())
-        WireFixture().use { server ->
+        WireFixture(Fault.STRUCTURAL_ONLY).use { server ->
             val doctor = cli.run(server.port, listOf("doctor"))
             val objects = cli.run(server.port, listOf("object", "list"))
             val profile = cli.run(server.port, listOf("profile", "get", "--date", "20261101", "--txid", WireFixture.ids[0].toString()))
+            listOf(doctor, objects, profile).forEach { it.exit shouldBe 0 }
             doctor.data()["group"]?.jsonPrimitive?.content shouldBe "guest"
             objects.events.single()["data"]!!.jsonArray.single().jsonObject["objName"]!!.jsonPrimitive.content shouldBe "/fixture"
             val decoded = json.decodeFromJsonElement<ProfileRecord>(profile.data())
@@ -29,7 +30,6 @@ class CliContractTest : FunSpec({
                 ProfileStep("SQL3", 2, SqlProfile(123, 7, 0, 1)),
                 ProfileStep("SQL3", 3, SqlProfile(456, 11, -789, -3)))
             listOf(doctor, objects, profile).forEach {
-                it.exit shouldBe 0
                 it.output shouldNotContain "secret-token"
                 it.output shouldNotContain scouter.util.CipherUtil.sha256("fixture-password")
                 it.output shouldNotContain "private-address"
@@ -121,7 +121,7 @@ class CliContractTest : FunSpec({
     }
 })
 
-private class ContractCli(private val temp: Path) {
+internal class ContractCli(private val temp: Path) {
     fun run(port: Int, args: List<String>): Outcome {
         val stderr = Files.createTempFile(temp, "stderr", ".txt")
         val stdout = Files.createTempFile(temp, "stdout", ".jsonl")
@@ -137,7 +137,7 @@ private class ContractCli(private val temp: Path) {
     }
 }
 
-private data class Outcome(val exit: Int, val output: String, val stderr: String) {
+internal data class Outcome(val exit: Int, val output: String, val stderr: String) {
     val events = output.lineSequence().filter { it.isNotBlank() }.map { json.parseToJsonElement(it).jsonObject }.toList()
     fun data() = events.single()["data"]!!.jsonObject
 }

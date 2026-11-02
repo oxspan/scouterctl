@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit
 fun main(args: Array<String>) {
     val upstream = Path.of(args.single()).toAbsolutePath().normalize()
     val work = Files.createTempDirectory("scouterctl-spring-smoke-")
+    val offline = SpringOfflineCheck(work)
     Files.createDirectory(work.resolve("conf"))
     val port = ServerSocket(0).use { it.localPort }
     val udp = DatagramSocket(0).use { it.localPort }
@@ -84,7 +85,7 @@ fun main(args: Array<String>) {
                     ?.also { objectHash = it.objHash } != null
             }
         }
-        val expected = linkedMapOf("/poc/ok" to 200, "/poc/sql" to 200, "/poc/app-error" to 500, "/poc/sql-error" to 500)
+        val expected = linkedMapOf("/poc/ok" to 200, "/poc/sql" to 200, "/poc/app-error" to 500, "/poc/sql-error" to 500, "/poc/slow-sql" to 200)
         val from = System.currentTimeMillis()
         val outcomes = mutableListOf<JsonObject>()
         HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build().use { http ->
@@ -100,12 +101,12 @@ fun main(args: Array<String>) {
         Files.writeString(work.resolve("http-outcomes.json"), json.encodeToString(outcomes))
         var to = System.currentTimeMillis() + 1
         val date = Instant.ofEpochMilli(from).atZone(ZoneOffset.UTC).toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
-        awaitSpring("18 Servlet-generated XLogs including error dispatches persisted") {
+        awaitSpring("21 Servlet-generated XLogs including error dispatches persisted") {
             to = System.currentTimeMillis() + 1
             CollectorSource.connect(endpoint, password).use {
                 val observed = it.page(Query(date, from, to, "UTC", objectHash, 100), Cursor()).records
                 Files.writeString(work.resolve("ingestion-observed.json"), json.encodeToString(observed))
-                observed.size == 18
+                observed.size == 21
             }
         }
         val cli = AgentCli(work, port, password)
@@ -115,8 +116,9 @@ fun main(args: Array<String>) {
             "--timezone", "UTC", "--object-hash", objectHash.toString(), "--page-size", "5")
         val rows = cli.run("xlogs", listOf("xlog", "search") + window)
             .filter { it["type"]?.jsonPrimitive?.content == "record" }.map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
-        check(rows.size == 18 && rows.map { it.txid }.toSet().size == 18)
+        check(rows.size == 21 && rows.map { it.txid }.toSet().size == 21)
         val verified = mutableListOf<JsonObject>()
+        val textCheck = SpringProfileTextCheck(cli, date)
         val transactionErrors = expected.mapValues { it.value == 500 } + ("/error" to false)
         transactionErrors.forEach { (route, expectedError) ->
             val serviceName = if (route == "/error") route else "$route<GET>"
@@ -132,10 +134,10 @@ fun main(args: Array<String>) {
                 val sql = profile.steps.mapNotNull { it.sql }
                 if (route == "/poc/ok" || route == "/error") check(sql.isEmpty()) else {
                     check(sql.size == 1) { "$route expected one SQL step: $profile" }
-                    val expectedSql = if (route == "/poc/sql-error") "insert into fixture_rows(id, marker) values (?, ?)"
-                        else "select marker from fixture_rows where id = ?"
+                    val expectedSql = expectedSpringSql(route)
                     check(sql.single().hash == HashUtil.hash(expectedSql)) { "$route SQL identity differs: $profile" }
                     check(sql.single().elapsedMs >= 0)
+                    if (route == "/poc/slow-sql") check(sql.single().elapsedMs >= 300 && row.elapsed >= 300)
                     check((sql.single().errorHash != 0) == (route == "/poc/sql-error")) { "$route SQL error flag differs: $profile" }
                     if (route == "/poc/sql-error") {
                         check(sql.single().errorHash == row.errorHash)
@@ -147,24 +149,30 @@ fun main(args: Array<String>) {
                     put("profileSteps", profile.steps.size); put("sqlSteps", sql.size)
                     put("sqlErrors", sql.count { it.errorHash != 0 })
                 }
+                textCheck.verify(row, route)
             }
         }
         Files.writeString(work.resolve("profile-checks.json"), json.encodeToString(verified))
+        offline.capture(cli, window)
         Files.list(work).use { files -> files.filter { it.toString().endsWith(".jsonl") }.forEach { file ->
             val output = Files.readString(file)
-            check(listOf(password, CipherUtil.sha256(password), "private-bind-marker", "private-application-error-marker")
+            val excluded = listOf(password, CipherUtil.sha256(password)) +
+                if (file.fileName.toString().startsWith("text-profile-")) emptyList()
+                else listOf("private-bind-marker", "private-application-error-marker")
+            check(excluded
                 .none { output.contains(it) }) { "Sensitive marker in $file" }
         } }
         Files.writeString(work.resolve("summary.json"), buildJsonObject {
-            put("requests", 12); put("uniqueXLogs", rows.size); put("profiles", verified.size)
+            put("requests", 15); put("uniqueXLogs", rows.size); put("profiles", verified.size)
             put("errorDispatches", 6)
-            put("applicationErrors", 3); put("sqlErrors", 3); put("sqlProfiles", 9)
+            put("applicationErrors", 3); put("sqlErrors", 3); put("sqlProfiles", 12); put("slowSqlProfiles", 3)
             put("servletAutomaticInstrumentation", true); put("customServiceHooks", false)
-            put("credentialsAndFreeTextExcluded", true)
+            put("credentialsExcluded", true); put("defaultFreeTextExcluded", true)
+            put("textProfilesVerified", verified.size); put("sqlTextProfilesVerified", 12)
             put("springBoot", SpringBootVersion.getVersion()); put("tomcat", ServerInfo.getServerNumber())
             put("agentJvm", System.getProperty("java.version"))
         }.toString())
-        println("PASS: 12 real Spring MVC requests, 18 Servlet XLogs and profiles including 6 error dispatches, 9 SQL profiles, 3 application errors, 3 SQL execution errors")
+        println("PASS: 15 real Spring MVC requests, 21 Servlet XLogs/profiles, 12 SQL texts including 3 slow queries, 3 application and 3 SQL errors")
     } finally {
         for (process in listOfNotNull(service, collector)) {
             process.destroy()
@@ -178,6 +186,7 @@ fun main(args: Array<String>) {
         }.toString())
         println("Fixture processes stopped")
     }
+    offline.verify()
 }
 
 private fun awaitSpring(label: String, predicate: () -> Boolean) {

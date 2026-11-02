@@ -27,7 +27,8 @@ data class CaptureManifest(
     val files: List<PageFile> = emptyList(),
 )
 
-data class CaptureRequest(val directory: Path, val resume: Boolean, val maxPages: Int, val endpoint: String)
+data class CaptureRequest(val directory: Path, val resume: Boolean, val maxPages: Int, val endpoint: String,
+    val includeText: Boolean = false)
 
 fun capture(source: ObservationSource, query: Query, request: CaptureRequest): CaptureManifest {
     query.validate()

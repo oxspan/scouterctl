@@ -34,14 +34,49 @@ A separate `release/*` branch is unnecessary while promotion to `master` is foll
 
 ## Commit messages
 
-Use a Conventional Commit PR title for squash merges:
+Use one Unicode Gitmoji that matches the primary intent of each authored commit. Keep subjects concise and in English:
+
+- `✨ Add offline profile inspection`
+- `🐛 (capture): Preserve checkpoints on connection failure`
+- `♻️ Extract profile lookup orchestration`
+- `✅ Cover missing profile retries`
+- `📝 Document offline inspection`
+- `👷 Update package verification workflow`
+
+For squash merges, use a Conventional Commit PR title with the Gitmoji **after** the type prefix, such as `feat: ✨ Add offline profile inspection` or `fix(capture): 🐛 Preserve checkpoints on connection failure`. Use that title as the squash commit subject so release-please can still determine the version bump:
 
 - `fix: ...` for a patch release.
 - `feat: ...` for a minor release.
 - `feat!: ...` (or another type with `!`) for a breaking change. Before 1.0, breaking changes bump the minor version.
 - `test: ...`, `docs: ...`, `ci: ...`, and `chore: ...` do not trigger a release on their own.
 
-For promotion and synchronization PRs, use descriptive titles such as `chore: promote develop to master` and preserve the underlying commits with a merge commit.
+For promotion and synchronization PRs, use descriptive titles such as `chore: 🔀 Promote develop to master` and preserve the underlying commits with a merge commit. Keep automated release-please and Dependabot messages in their generated format. Do not rewrite published history solely to add Gitmoji.
+
+## Pull request descriptions
+
+Choose one language before writing; each template has headings and guidance only in that language:
+
+| Language | Start a feature PR | Template file |
+| --- | --- | --- |
+| English | [Use English](https://github.com/oxspan/scouterctl/compare/develop...develop?expand=1&template=english.md) | [english.md](.github/PULL_REQUEST_TEMPLATE/english.md) |
+| 한국어 | [한국어로 작성](https://github.com/oxspan/scouterctl/compare/develop...develop?expand=1&template=korean.md) | [korean.md](.github/PULL_REQUEST_TEMPLATE/korean.md) |
+
+The links initially compare `develop` against itself; select your feature branch as the compare branch and confirm the base branch. No changes appear until you select a different compare branch. They do not preserve an existing draft or branch selection. Use the branch targets and title conventions above, including `master` for hotfix PRs. If you opened a PR form without choosing a language, the default template shows these language links. Remove that selection guide before submitting.
+
+GitHub loads templates from the default branch (`master`). Until these files reach `master`, copy the chosen file or load it locally:
+
+```sh
+# English
+gh pr create --base develop --template .github/PULL_REQUEST_TEMPLATE/english.md
+# 한국어
+gh pr create --base develop --template .github/PULL_REQUEST_TEMPLATE/korean.md
+```
+
+Keep the body concise: explain the problem, resulting behavior, actual validation, and compatibility risks. Report untested items explicitly. Documentation-only changes need documentation checks, not runtime tests. Include only information safe to publish. Templates are guidance, not an automated merge gate.
+
+작성 전에 위 표에서 영어 또는 한국어 양식을 선택해 주세요. 각 양식에는 선택한 언어의 제목과 안내만 있습니다. 링크를 연 뒤 작업 브랜치와 대상 브랜치를 확인하세요. 처음에는 양쪽이 `develop`이어서 변경 사항이 보이지 않습니다. 비교 브랜치를 작업 브랜치로 바꾸고, hotfix는 위 규칙에 따라 `master`를 선택합니다. 현재 작성 중인 본문이나 브랜치 선택은 새 화면으로 전달되지 않습니다. 언어를 선택하지 않고 작성 화면을 열었다면 기본 안내의 언어 링크를 사용하고, 제출할 때 선택 안내는 제거해 주세요.
+
+GitHub의 양식 불러오기는 파일이 `master`에 반영된 뒤 적용됩니다. 그전에는 파일을 복사하거나 위 명령으로 선택한 양식을 불러오세요. 변경 이유·결과·실제 검증·호환성을 간결하게 적고 미검증 항목을 명시해 주세요. 문서만 바뀌었다면 문서 확인 결과만 적으면 됩니다. 공개 가능한 정보만 포함하며, 템플릿 자체가 병합을 자동으로 차단하지는 않습니다.
 
 ## Release process
 
