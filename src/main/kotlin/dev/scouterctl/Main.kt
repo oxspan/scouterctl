@@ -17,32 +17,43 @@ import java.util.concurrent.Callable
 import kotlin.system.exitProcess
 
 @Command(name = "scouterctl", mixinStandardHelpOptions = true, versionProvider = CliVersion::class,
-    description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture.",
+    description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect.",
         "Password: SCOUTERCTL_PASSWORD environment variable. TCP has no native TLS; use a trusted path."])
 class Cli : Callable<Int> {
     @Parameters(arity = "1..2", paramLabel = "COMMAND") lateinit var words: List<String>
     @Option(names = ["--host"], defaultValue = "127.0.0.1") lateinit var host: String
     @Option(names = ["--port"], defaultValue = "6100") var port: Int = 6100
-    @Option(names = ["--user"], required = true) lateinit var user: String
+    @Option(names = ["--user"], description = ["Collector account; required except for offline inspect"]) var user: String? = null
     @Option(names = ["--timeout-ms"], defaultValue = "5000") var timeoutMs: Int = 5000
     @Option(names = ["--date"]) var date: String? = null
     @Option(names = ["--from"]) var from: String? = null
     @Option(names = ["--to"]) var to: String? = null
     @Option(names = ["--timezone"], description = ["Operator-declared collector IANA timezone"] ) var timezone: String? = null
     @Option(names = ["--object-hash"]) var objHash: Int? = null
-    @Option(names = ["--page-size"], defaultValue = "1000") var pageSize: Int = 1000
+    @Option(names = ["--page-size"], description = ["Default 1000; profile capture default 25, maximum 100"]) var pageSize: Int? = null
     @Option(names = ["--max-pages"], defaultValue = "40") var maxPages: Int = 40
     @Option(names = ["--txid"]) var txid: Long? = null
     @Option(names = ["--directory"]) var directory: Path? = null
     @Option(names = ["--resume"]) var resume: Boolean = false
-    @Option(names = ["--include-text"], description = ["Profile only: include service, SQL and error dictionary text; may contain sensitive values"])
+    @Option(names = ["--include-profiles"], description = ["Capture profiles in a v2 offline bundle"]) var includeProfiles: Boolean = false
+    @Option(names = ["--include-text"], description = ["Include potentially sensitive dictionary text in profile get, profile capture or inspect"])
     var includeText: Boolean = false
 
     override fun call(): Int {
         try {
             val command = words.joinToString(" ")
-            if (command !in setOf("doctor", "object list", "xlog search", "profile get", "capture")) invalid("Unknown command")
-            if (includeText && command != "profile get") invalid("--include-text is supported only by profile get")
+            if (command !in setOf("doctor", "object list", "xlog search", "profile get", "capture", "inspect")) invalid("Unknown command")
+            if (includeProfiles && command != "capture") invalid("--include-profiles requires capture")
+            if (includeText && command !in setOf("profile get", "inspect") && !(command == "capture" && includeProfiles)) {
+                invalid("--include-text requires profile get, inspect or capture --include-profiles")
+            }
+            if (command == "inspect") {
+                if (resume) invalid("--resume requires capture")
+                val inspection = inspectCapture(required(directory, "--directory"), required(txid, "--txid"), includeText)
+                val complete = inspection.captureExecutionComplete && inspection.unavailableProfiles == 0
+                result(json.encodeToJsonElement(inspection), complete)
+                return if (complete) 0 else 8
+            }
             if (port !in 1..65535 || timeoutMs !in 1..60000 || maxPages !in 1..40) invalid("Invalid port, timeout or max-pages (1..40)")
             val query = if (command in setOf("xlog search", "capture")) query() else null
             if (command == "profile get") {
@@ -51,14 +62,21 @@ class Cli : Callable<Int> {
                 required(txid, "--txid")
             }
             if (command == "capture") required(directory, "--directory")
+            if (includeProfiles && required(query, "query").pageSize > 100) invalid("Profile capture page-size must be 1..100")
             val password = System.getenv("SCOUTERCTL_PASSWORD") ?: invalid("Set SCOUTERCTL_PASSWORD")
-            CollectorSource.connect(Endpoint(host, port, user, timeoutMs), password).use { source ->
+            CollectorSource.connect(Endpoint(host, port, required(user, "--user"), timeoutMs), password).use { source ->
                 when (command) {
                     "doctor" -> result(json.encodeToJsonElement(source.info))
                     "object list" -> result(json.encodeToJsonElement(source.objects()))
                     "profile get" -> result(json.encodeToJsonElement(source.profile(required(date, "--date"), required(txid, "--txid"), includeText)))
                     "xlog search" -> return stream(source, required(query, "query"))
                     "capture" -> {
+                        if (includeProfiles) {
+                            val manifest = captureEvidence(source, required(query, "query"),
+                                CaptureRequest(required(directory, "--directory"), resume, maxPages, "$host:$port", includeText))
+                            result(json.encodeToJsonElement(manifest), manifest.complete)
+                            return if (manifest.complete) 0 else 8
+                        }
                         val manifest = capture(source, required(query, "query"),
                             CaptureRequest(required(directory, "--directory"), resume, maxPages, "$host:$port"))
                         result(json.encodeToJsonElement(manifest), manifest.executionComplete)
@@ -86,7 +104,7 @@ class Cli : Callable<Int> {
 
     private fun query(): Query = Query(required(date, "--date"),
         Instant.parse(required(from, "--from")).toEpochMilli(), Instant.parse(required(to, "--to")).toEpochMilli(),
-        required(timezone, "--timezone"), required(objHash, "--object-hash"), pageSize).also { it.validate() }
+        required(timezone, "--timezone"), required(objHash, "--object-hash"), pageSize ?: if (includeProfiles) 25 else 1000).also { it.validate() }
 
     private fun stream(source: ObservationSource, query: Query): Int {
         emit(buildJsonObject { put("type", "start"); put("schemaVersion", "scouterctl.stream/v1");

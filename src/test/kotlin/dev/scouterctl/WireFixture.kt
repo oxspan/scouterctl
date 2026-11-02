@@ -20,6 +20,7 @@ enum class Fault {
     NONE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
+    PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT,
 }
 
 class WireFixture(private val fault: Fault = Fault.NONE) : AutoCloseable {
@@ -27,6 +28,7 @@ class WireFixture(private val fault: Fault = Fault.NONE) : AutoCloseable {
     val port: Int = server.localPort
     private val executor = Executors.newSingleThreadExecutor()
     private var disconnected = false
+    private var profileMissed = false
     private val future = executor.submit {
         while (!server.isClosed) {
             val socket = try { server.accept() } catch (_: SocketException) { break }
@@ -78,8 +80,14 @@ class WireFixture(private val fault: Fault = Fault.NONE) : AutoCloseable {
                                 })
                             }
                             RequestCmd.TRANX_PROFILE -> {
-                                input.readMapPack()
-                                send(output, XLogProfilePack().apply {
+                                val request = input.readMapPack()
+                                if (fault == Fault.PROFILE_DISCONNECT && request.getLong("txid") == ids.last() && !disconnected) {
+                                    disconnected = true
+                                    break
+                                }
+                                val missing = request.getLong("txid") == ids[1] &&
+                                    (fault == Fault.PROFILE_MISSING || (fault == Fault.PROFILE_MISSING_ONCE && !profileMissed))
+                                if (missing) profileMissed = true else send(output, XLogProfilePack().apply {
                                     profile = if (fault == Fault.MANY_SQL) Step.toBytes(Array(101) { number ->
                                         SqlStep3().apply { index = number; hash = number }
                                     }) else Step.toBytes(arrayOf(
