@@ -11,7 +11,7 @@ This project is an **early POC**. See [version.txt](version.txt) for the current
 | `doctor` | Check Collector connectivity, authentication, and version |
 | `object list` | List monitored objects and their object hashes |
 | `xlog search` | Query transactions within a time range |
-| `profile get` | Retrieve transaction profile steps and SQL execution metadata |
+| `profile get` | Retrieve profile steps and SQL metadata; optionally resolve service, SQL, and error text |
 | `capture` | Save query results as JSONL files with a manifest |
 | `capture --resume` | Resume an interrupted export from its saved checkpoint |
 
@@ -66,7 +66,16 @@ java -jar "$SCOUTERCTL_JAR" profile get --user guest \
   --date 20261102 --txid 9223372036854775806
 ```
 
-Profiles include step types and ordering, along with SQL hashes, elapsed times, error hashes, and execution results. SQL text, exception text, and SQL bind values are not included.
+Profiles include step types and ordering, along with SQL hashes, elapsed times, error hashes, and execution results. Text is excluded by default. To resolve service names, SQL statements, and transaction/SQL errors from the Collector's dictionaries, opt in explicitly:
+
+```sh
+java -jar "$SCOUTERCTL_JAR" profile get --user guest \
+  --date 20261102 --txid 9223372036854775806 --include-text
+```
+
+The result adds `transaction.service`, `transaction.error`, `steps[].sql.statement`, and `steps[].sql.error`. Each dictionary entry retains its `hash` and reports `status: "resolved"` with `text`, or `status: "unresolved"` with `text: null` when absent. A zero error hash means no recorded error and produces no error entry. If the transaction is unavailable but its profile exists, `transaction.status` is `"unavailable"`; SQL resolution still proceeds. Dictionary lookup uses the requested storage date. Connection and protocol failures return a nonzero exit code instead of being treated as missing text.
+
+**Opt-in text may contain sensitive data.** SQL bind fields and other free-text profile steps remain excluded, but SQL literals and exception messages can contain application values. Text is returned as stored, without redaction. `--include-text` is supported only by `profile get`; XLog searches and captures retain their existing metadata-only format.
 
 ### Export and resume
 
@@ -111,7 +120,8 @@ unset SCOUTERCTL_PASSWORD
 ## Current limitations
 
 - The Collector TCP connection has no built-in TLS. Use a trusted network or an SSH/VPN tunnel.
-- Profile requests are limited to 1,000 steps. Truncation detection and resolution of SQL, method, and error names are not supported yet.
+- Profile requests are limited to 1,000 steps. Truncation detection and method-name resolution are not supported yet. Text resolution depends on the Collector's retained dictionaries; hashes are not collision-free identities.
+- Captures contain XLogs and a manifest; profiles and dictionaries are not included yet.
 - File durability during power loss, load from long-running exports, Windows execution, and Native Image builds have not been validated.
 - Server configuration changes and administrative commands are not available.
 

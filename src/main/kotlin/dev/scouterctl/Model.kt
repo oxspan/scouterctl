@@ -26,11 +26,26 @@ data class XLogRecord(
     val objHash: Int, val serviceHash: Int, val elapsed: Int, val errorHash: Int,
 )
 @Serializable
-data class SqlProfile(val hash: Int, val elapsedMs: Int, val errorHash: Int, val updated: Int? = null)
+data class SqlProfile(
+    val hash: Int, val elapsedMs: Int, val errorHash: Int, val updated: Int? = null,
+    val statement: DictionaryText? = null, val error: DictionaryText? = null,
+)
+@Serializable
+data class DictionaryText(val hash: Int, val text: String? = null) {
+    val status: String = if (text == null) "unresolved" else "resolved"
+}
+@Serializable
+data class ProfileTransaction(
+    val status: String, val service: DictionaryText? = null, val error: DictionaryText? = null,
+)
 @Serializable
 data class ProfileStep(val type: String, val order: Int, val sql: SqlProfile? = null)
 @Serializable
-data class ProfileRecord(val txid: String, val steps: List<ProfileStep>, val detail: String = "structural-only; free text and binds omitted")
+data class ProfileRecord(
+    val txid: String, val steps: List<ProfileStep>,
+    val detail: String = "structural-only; free text and binds omitted",
+    val transaction: ProfileTransaction? = null,
+)
 @Serializable
 data class Cursor(val bucketTime: Long = 0, val txid: String = "0")
 @Serializable
@@ -56,5 +71,5 @@ interface ObservationSource : AutoCloseable {
     val info: ServerInfo
     fun objects(): List<ObjectRecord>
     fun page(query: Query, cursor: Cursor): XLogPage
-    fun profile(date: String, txid: Long): ProfileRecord
+    fun profile(date: String, txid: Long, includeText: Boolean = false): ProfileRecord
 }

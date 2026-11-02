@@ -3,6 +3,7 @@ package dev.scouterctl
 import scouter.io.DataInputX
 import scouter.io.DataOutputX
 import scouter.lang.pack.*
+import scouter.lang.TextTypes
 import scouter.lang.step.Step
 import scouter.lang.step.SqlStep
 import scouter.lang.step.SqlStep3
@@ -123,7 +124,7 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
         return XLogPage(records, next, more)
     }
 
-    override fun profile(date: String, txid: Long): ProfileRecord {
+    override fun profile(date: String, txid: Long, includeText: Boolean): ProfileRecord {
         val request = MapPack().apply { put("date", date); put("txid", txid); put("max", 1000) }
         val packs = exchange(RequestCmd.TRANX_PROFILE, request)
         if (packs.isEmpty()) throw CliFailure(ErrorCode.NOT_FOUND, "Profile unavailable")
@@ -135,7 +136,56 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
                 ProfileStep(step.stepTypeName, step.order, sql)
             }
         }
-        return ProfileRecord(txid.toString(), steps)
+        val profile = ProfileRecord(txid.toString(), steps)
+        return if (includeText) resolveText(date, profile) else profile
+    }
+
+    private fun resolveText(date: String, profile: ProfileRecord): ProfileRecord {
+        val packs = exchange(RequestCmd.XLOG_READ_BY_TXID, MapPack().apply {
+            put("date", date); put("txid", profile.txid.toLong())
+        })
+        val transaction = if (packs.isEmpty()) null else {
+            val p = packs.singleOrNull() as? XLogPack
+                ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Expected one transaction pack")
+            if (p.txid.toString() != profile.txid) {
+                throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Transaction identity differs from requested profile")
+            }
+            p
+        }
+        val sql = profile.steps.mapNotNull { it.sql }
+        val statements = dictionary(date, TextTypes.SQL, sql.map { it.hash })
+        val errors = dictionary(date, TextTypes.ERROR,
+            (sql.map { it.errorHash } + listOfNotNull(transaction?.error)).filter { it != 0 })
+        val service = transaction?.let { dictionary(date, TextTypes.SERVICE, listOf(it.service)) }
+        return profile.copy(
+            steps = profile.steps.map { step -> step.copy(sql = step.sql?.let {
+                it.copy(statement = DictionaryText(it.hash, statements[it.hash]),
+                    error = if (it.errorHash == 0) null else DictionaryText(it.errorHash, errors[it.errorHash]))
+            }) },
+            transaction = if (transaction == null) ProfileTransaction("unavailable") else ProfileTransaction(
+                "available", DictionaryText(transaction.service, service?.get(transaction.service)),
+                if (transaction.error == 0) null else DictionaryText(transaction.error, errors[transaction.error])),
+            detail = "service, SQL and error dictionary text included; bind fields and other free text omitted; dictionary text may contain sensitive values",
+        )
+    }
+
+    private fun dictionary(date: String, type: String, hashes: List<Int>): Map<Int, String> {
+        val result = mutableMapOf<Int, String>()
+        hashes.distinct().chunked(100).forEach { batch ->
+            val packs = exchange(RequestCmd.GET_TEXT_PACK, MapPack().apply {
+                put("date", date); put("type", type)
+                val requested = newList("hash")
+                batch.forEach { requested.add(it.toLong()) }
+            })
+            packs.forEach {
+                val p = it as? TextPack ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Expected dictionary text pack")
+                if (p.xtype != type || p.hash !in batch || p.text == null || result.containsKey(p.hash)) {
+                    throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Invalid dictionary response")
+                }
+                result[p.hash] = p.text
+            }
+        }
+        return result
     }
 
     override fun close() { socket.close() }

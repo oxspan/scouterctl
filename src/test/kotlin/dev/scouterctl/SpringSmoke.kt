@@ -117,6 +117,7 @@ fun main(args: Array<String>) {
             .filter { it["type"]?.jsonPrimitive?.content == "record" }.map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
         check(rows.size == 18 && rows.map { it.txid }.toSet().size == 18)
         val verified = mutableListOf<JsonObject>()
+        val textCheck = SpringProfileTextCheck(cli, date)
         val transactionErrors = expected.mapValues { it.value == 500 } + ("/error" to false)
         transactionErrors.forEach { (route, expectedError) ->
             val serviceName = if (route == "/error") route else "$route<GET>"
@@ -147,12 +148,16 @@ fun main(args: Array<String>) {
                     put("profileSteps", profile.steps.size); put("sqlSteps", sql.size)
                     put("sqlErrors", sql.count { it.errorHash != 0 })
                 }
+                textCheck.verify(row, route)
             }
         }
         Files.writeString(work.resolve("profile-checks.json"), json.encodeToString(verified))
         Files.list(work).use { files -> files.filter { it.toString().endsWith(".jsonl") }.forEach { file ->
             val output = Files.readString(file)
-            check(listOf(password, CipherUtil.sha256(password), "private-bind-marker", "private-application-error-marker")
+            val excluded = listOf(password, CipherUtil.sha256(password)) +
+                if (file.fileName.toString().startsWith("text-profile-")) emptyList()
+                else listOf("private-bind-marker", "private-application-error-marker")
+            check(excluded
                 .none { output.contains(it) }) { "Sensitive marker in $file" }
         } }
         Files.writeString(work.resolve("summary.json"), buildJsonObject {
@@ -160,11 +165,12 @@ fun main(args: Array<String>) {
             put("errorDispatches", 6)
             put("applicationErrors", 3); put("sqlErrors", 3); put("sqlProfiles", 9)
             put("servletAutomaticInstrumentation", true); put("customServiceHooks", false)
-            put("credentialsAndFreeTextExcluded", true)
+            put("credentialsExcluded", true); put("defaultFreeTextExcluded", true)
+            put("textProfilesVerified", verified.size); put("sqlTextProfilesVerified", 9)
             put("springBoot", SpringBootVersion.getVersion()); put("tomcat", ServerInfo.getServerNumber())
             put("agentJvm", System.getProperty("java.version"))
         }.toString())
-        println("PASS: 12 real Spring MVC requests, 18 Servlet XLogs and profiles including 6 error dispatches, 9 SQL profiles, 3 application errors, 3 SQL execution errors")
+        println("PASS: 12 real Spring MVC requests, 18 Servlet XLogs, 18 default and 18 text profiles, 9 SQL texts, 3 application errors, 3 SQL execution errors")
     } finally {
         for (process in listOfNotNull(service, collector)) {
             process.destroy()
