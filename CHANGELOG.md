@@ -1,5 +1,20 @@
 # 변경 기록
 
+## [0.1.0](https://github.com/oxspan/scouterctl/compare/v0.0.0...v0.1.0) (2026-11-02)
+
+
+### Features
+
+* ✨ Capture profiles and inspect evidence offline ([#6](https://github.com/oxspan/scouterctl/issues/6)) ([1be146b](https://github.com/oxspan/scouterctl/commit/1be146b32bf051e007d25f49f117e9d0e5a4dc95))
+* ✨ Search and summarize captured requests offline ([#7](https://github.com/oxspan/scouterctl/issues/7)) ([7cc5097](https://github.com/oxspan/scouterctl/commit/7cc50978c184d85683f5811717a3aa2b18c4997b))
+* resolve profile service SQL and error text ([#5](https://github.com/oxspan/scouterctl/issues/5)) ([53b59fe](https://github.com/oxspan/scouterctl/commit/53b59fe856e68f36ac0fe9d2f771dcdf08ff373f))
+
+
+### Bug Fixes
+
+* 🐛 Preserve branches when selecting a PR template ([#12](https://github.com/oxspan/scouterctl/issues/12)) ([4e1c481](https://github.com/oxspan/scouterctl/commit/4e1c4814ce9890d95bdbcb36daf53715ec7b854e))
+* **build:** synchronize versions and automate POC releases ([a5c32d2](https://github.com/oxspan/scouterctl/commit/a5c32d2f77d133c612590bdda2a4032308b6cf0b))
+
 ## 0.0.0 — 2026-11-02
 
 첫 로컬 평가용 POC 패키지입니다. 이전 개발 중 표기 `0.1.0-poc`는 공개 릴리스가 아니며, 이번 첫 버전을 `0.0.0`으로 정리했습니다.
