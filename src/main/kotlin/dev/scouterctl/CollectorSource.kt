@@ -17,6 +17,7 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.net.UnknownHostException
 
 class CollectorSource private constructor(private val socket: Socket) : ObservationSource {
     private val input = object : DataInputX(BufferedInputStream(socket.getInputStream())) {
@@ -45,6 +46,8 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
                 return client
             } catch (error: Exception) {
                 socket.close()
+                if (error is UnknownHostException) throw CliFailure(ErrorCode.CONNECTION_FAILED,
+                    "Collector host could not be resolved; check --host and DNS")
                 throw error
             }
         }
@@ -59,7 +62,8 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
         val reply = exchange(RequestCmd.LOGIN, request).singleOrNull() as? MapPack
             ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Expected one login response")
         session = reply.getLong("session")
-        if (session == 0L) throw CliFailure(ErrorCode.AUTH_FAILED, "Collector authentication failed")
+        if (session == 0L) throw CliFailure(ErrorCode.AUTH_FAILED,
+            "Collector authentication failed; check --user and SCOUTERCTL_PASSWORD with the Collector administrator")
         val version = reply.getText("version") ?: "unknown"
         if (version.substringBefore(' ') != "2.21.3") {
             throw CliFailure(ErrorCode.VERSION_MISMATCH, "This POC requires Collector 2.21.3")
@@ -190,5 +194,3 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
 
     override fun close() { socket.close() }
 }
-
-data class Endpoint(val host: String, val port: Int, val user: String, val timeoutMs: Int)

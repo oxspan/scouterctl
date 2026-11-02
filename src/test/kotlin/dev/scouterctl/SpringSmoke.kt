@@ -70,6 +70,7 @@ fun main(args: Array<String>) {
     try {
         val endpoint = Endpoint("127.0.0.1", port, "poc", 1500)
         awaitSpring("Collector login") { CollectorSource.connect(endpoint, password).use { it.info.serverId == "scouterctl-spring-smoke" } }
+        verifyInitialConnection(work, endpoint, password)
         val agent = upstream.resolve("scouter.agent.java/target/scouter.agent.jar")
         check(Files.isRegularFile(agent)) { "Build Java 21 agent first: $agent" }
         service = ProcessBuilder(java, "-Xmx256m", "-Duser.timezone=UTC", "-javaagent:$agent",

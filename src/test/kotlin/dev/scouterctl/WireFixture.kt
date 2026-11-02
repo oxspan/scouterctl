@@ -17,7 +17,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 enum class Fault {
-    NONE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT,
+    NONE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
     PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT,
@@ -53,7 +53,7 @@ class WireFixture(private val fault: Fault = Fault.NONE) : AutoCloseable {
                                 request.put("timezone", "Coordinated Universal Time")
                                 send(output, request)
                             }
-                            RequestCmd.OBJECT_LIST_REAL_TIME -> send(output, ObjectPack().apply {
+                            RequestCmd.OBJECT_LIST_REAL_TIME -> if (fault != Fault.EMPTY_OBJECTS) send(output, ObjectPack().apply {
                                 objHash = 42; objName = "/fixture"; objType = "java"; address = "private-address"
                             })
                             RequestCmd.TRANX_LOAD_TIME_GROUP_V2 -> {

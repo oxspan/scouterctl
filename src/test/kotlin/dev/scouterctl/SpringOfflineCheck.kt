@@ -38,6 +38,7 @@ internal class SpringOfflineCheck(private val work: Path) {
             put("resumedCapture", true); put("matchesOnlineProfiles", true)
         }.toString())
         SpringSearchCheck(work, directory).verify()
+        SpringSummaryCheck(work, directory).verify()
         println("PASS: 21 captured profiles match online data after Collector shutdown; 42 offline inspections without credentials")
     }
 }

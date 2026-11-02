@@ -6,6 +6,9 @@ import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
+import picocli.CommandLine.Mixin
+import picocli.CommandLine.Spec
+import picocli.CommandLine.Model.CommandSpec
 import java.io.IOException
 import java.net.SocketException
 import java.net.SocketTimeoutException
@@ -17,14 +20,16 @@ import java.util.concurrent.Callable
 import kotlin.system.exitProcess
 
 @Command(name = "scouterctl", mixinStandardHelpOptions = true, versionProvider = CliVersion::class,
-    description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search.",
-        "Password: SCOUTERCTL_PASSWORD environment variable. TCP has no native TLS; use a trusted path."])
+    description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary.",
+        "Connect: doctor --host HOST --port PORT --user ACCOUNT, then object list with the same options.",
+        "Save/select connections: context add/list/use --name NAME. Check credentials: auth login.",
+        "Password: SCOUTERCTL_PASSWORD, or --interactive for hidden terminal input. Passwords are never saved.",
+        "TCP has no native TLS; use a trusted path."])
 class Cli : Callable<Int> {
     @Parameters(arity = "1..2", paramLabel = "COMMAND") lateinit var words: List<String>
-    @Option(names = ["--host"], defaultValue = "127.0.0.1") lateinit var host: String
-    @Option(names = ["--port"], defaultValue = "6100") var port: Int = 6100
-    @Option(names = ["--user"], description = ["Collector account; required except for offline inspect"]) var user: String? = null
-    @Option(names = ["--timeout-ms"], defaultValue = "5000") var timeoutMs: Int = 5000
+    @Mixin val connection = ConnectionOptions()
+    @Spec lateinit var spec: CommandSpec
+    @Option(names = ["--name"], description = ["Name for context add/use"]) var name: String? = null
     @Option(names = ["--date"]) var date: String? = null
     @Option(names = ["--from"]) var from: String? = null
     @Option(names = ["--to"]) var to: String? = null
@@ -38,7 +43,8 @@ class Cli : Callable<Int> {
     @Option(names = ["--include-profiles"], description = ["Capture profiles in a v2 offline bundle"]) var includeProfiles: Boolean = false
     @Option(names = ["--include-text"], description = ["Include potentially sensitive dictionary text in profile get, profile capture or inspect"])
     var includeText: Boolean = false
-    @Option(names = ["--limit"], description = ["inspect search: top 1..1000 requests by elapsed time; default 20"]) var limit: Int? = null
+    @Option(names = ["--limit"], description = ["inspect search/summary: top 1..1000 requests/services; default 20"]) var limit: Int? = null
+    @Option(names = ["--sort"], description = ["inspect summary: errors, elapsed (maximum), requests; default errors"]) var summarySort: String? = null
     @Option(names = ["--min-elapsed-ms"], description = ["inspect search: inclusive minimum request duration"]) var minElapsedMs: Int? = null
     @Option(names = ["--errors-only"], description = ["inspect search: nonzero XLog error hash"]) var errorsOnly: Boolean = false
     @Option(names = ["--service-hash"], description = ["inspect search: exact service hash"]) var serviceHash: Int? = null
@@ -47,7 +53,21 @@ class Cli : Callable<Int> {
     override fun call(): Int {
         try {
             val command = words.joinToString(" ")
-            if (command !in setOf("doctor", "object list", "xlog search", "profile get", "capture", "inspect", "inspect search")) invalid("Unknown command")
+            if (command in setOf("context add", "context list", "context use")) {
+                contextCommand(command)
+                return 0
+            }
+            if (name != null) invalid("--name requires context add/use")
+            if (command == "inspect summary") {
+                allowedOptions(setOf("--directory", "--limit", "--sort", "--include-text", "--no-input"))
+                val summary = summarizeCapture(required(directory, "--directory"),
+                    ServiceSummaryOptions(limit ?: 20, ServiceSort.parse(summarySort ?: "errors"), includeText))
+                result(json.encodeToJsonElement(summary), summary.complete)
+                return if (summary.complete) 0 else 8
+            }
+            if (summarySort != null) invalid("--sort requires inspect summary")
+            if (command !in setOf("doctor", "auth login", "object list", "xlog search", "profile get", "capture", "inspect", "inspect search")) invalid("Unknown command")
+            if (command == "auth login") allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input"))
             if (command != "inspect search" && (limit != null || minElapsedMs != null || errorsOnly || serviceHash != null || serviceName != null)) {
                 invalid("Search filters require inspect search")
             }
@@ -70,7 +90,7 @@ class Cli : Callable<Int> {
                 result(json.encodeToJsonElement(inspection), complete)
                 return if (complete) 0 else 8
             }
-            if (port !in 1..65535 || timeoutMs !in 1..60000 || maxPages !in 1..40) invalid("Invalid port, timeout or max-pages (1..40)")
+            if (maxPages !in 1..40) invalid("Use --max-pages 1..40")
             val query = if (command in setOf("xlog search", "capture")) query() else null
             if (command == "profile get") {
                 if (!required(date, "--date").matches(Regex("[0-9]{8}"))) invalid("Use an 8-digit storage date")
@@ -79,22 +99,23 @@ class Cli : Callable<Int> {
             }
             if (command == "capture") required(directory, "--directory")
             if (includeProfiles && required(query, "query").pageSize > 100) invalid("Profile capture page-size must be 1..100")
-            val password = System.getenv("SCOUTERCTL_PASSWORD") ?: invalid("Set SCOUTERCTL_PASSWORD")
-            CollectorSource.connect(Endpoint(host, port, required(user, "--user"), timeoutMs), password).use { source ->
+            val endpoint = connection.endpoint()
+            val password = connection.password(command == "auth login")
+            CollectorSource.connect(endpoint, password).use { source ->
                 when (command) {
-                    "doctor" -> result(json.encodeToJsonElement(source.info))
+                    "doctor", "auth login" -> result(json.encodeToJsonElement(source.info))
                     "object list" -> result(json.encodeToJsonElement(source.objects()))
                     "profile get" -> result(json.encodeToJsonElement(source.profile(required(date, "--date"), required(txid, "--txid"), includeText)))
                     "xlog search" -> return stream(source, required(query, "query"))
                     "capture" -> {
                         if (includeProfiles) {
                             val manifest = captureEvidence(source, required(query, "query"),
-                                CaptureRequest(required(directory, "--directory"), resume, maxPages, "$host:$port", includeText))
+                                CaptureRequest(required(directory, "--directory"), resume, maxPages, "${endpoint.host}:${endpoint.port}", includeText))
                             result(json.encodeToJsonElement(manifest), manifest.complete)
                             return if (manifest.complete) 0 else 8
                         }
                         val manifest = capture(source, required(query, "query"),
-                            CaptureRequest(required(directory, "--directory"), resume, maxPages, "$host:$port"))
+                            CaptureRequest(required(directory, "--directory"), resume, maxPages, "${endpoint.host}:${endpoint.port}"))
                         result(json.encodeToJsonElement(manifest), manifest.executionComplete)
                         return if (manifest.executionComplete) 0 else 8
                     }
@@ -104,9 +125,11 @@ class Cli : Callable<Int> {
         } catch (error: CliFailure) {
             return failure(error)
         } catch (_: SocketTimeoutException) {
-            return failure(CliFailure(ErrorCode.CONNECTION_FAILED, "Collector timeout; upstream cancellation is not guaranteed"))
+            return failure(CliFailure(ErrorCode.CONNECTION_FAILED,
+                "Collector timeout; check TCP access and --timeout-ms; upstream cancellation is not guaranteed"))
         } catch (_: SocketException) {
-            return failure(CliFailure(ErrorCode.CONNECTION_FAILED, "Collector connection failed"))
+            return failure(CliFailure(ErrorCode.CONNECTION_FAILED,
+                "Collector connection failed; check --host, --port and TCP access"))
         } catch (_: IOException) {
             return failure(CliFailure(ErrorCode.IO_ERROR, "Transport or artifact I/O failed"))
         } catch (_: IllegalArgumentException) {
@@ -115,6 +138,29 @@ class Cli : Callable<Int> {
             return failure(CliFailure(ErrorCode.INVALID_ARGUMENT, "Invalid date or timestamp"))
         } catch (_: Exception) {
             return failure(CliFailure(ErrorCode.PROTOCOL_ERROR, "Response could not be decoded"))
+        }
+    }
+
+    private fun contextCommand(command: String) {
+        val allowed = when (command) {
+            "context add" -> setOf("--name", "--host", "--port", "--user", "--no-input")
+            "context use" -> setOf("--name", "--no-input")
+            else -> setOf("--no-input")
+        }
+        allowedOptions(allowed)
+        val store = ContextStore()
+        val config = when (command) {
+            "context add" -> store.add(required(name, "--name"), SavedConnection(
+                connection.host ?: "127.0.0.1", connection.port ?: 6100, required(connection.user, "--user")))
+            "context use" -> store.use(required(name, "--name"))
+            else -> store.read()
+        }
+        result(json.encodeToJsonElement(config))
+    }
+
+    private fun allowedOptions(allowed: Set<String>) {
+        if (spec.commandLine().parseResult.matchedOptions().any { it.longestName() !in allowed }) {
+            invalid("Option is not supported by this command; use --help")
         }
     }
 
