@@ -40,6 +40,10 @@ java -jar "$SCOUTERCTL_JAR" xlog search --user guest \
 java -jar "$SCOUTERCTL_JAR" profile get --user guest \
   --date 20261102 --txid 9223372036854775806
 
+# Optional: include potentially sensitive service, SQL, and error dictionary text.
+java -jar "$SCOUTERCTL_JAR" profile get --user guest \
+  --date 20261102 --txid 9223372036854775806 --include-text
+
 java -jar "$SCOUTERCTL_JAR" capture --user guest \
   --object-hash 42 --date 20261102 --timezone Asia/Seoul \
   --from 2026-11-02T09:00:00+09:00 --to 2026-11-02T09:10:00+09:00 \
@@ -59,7 +63,9 @@ unset SCOUTERCTL_PASSWORD
 - `doctor`, `object list`, `xlog search`, `profile get`, and `capture` (including `--resume`) are read-only.
 - Results use JSON or JSONL, with 64-bit transaction IDs represented as strings. Help and version output use plain text.
 - SQL steps include `hash`, `elapsedMs`, `errorHash`, and `updated`. To investigate application errors, inspect the XLog's `errorHash` and the profile for the same `txid`.
-- SQL text, exception text, SQL bind values, and service name resolution are not available. Profile requests are limited to 1,000 steps; truncation detection is not supported.
+- Text is excluded by default. `profile get --include-text` adds `transaction.service`, `transaction.error`, `steps[].sql.statement`, and `steps[].sql.error`. Entries retain their hash and report `resolved` with text or `unresolved` with null text. A zero error hash has no error entry; an unavailable XLog sets `transaction.status` to `unavailable` while SQL resolution continues. Lookup uses the requested date; connection/protocol failures return a nonzero exit code.
+- Opt-in text is returned as stored and may contain sensitive values, SQL literals, or exception details. Separate SQL bind fields and other free-text steps remain excluded. Profile requests are limited to 1,000 steps; truncation detection and method-name resolution are not supported.
+- `--include-text` is only supported by `profile get`. Captures contain XLogs and a manifest, without profiles or dictionaries.
 - Capture completion indicates that the requested execution has finished, not that all traffic is included. Concurrent writes and durability during power loss are not guaranteed.
 - Runtime validation has been performed on Linux/WSL. Other Collector versions, external databases, Windows, and Native Image builds are outside the validated scope.
 

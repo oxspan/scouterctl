@@ -35,11 +35,14 @@ class Cli : Callable<Int> {
     @Option(names = ["--txid"]) var txid: Long? = null
     @Option(names = ["--directory"]) var directory: Path? = null
     @Option(names = ["--resume"]) var resume: Boolean = false
+    @Option(names = ["--include-text"], description = ["Profile only: include service, SQL and error dictionary text; may contain sensitive values"])
+    var includeText: Boolean = false
 
     override fun call(): Int {
         try {
             val command = words.joinToString(" ")
             if (command !in setOf("doctor", "object list", "xlog search", "profile get", "capture")) invalid("Unknown command")
+            if (includeText && command != "profile get") invalid("--include-text is supported only by profile get")
             if (port !in 1..65535 || timeoutMs !in 1..60000 || maxPages !in 1..40) invalid("Invalid port, timeout or max-pages (1..40)")
             val query = if (command in setOf("xlog search", "capture")) query() else null
             if (command == "profile get") {
@@ -53,7 +56,7 @@ class Cli : Callable<Int> {
                 when (command) {
                     "doctor" -> result(json.encodeToJsonElement(source.info))
                     "object list" -> result(json.encodeToJsonElement(source.objects()))
-                    "profile get" -> result(json.encodeToJsonElement(source.profile(required(date, "--date"), required(txid, "--txid"))))
+                    "profile get" -> result(json.encodeToJsonElement(source.profile(required(date, "--date"), required(txid, "--txid"), includeText)))
                     "xlog search" -> return stream(source, required(query, "query"))
                     "capture" -> {
                         val manifest = capture(source, required(query, "query"),
