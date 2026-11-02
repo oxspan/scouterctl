@@ -20,7 +20,7 @@ import java.util.concurrent.Callable
 import kotlin.system.exitProcess
 
 @Command(name = "scouterctl", mixinStandardHelpOptions = true, versionProvider = CliVersion::class,
-    description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search.",
+    description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary.",
         "Connect: doctor --host HOST --port PORT --user ACCOUNT, then object list with the same options.",
         "Save/select connections: context add/list/use --name NAME. Check credentials: auth login.",
         "Password: SCOUTERCTL_PASSWORD, or --interactive for hidden terminal input. Passwords are never saved.",
@@ -43,7 +43,8 @@ class Cli : Callable<Int> {
     @Option(names = ["--include-profiles"], description = ["Capture profiles in a v2 offline bundle"]) var includeProfiles: Boolean = false
     @Option(names = ["--include-text"], description = ["Include potentially sensitive dictionary text in profile get, profile capture or inspect"])
     var includeText: Boolean = false
-    @Option(names = ["--limit"], description = ["inspect search: top 1..1000 requests by elapsed time; default 20"]) var limit: Int? = null
+    @Option(names = ["--limit"], description = ["inspect search/summary: top 1..1000 requests/services; default 20"]) var limit: Int? = null
+    @Option(names = ["--sort"], description = ["inspect summary: errors, elapsed (maximum), requests; default errors"]) var summarySort: String? = null
     @Option(names = ["--min-elapsed-ms"], description = ["inspect search: inclusive minimum request duration"]) var minElapsedMs: Int? = null
     @Option(names = ["--errors-only"], description = ["inspect search: nonzero XLog error hash"]) var errorsOnly: Boolean = false
     @Option(names = ["--service-hash"], description = ["inspect search: exact service hash"]) var serviceHash: Int? = null
@@ -57,6 +58,14 @@ class Cli : Callable<Int> {
                 return 0
             }
             if (name != null) invalid("--name requires context add/use")
+            if (command == "inspect summary") {
+                allowedOptions(setOf("--directory", "--limit", "--sort", "--include-text", "--no-input"))
+                val summary = summarizeCapture(required(directory, "--directory"),
+                    ServiceSummaryOptions(limit ?: 20, ServiceSort.parse(summarySort ?: "errors"), includeText))
+                result(json.encodeToJsonElement(summary), summary.complete)
+                return if (summary.complete) 0 else 8
+            }
+            if (summarySort != null) invalid("--sort requires inspect summary")
             if (command !in setOf("doctor", "auth login", "object list", "xlog search", "profile get", "capture", "inspect", "inspect search")) invalid("Unknown command")
             if (command == "auth login") allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input"))
             if (command != "inspect search" && (limit != null || minElapsedMs != null || errorsOnly || serviceHash != null || serviceName != null)) {
