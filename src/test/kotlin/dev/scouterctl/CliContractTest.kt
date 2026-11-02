@@ -133,6 +133,7 @@ internal class ContractCli(private val temp: Path) {
             .directory(temp.toFile())
             .redirectOutput(stdout.toFile()).redirectError(stderr.toFile()).apply {
                 environment().remove("SCOUTERCTL_PASSWORD")
+                environment()["SCOUTERCTL_CONFIG"] = temp.resolve("config.json").toString()
                 if (password != null) environment()["SCOUTERCTL_PASSWORD"] = password
             }.start()
         process.outputStream.close()
