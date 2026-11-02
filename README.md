@@ -28,6 +28,12 @@ Runtime validation has been performed on Linux/WSL. Other Collector versions are
 
 ## Getting started
 
+### Use a release package
+
+Download the ZIP and `SHA256SUMS` from the same [GitHub Release](https://github.com/oxspan/scouterctl/releases). Follow the [quick start](QUICKSTART.md) to verify/extract it, set the Collector TCP endpoint once, enter the password with hidden Bash input, and run `doctor` followed by `object list`. The packaged README contains the same instructions.
+
+`doctor` checks login and the supported version; a successful login does not imply that an Agent is connected. An empty object list is a successful result. The quick start includes recovery steps for missing input, DNS/TCP failures, rejected credentials, unsupported versions, and missing targets.
+
 ### Build from source
 
 Set `JAVA_HOME` to JDK 21, then run:
@@ -43,36 +49,38 @@ The executable JAR includes its required libraries. Run `./gradlew pocRelease` t
 
 ### Connect and find a target
 
-The following examples use Bash. Supply the password through the `SCOUTERCTL_PASSWORD` environment variable.
+The following examples use Bash. Set the Collector TCP host, port, and account once; supply the password through `SCOUTERCTL_PASSWORD`. No connection settings or credentials are saved by the CLI.
 
 ```sh
 SCOUTERCTL_JAR="build/libs/scouterctl-$(cat version.txt)-all.jar"
+SCOUTERCTL=(java -jar "$SCOUTERCTL_JAR" --host 127.0.0.1 --port 6100 --user guest)
 read -r -s -p 'Collector password: ' SCOUTERCTL_PASSWORD
+printf '\n'
 export SCOUTERCTL_PASSWORD
 
-java -jar "$SCOUTERCTL_JAR" doctor --user guest
-java -jar "$SCOUTERCTL_JAR" object list --user guest
+"${SCOUTERCTL[@]}" doctor
+"${SCOUTERCTL[@]}" object list
 ```
 
-The default address is `127.0.0.1:6100`. To connect to another server, add `--host` and `--port` to each command. Replace `guest` with your Collector account.
+Set `--host`, `--port`, and `--user` in the array to your Collector's TCP endpoint and account. Every online example below reuses those values. For connection failures or an empty list, follow the [quick-start recovery steps](QUICKSTART.md#if-connection-or-discovery-fails).
 
 ### Query transactions and profiles
 
 Use an object hash returned by `object list`. Replace the example date, time range, object hash, and transaction ID with values from your environment.
 
 ```sh
-java -jar "$SCOUTERCTL_JAR" xlog search --user guest \
+"${SCOUTERCTL[@]}" xlog search \
   --object-hash 42 --date 20261102 --timezone Asia/Seoul \
   --from 2026-11-02T09:00:00+09:00 --to 2026-11-02T09:10:00+09:00
 
-java -jar "$SCOUTERCTL_JAR" profile get --user guest \
+"${SCOUTERCTL[@]}" profile get \
   --date 20261102 --txid 9223372036854775806
 ```
 
 Profiles include step types and ordering, along with SQL hashes, elapsed times, error hashes, and execution results. Text is excluded by default. To resolve service names, SQL statements, and transaction/SQL errors from the Collector's dictionaries, opt in explicitly:
 
 ```sh
-java -jar "$SCOUTERCTL_JAR" profile get --user guest \
+"${SCOUTERCTL[@]}" profile get \
   --date 20261102 --txid 9223372036854775806 --include-text
 ```
 
@@ -83,7 +91,7 @@ The result adds `transaction.service`, `transaction.error`, `steps[].sql.stateme
 ### Export and resume
 
 ```sh
-java -jar "$SCOUTERCTL_JAR" capture --user guest \
+"${SCOUTERCTL[@]}" capture \
   --object-hash 42 --date 20261102 --timezone Asia/Seoul \
   --from 2026-11-02T09:00:00+09:00 --to 2026-11-02T09:10:00+09:00 \
   --directory ./incident-001
@@ -94,7 +102,7 @@ The destination directory must not exist when starting a new export. If an expor
 ### Capture profiles and inspect offline
 
 ```sh
-java -jar "$SCOUTERCTL_JAR" capture --user guest \
+"${SCOUTERCTL[@]}" capture \
   --object-hash 42 --date 20261102 --timezone Asia/Seoul \
   --from 2026-11-02T09:00:00+09:00 --to 2026-11-02T09:10:00+09:00 \
   --directory ./incident-profiles --include-profiles --include-text

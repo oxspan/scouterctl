@@ -18,6 +18,7 @@ import kotlin.system.exitProcess
 
 @Command(name = "scouterctl", mixinStandardHelpOptions = true, versionProvider = CliVersion::class,
     description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search.",
+        "Connect: doctor --host HOST --port PORT --user ACCOUNT, then object list with the same options.",
         "Password: SCOUTERCTL_PASSWORD environment variable. TCP has no native TLS; use a trusted path."])
 class Cli : Callable<Int> {
     @Parameters(arity = "1..2", paramLabel = "COMMAND") lateinit var words: List<String>
@@ -70,7 +71,7 @@ class Cli : Callable<Int> {
                 result(json.encodeToJsonElement(inspection), complete)
                 return if (complete) 0 else 8
             }
-            if (port !in 1..65535 || timeoutMs !in 1..60000 || maxPages !in 1..40) invalid("Invalid port, timeout or max-pages (1..40)")
+            if (maxPages !in 1..40) invalid("Use --max-pages 1..40")
             val query = if (command in setOf("xlog search", "capture")) query() else null
             if (command == "profile get") {
                 if (!required(date, "--date").matches(Regex("[0-9]{8}"))) invalid("Use an 8-digit storage date")
@@ -79,8 +80,10 @@ class Cli : Callable<Int> {
             }
             if (command == "capture") required(directory, "--directory")
             if (includeProfiles && required(query, "query").pageSize > 100) invalid("Profile capture page-size must be 1..100")
-            val password = System.getenv("SCOUTERCTL_PASSWORD") ?: invalid("Set SCOUTERCTL_PASSWORD")
-            CollectorSource.connect(Endpoint(host, port, required(user, "--user"), timeoutMs), password).use { source ->
+            val endpoint = Endpoint(host, port, required(user, "--user"), timeoutMs)
+            val password = System.getenv("SCOUTERCTL_PASSWORD")
+                ?: invalid("Set SCOUTERCTL_PASSWORD to your Collector password; see the quick start for hidden input")
+            CollectorSource.connect(endpoint, password).use { source ->
                 when (command) {
                     "doctor" -> result(json.encodeToJsonElement(source.info))
                     "object list" -> result(json.encodeToJsonElement(source.objects()))
@@ -104,9 +107,11 @@ class Cli : Callable<Int> {
         } catch (error: CliFailure) {
             return failure(error)
         } catch (_: SocketTimeoutException) {
-            return failure(CliFailure(ErrorCode.CONNECTION_FAILED, "Collector timeout; upstream cancellation is not guaranteed"))
+            return failure(CliFailure(ErrorCode.CONNECTION_FAILED,
+                "Collector timeout; check TCP access and --timeout-ms; upstream cancellation is not guaranteed"))
         } catch (_: SocketException) {
-            return failure(CliFailure(ErrorCode.CONNECTION_FAILED, "Collector connection failed"))
+            return failure(CliFailure(ErrorCode.CONNECTION_FAILED,
+                "Collector connection failed; check --host, --port and TCP access"))
         } catch (_: IOException) {
             return failure(CliFailure(ErrorCode.IO_ERROR, "Transport or artifact I/O failed"))
         } catch (_: IllegalArgumentException) {

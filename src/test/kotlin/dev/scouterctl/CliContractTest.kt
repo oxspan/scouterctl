@@ -122,14 +122,20 @@ class CliContractTest : FunSpec({
 })
 
 internal class ContractCli(private val temp: Path) {
-    fun run(port: Int, args: List<String>): Outcome {
+    fun run(port: Int, args: List<String>): Outcome =
+        run(args + listOf("--port", port.toString(), "--user", "guest"))
+
+    fun run(args: List<String>, password: String? = "fixture-password"): Outcome {
         val stderr = Files.createTempFile(temp, "stderr", ".txt")
         val stdout = Files.createTempFile(temp, "stdout", ".jsonl")
         val process = ProcessBuilder(listOf(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-            "-jar", System.getProperty("cli.jar")) + args + listOf("--port", port.toString(), "--user", "guest"))
+            "-jar", System.getProperty("cli.jar")) + args)
+            .directory(temp.toFile())
             .redirectOutput(stdout.toFile()).redirectError(stderr.toFile()).apply {
-                environment()["SCOUTERCTL_PASSWORD"] = "fixture-password"
+                environment().remove("SCOUTERCTL_PASSWORD")
+                if (password != null) environment()["SCOUTERCTL_PASSWORD"] = password
             }.start()
+        process.outputStream.close()
         try {
             check(process.waitFor(15, TimeUnit.SECONDS)) { "CLI did not terminate" }
             return Outcome(process.exitValue(), Files.readString(stdout), Files.readString(stderr))

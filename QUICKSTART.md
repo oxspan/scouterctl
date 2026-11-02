@@ -4,7 +4,17 @@ A CLI for querying observability data from a Scouter Collector and exporting it 
 
 ## Prerequisites
 
-You need JDK 21 and access to a Scouter Collector running **2.21.3**. The Java runtime, Collector, and Agent are not included in the package. Extract the ZIP and start in the directory containing the executable JAR.
+You need JDK 21 and access to a Scouter Collector running **2.21.3**. The Java runtime, Collector, and Agent are not included in the package. Check `java -version` first: an older runtime cannot start this JAR and cannot return the CLI's JSON errors.
+
+Download one ZIP and its `SHA256SUMS` from the same release into an empty directory. Before extracting:
+
+```sh
+sha256sum -c SHA256SUMS
+unzip scouterctl-*-poc.zip
+cd scouterctl-*/
+```
+
+Start in the extracted directory containing the executable JAR:
 
 ```sh
 SCOUTERCTL_JAR="scouterctl-$(cat version.txt)-all.jar"
@@ -12,39 +22,55 @@ java -jar "$SCOUTERCTL_JAR" --version
 java -jar "$SCOUTERCTL_JAR" --help
 ```
 
-The version output matches the included `version.txt`. To verify the downloaded ZIP, place it alongside `SHA256SUMS` and run `sha256sum -c SHA256SUMS`. Offline `inspect` needs only JDK 21 and a v2 capture, with no account or Collector connection.
+The version output matches the included `version.txt`. Offline `inspect` needs only JDK 21 and a v2 capture, with no account or Collector connection.
 
 ## Connect and find a target
 
-These examples use Bash. Replace `guest` with your Collector account. Supply the password through an environment variable.
+These examples use Bash. Obtain the Collector's TCP host, port, and an account from its administrator. The defaults are `127.0.0.1:6100`; a Web API URL or port is not the Collector TCP endpoint. Replace the three connection values below once. The array keeps the same endpoint/account for subsequent online commands in this shell; it contains no password.
 
 ```sh
+SCOUTERCTL=(java -jar "$SCOUTERCTL_JAR" --host 127.0.0.1 --port 6100 --user guest)
 read -r -s -p 'Collector password: ' SCOUTERCTL_PASSWORD
+printf '\n'
 export SCOUTERCTL_PASSWORD
 
-java -jar "$SCOUTERCTL_JAR" doctor --user guest
-java -jar "$SCOUTERCTL_JAR" object list --user guest
+"${SCOUTERCTL[@]}" doctor
+"${SCOUTERCTL[@]}" object list
 ```
 
-The default address is `127.0.0.1:6100`. To connect to another server, add `--host` and `--port` to **each command**. The TCP connection has no built-in TLS; use a trusted network or an SSH/VPN tunnel.
+`doctor` returning `ok: true` and exit `0` confirms login and the supported Collector version. It does not confirm that an Agent is connected. `object list` returns `data[]`; choose the expected application with `alive: true` and copy its `objHash` for queries. An empty `data: []` with exit `0` is valid: confirm the Agent points to this Collector and is running, then repeat discovery.
+
+The CLI does not prompt or save credentials/connection settings. Missing input returns JSON and exit `2`, including when stdin is redirected. The hidden password prompt above belongs to Bash. The TCP connection has no built-in TLS; use a trusted network or an SSH/VPN tunnel.
+
+### If connection or discovery fails
+
+| Result | Next step |
+| --- | --- |
+| Exit `2`, `INVALID_ARGUMENT` | Supply `--user` and `SCOUTERCTL_PASSWORD`. Use a hostname/IP for `--host`, a port in 1..65535, and `--timeout-ms` in 1..60000. |
+| Exit `3`, `AUTH_FAILED` | Check the account and password with the Collector administrator. Re-enter the password using hidden input. |
+| Exit `5`, `CONNECTION_FAILED` | Check hostname resolution, the TCP port, Collector availability, and the network/tunnel. For a slow reachable Collector, adjust `--timeout-ms` (default 5000). |
+| Exit `9`, `VERSION_MISMATCH` | This POC supports Collector 2.21.3. Confirm the endpoint and version; there is no compatibility override. |
+| Exit `0`, empty object list | Login worked, but no targets were reported. Check the Agent's Collector address and startup logs. |
+
+Messages suggest a next check, not a definitive network diagnosis. A timeout can occur after a connection was established. After correcting input or configuration, rerun `doctor`, then `object list`.
 
 ## Query and export
 
 Run these commands with the password environment variable set. Replace the example object hash, date, time zone, and transaction ID with values from your environment.
 
 ```sh
-java -jar "$SCOUTERCTL_JAR" xlog search --user guest \
+"${SCOUTERCTL[@]}" xlog search \
   --object-hash 42 --date 20261102 --timezone Asia/Seoul \
   --from 2026-11-02T09:00:00+09:00 --to 2026-11-02T09:10:00+09:00
 
-java -jar "$SCOUTERCTL_JAR" profile get --user guest \
+"${SCOUTERCTL[@]}" profile get \
   --date 20261102 --txid 9223372036854775806
 
 # Optional: include potentially sensitive service, SQL, and error dictionary text.
-java -jar "$SCOUTERCTL_JAR" profile get --user guest \
+"${SCOUTERCTL[@]}" profile get \
   --date 20261102 --txid 9223372036854775806 --include-text
 
-java -jar "$SCOUTERCTL_JAR" capture --user guest \
+"${SCOUTERCTL[@]}" capture \
   --object-hash 42 --date 20261102 --timezone Asia/Seoul \
   --from 2026-11-02T09:00:00+09:00 --to 2026-11-02T09:10:00+09:00 \
   --directory ./incident-001
