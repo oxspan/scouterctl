@@ -1,5 +1,19 @@
 # 변경 기록
 
+## [0.2.0](https://github.com/oxspan/scouterctl/compare/v0.1.0...v0.2.0) (2026-11-03)
+
+
+### Features
+
+* ✨ Add offline service error and latency summaries ([#16](https://github.com/oxspan/scouterctl/issues/16)) ([e7c771f](https://github.com/oxspan/scouterctl/commit/e7c771f9b83617b89510e3cef8010aa1a618acbf))
+* ✨ Add saved connections and hidden terminal password input ([#15](https://github.com/oxspan/scouterctl/issues/15)) ([c6bc266](https://github.com/oxspan/scouterctl/commit/c6bc26645b356ff19f64ef57c62ee4c0ae798351))
+
+
+### Bug Fixes
+
+* 🐛 Improve initial Collector connection diagnostics ([#14](https://github.com/oxspan/scouterctl/issues/14)) ([1f7f6c1](https://github.com/oxspan/scouterctl/commit/1f7f6c13ffbbe9c3b1cf94a7aa67745c3fa40a58))
+* 🐛 Preserve UTF-8 JSON output on Windows ([2a74318](https://github.com/oxspan/scouterctl/commit/2a743180643f0b1c309683fcb5984645fb215aa2))
+
 ## [0.1.0](https://github.com/oxspan/scouterctl/compare/v0.0.0...v0.1.0) (2026-11-02)
 
 
