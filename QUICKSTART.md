@@ -6,7 +6,9 @@ A CLI for querying observability data from a Scouter Collector and exporting it 
 
 You need JDK 21 and access to a Scouter Collector running **2.21.3**. The Java runtime, Collector, and Agent are not included in the package. Check `java -version` first: an older runtime cannot start this JAR and cannot return the CLI's JSON errors.
 
-Download one ZIP and its `SHA256SUMS` from the same release into an empty directory. Before extracting:
+Download one ZIP and its `SHA256SUMS` from the same release into an empty directory.
+
+On Linux:
 
 ```sh
 sha256sum -c SHA256SUMS
@@ -23,6 +25,26 @@ java -jar "$SCOUTERCTL_JAR" --help
 ```
 
 The version output matches the included `version.txt`. Offline `inspect` needs only JDK 21 and a v2 capture, with no account or Collector connection.
+
+On macOS, use `shasum -a 256 -c SHA256SUMS` instead of `sha256sum -c SHA256SUMS`, then use the same unzip and Bash commands.
+
+On Windows with PowerShell 7:
+
+Use ASCII installation paths and command-line arguments; spaces are supported. The Windows JDK launcher can replace characters outside the system code page before the CLI starts. Use `--service-hash` instead of a non-ASCII `--service-name`. Unicode text inside captures and JSON output is preserved.
+
+```powershell
+$archive = Get-Item ./scouterctl-*-poc.zip
+$expected = (Get-Content ./SHA256SUMS -Raw).Trim()
+$actual = (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($expected -cne "$actual  $($archive.Name)") { throw 'Checksum mismatch' }
+Expand-Archive -LiteralPath $archive.FullName -DestinationPath .
+Set-Location $archive.Name.Replace('-poc.zip', '')
+$SCOUTERCTL_JAR = "scouterctl-$((Get-Content version.txt -Raw).Trim())-all.jar"
+java -jar $SCOUTERCTL_JAR --version
+java -jar $SCOUTERCTL_JAR --help
+```
+
+For online commands in PowerShell, set the password with `$env:SCOUTERCTL_PASSWORD = Read-Host 'Collector password' -MaskInput`, then run `java -jar $SCOUTERCTL_JAR --host 127.0.0.1 --port 6100 --user guest doctor` with your connection values. Clear the environment value afterward with `Remove-Item Env:SCOUTERCTL_PASSWORD`. Replace the Bash array invocation in later examples with `java -jar $SCOUTERCTL_JAR` and the same connection flags. Passwords are not stored in the CLI configuration.
 
 ## Connect and find a target
 
@@ -142,7 +164,7 @@ java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles \
 
 Results contain `records[].xlog.txid`; pass one to `inspect --txid` for details. All filters combine with AND. Service names match exactly and require stored text plus `--include-text`; use `--service-hash` without text. Unknown names are counted separately and do not match name filters. Results sort by request duration descending, end time ascending, then numeric txid ascending. `--errors-only` means a nonzero XLog error hash, not HTTP status or SQL error classification.
 
-Search defaults to 20 results (limit 1..1000), scans and validates every referenced page, and summarizes all matches rather than only the displayed top N. `truncated` means the result limit omitted matches. Empty matches return an empty result. Partial captures, missing profiles or a saved failure return `8` with data; otherwise search returns `0`. No Collector account or connection is needed. Grouped aggregation and bundle comparison are not supported.
+Search defaults to 20 results (limit 1..1000), scans and validates every referenced page, and summarizes all matches rather than only the displayed top N. `truncated` means the result limit omitted matches. Empty matches return an empty result. Partial captures, missing profiles or a saved failure return `8` with data; otherwise search returns `0`. No Collector account or connection is needed. Use `inspect summary` for service-level aggregation; comparisons across bundles are not supported.
 
 Unset the password environment variable when you finish:
 
@@ -153,14 +175,14 @@ unset SCOUTERCTL_PASSWORD
 ## Output and support scope
 
 - `doctor`, `object list`, `xlog search`, `profile get`, and `capture` (including `--resume`) are read-only.
-- Results use JSON or JSONL, with 64-bit transaction IDs represented as strings. Help and version output use plain text.
+- Results use UTF-8 JSON or JSONL, with 64-bit transaction IDs represented as strings. Configure terminal and pipe readers to decode UTF-8. Help and version output use plain text.
 - SQL steps include `hash`, `elapsedMs`, `errorHash`, and `updated`. To investigate application errors, inspect the XLog's `errorHash` and the profile for the same `txid`.
 - Text is excluded by default. `profile get --include-text` adds `transaction.service`, `transaction.error`, `steps[].sql.statement`, and `steps[].sql.error`. Entries retain their hash and report `resolved` with text or `unresolved` with null text. A zero error hash has no error entry; an unavailable XLog sets `transaction.status` to `unavailable` while SQL resolution continues. Lookup uses the requested date; connection/protocol failures return a nonzero exit code.
 - Opt-in text is returned as stored and may contain sensitive values, SQL literals, or exception details. Separate SQL bind fields and other free-text steps remain excluded. Profile requests are limited to 1,000 steps; truncation detection and method-name resolution are not supported.
 - `--include-text` is supported by `profile get`, `capture --include-profiles`, and `inspect`. V2 pages contain XLogs, profile availability, profiles, and optional dictionary snapshots. Inspect uses only these stored values.
 - Profile capture is limited to 10,000 pages and 16 MiB per page. A smaller page size may be needed for large profiles; changing the query requires a new capture. Resume may leave unreferenced page files, which are ignored. Checksums detect accidental corruption; the manifest is not signed.
 - Capture completion indicates that the requested execution has finished, not that all traffic is included. Concurrent writes and durability during power loss are not guaranteed.
-- Runtime validation has been performed on Linux/WSL. Other Collector versions, external databases, Windows, and Native Image builds are outside the validated scope.
+- The packaged CLI and Kotest suite are verified on Linux, Windows, and macOS with JDK 21. Real Collector/Agent/Spring instrumentation has been validated on Linux/WSL. Instrumentation and interactive terminal behavior on other systems, other Collector versions, external databases, non-ASCII installation paths, and Native Image builds are outside the validated scope.
 
 Exit codes: `0` success, `2` invalid input/resume conditions, `3` authentication/session error, `5` connection failure/timeout, `6` protocol error, `7` profile/transaction not found, `8` partial completion or capture limit, `9` version mismatch, `10` I/O or integrity error.
 

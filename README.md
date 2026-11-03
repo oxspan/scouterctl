@@ -25,7 +25,7 @@ This project is an **early POC**. See [version.txt](version.txt) for the current
 - **Scouter Collector 2.21.3** and an account with query access for online commands
 - Network access to the Collector's TCP port
 
-Runtime validation has been performed on Linux/WSL. Other Collector versions are rejected at connection time. Install the Collector and Agent separately.
+CI verifies the same release ZIP and CLI contract suite on Linux, Windows, and macOS with JDK 21. Real Collector/Agent/Spring instrumentation has been validated on Linux/WSL; interactive terminal behavior and instrumentation on other systems remain separate verification work. Other Collector versions are rejected at connection time. Install the Collector and Agent separately. The [quick start](QUICKSTART.md) includes Bash, macOS checksum, and PowerShell 7 installation commands.
 
 ## Getting started
 
@@ -198,7 +198,7 @@ For CI, use explicit endpoint flags or an isolated `SCOUTERCTL_CONFIG`, set the 
 
 ## Output and query scope
 
-- Regular queries return JSON. `xlog search` returns JSONL with one event per line: `start → record → complete`. On failure, it ends with an `error` event.
+- Regular queries return UTF-8 JSON. `xlog search` returns UTF-8 JSONL with one event per line: `start → record → complete`. On failure, it ends with an `error` event. Configure terminal and pipe readers to decode UTF-8.
 - `txid`, `gxid`, and `caller` are strings to preserve 64-bit precision.
 - Each query covers one date and one object. The start time is inclusive and the end time is exclusive: `[from,to)`.
 - `--timezone` must match the Collector's actual time zone.
@@ -224,7 +224,7 @@ For CI, use explicit endpoint flags or an isolated `SCOUTERCTL_CONFIG`, set the 
 - The Collector TCP connection has no built-in TLS. Use a trusted network or an SSH/VPN tunnel.
 - Profile requests are limited to 1,000 steps. Truncation detection and method-name resolution are not supported yet. Text resolution depends on the Collector's retained dictionaries; hashes are not collision-free identities.
 - Offline search supports request filters, top N and summary counts/durations. Service summaries group captured XLogs by service hash. Percentiles, SQL-level ranking and bundle comparison are not implemented.
-- File durability during power loss, load from long-running exports, Windows execution, and Native Image builds have not been validated.
+- File durability during power loss, load from long-running exports, non-ASCII installation paths, and Native Image builds have not been validated. On Windows, use ASCII installation paths and command-line arguments (spaces are supported); the JDK launcher can replace characters outside the system code page before the CLI starts. Use `--service-hash` when a service name contains such characters. Unicode text inside captures and JSON output is preserved.
 - Server configuration changes and administrative commands are not available.
 
 ## Documentation

@@ -10,6 +10,7 @@ import picocli.CommandLine.Mixin
 import picocli.CommandLine.Spec
 import picocli.CommandLine.Model.CommandSpec
 import java.io.IOException
+import java.io.PrintStream
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.nio.file.Path
@@ -194,12 +195,13 @@ private fun result(data: JsonElement, complete: Boolean = true) {
     emit(buildJsonObject { put("schemaVersion", "scouterctl.result/v1"); put("ok", true)
         put("data", data); put("executionComplete", complete) })
 }
+private val jsonOutput = PrintStream(System.out, true, Charsets.UTF_8)
 private fun emit(value: JsonElement) {
-    println(value)
-    if (System.out.checkError()) throw CliFailure(ErrorCode.IO_ERROR, "Output stream failed")
+    jsonOutput.println(value)
+    if (jsonOutput.checkError()) throw CliFailure(ErrorCode.IO_ERROR, "Output stream failed")
 }
 private fun failure(error: CliFailure): Int {
-    println(buildJsonObject { put("schemaVersion", "scouterctl.error/v1"); put("type", "error"); put("ok", false)
+    jsonOutput.println(buildJsonObject { put("schemaVersion", "scouterctl.error/v1"); put("type", "error"); put("ok", false)
         putJsonObject("error") { put("code", error.code.name); put("message", error.message) } })
     return error.code.exit
 }
