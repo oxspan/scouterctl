@@ -25,7 +25,7 @@ This project is an **early POC**. See [version.txt](version.txt) for the current
 - **Scouter Collector 2.21.3** and an account with query access for online commands
 - Network access to the Collector's TCP port
 
-Runtime validation has been performed on Linux/WSL. Other Collector versions are rejected at connection time. Install the Collector and Agent separately.
+CI verifies the same release ZIP and CLI contract suite on Linux, Windows, and macOS with JDK 21. Real Collector/Agent/Spring instrumentation has been validated on Linux/WSL; interactive terminal behavior and instrumentation on other systems remain separate verification work. Other Collector versions are rejected at connection time. Install the Collector and Agent separately. The [quick start](QUICKSTART.md) includes Bash, macOS checksum, and PowerShell 7 installation commands.
 
 ## Getting started
 

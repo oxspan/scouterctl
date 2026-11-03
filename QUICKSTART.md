@@ -6,7 +6,9 @@ A CLI for querying observability data from a Scouter Collector and exporting it 
 
 You need JDK 21 and access to a Scouter Collector running **2.21.3**. The Java runtime, Collector, and Agent are not included in the package. Check `java -version` first: an older runtime cannot start this JAR and cannot return the CLI's JSON errors.
 
-Download one ZIP and its `SHA256SUMS` from the same release into an empty directory. Before extracting:
+Download one ZIP and its `SHA256SUMS` from the same release into an empty directory.
+
+On Linux:
 
 ```sh
 sha256sum -c SHA256SUMS
@@ -23,6 +25,24 @@ java -jar "$SCOUTERCTL_JAR" --help
 ```
 
 The version output matches the included `version.txt`. Offline `inspect` needs only JDK 21 and a v2 capture, with no account or Collector connection.
+
+On macOS, use `shasum -a 256 -c SHA256SUMS` instead of `sha256sum -c SHA256SUMS`, then use the same unzip and Bash commands.
+
+On Windows with PowerShell 7:
+
+```powershell
+$archive = Get-Item ./scouterctl-*-poc.zip
+$expected = (Get-Content ./SHA256SUMS -Raw).Trim()
+$actual = (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($expected -cne "$actual  $($archive.Name)") { throw 'Checksum mismatch' }
+Expand-Archive -LiteralPath $archive.FullName -DestinationPath .
+Set-Location $archive.Name.Replace('-poc.zip', '')
+$SCOUTERCTL_JAR = "scouterctl-$((Get-Content version.txt -Raw).Trim())-all.jar"
+java -jar $SCOUTERCTL_JAR --version
+java -jar $SCOUTERCTL_JAR --help
+```
+
+For online commands in PowerShell, set the password with `$env:SCOUTERCTL_PASSWORD = Read-Host 'Collector password' -MaskInput`, then run `java -jar $SCOUTERCTL_JAR --host 127.0.0.1 --port 6100 --user guest doctor` with your connection values. Clear the environment value afterward with `Remove-Item Env:SCOUTERCTL_PASSWORD`. Replace the Bash array invocation in later examples with `java -jar $SCOUTERCTL_JAR` and the same connection flags. Passwords are not stored in the CLI configuration.
 
 ## Connect and find a target
 

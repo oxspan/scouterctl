@@ -9,7 +9,11 @@ Use JDK 21 and the checked-in Gradle Wrapper:
 bash .github/scripts/verify-package.sh
 ```
 
-The verification script requires Bash, Java, jq, unzip, and standard GNU utilities. CI runs on Linux and checks the CLI contract tests, packaged CLI version/help, archive contents, and checksum. The real Collector/Agent/Spring smoke tests require a separately built Scouter checkout and are not part of this CI workflow.
+The Linux verification script requires Bash, Java, jq, unzip, and standard GNU utilities. CI builds the release package on Linux, then downloads that exact ZIP on Windows and macOS. Those jobs verify the checksum, archive contents, version/help, and run the complete Kotest suite against the extracted JAR in a path containing spaces and non-ASCII characters. Each operating system uses its native JDK 21. Release automation waits for all three platforms.
+
+To test an extracted package locally, run `./gradlew test -PcliJar=/absolute/path/to/scouterctl-version-all.jar` (`./gradlew.bat` in PowerShell). The package version must match the checkout. The normal test task builds and uses the local JAR when this property is omitted.
+
+The real Collector/Agent/Spring smoke tests require a separately built Scouter checkout and are not part of this CI workflow. Hosted-runner CLI checks do not establish real Collector instrumentation or interactive terminal behavior on every OS.
 
 ## Branches
 
@@ -94,5 +98,7 @@ The workflow uses only the repository's `GITHUB_TOKEN`. Allow GitHub Actions to 
 For releases created by this automation, open **Actions → CI and release → Run workflow** on `master` and enter the existing tag, such as `v0.0.1`, in `release_tag`. Leaving it blank runs checks only.
 
 The workflow checks out that tag, rebuilds and verifies its package, confirms the tag matches the built commit, and uploads missing assets. Existing assets must be byte-identical; they are never overwritten. If rebuilding produces different bytes, recover the original `release-package` artifact from the release run (retained for 14 days) and upload only the missing file. Do not retag an existing release.
+
+Recovery verifies the historical tag on Linux and skips the new portable jobs because older tags may not contain their scripts or test configuration. This exception only repairs an existing tag; new release publication requires the Windows and macOS checks.
 
 Actions are pinned to commit SHAs. Dependabot groups GitHub Actions updates into one weekly PR. No personal access token or additional release service is required.
