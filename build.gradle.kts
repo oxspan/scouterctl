@@ -47,8 +47,12 @@ tasks.processResources {
 }
 tasks.test {
     useJUnitPlatform { includeEngines("kotest") }
-    dependsOn("fatJar")
-    systemProperty("cli.jar", layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath)
+    val externalJar = providers.gradleProperty("cliJar")
+    if (!externalJar.isPresent) dependsOn("fatJar")
+    val cliJar = externalJar.map { file(it) }
+        .orElse(layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").map { it.asFile })
+    inputs.file(cliJar)
+    systemProperty("cli.jar", cliJar.get().absolutePath)
 }
 tasks.register<Jar>("fatJar") {
     dependsOn(tasks.classes)
