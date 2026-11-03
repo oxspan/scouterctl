@@ -19,7 +19,7 @@ try {
     if (Compare-Object $expected $actual -CaseSensitive) { throw 'Unexpected archive contents' }
 } finally { $zip.Dispose() }
 
-$destination = [IO.Path]::GetFullPath('build/portable install 한글')
+$destination = [IO.Path]::GetFullPath('build/portable install')
 Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force
 $package = Join-Path $destination $prefix
 foreach ($pair in @(@('QUICKSTART.md', 'README.md'), @('version.txt', 'version.txt'))) {

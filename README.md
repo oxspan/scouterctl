@@ -224,7 +224,7 @@ For CI, use explicit endpoint flags or an isolated `SCOUTERCTL_CONFIG`, set the 
 - The Collector TCP connection has no built-in TLS. Use a trusted network or an SSH/VPN tunnel.
 - Profile requests are limited to 1,000 steps. Truncation detection and method-name resolution are not supported yet. Text resolution depends on the Collector's retained dictionaries; hashes are not collision-free identities.
 - Offline search supports request filters, top N and summary counts/durations. Service summaries group captured XLogs by service hash. Percentiles, SQL-level ranking and bundle comparison are not implemented.
-- File durability during power loss, load from long-running exports, Windows execution, and Native Image builds have not been validated.
+- File durability during power loss, load from long-running exports, non-ASCII installation paths, and Native Image builds have not been validated. On Windows, use an installation path containing ASCII characters (spaces are supported); the JDK launcher can reject paths containing characters outside the system code page.
 - Server configuration changes and administrative commands are not available.
 
 ## Documentation

@@ -30,6 +30,8 @@ On macOS, use `shasum -a 256 -c SHA256SUMS` instead of `sha256sum -c SHA256SUMS`
 
 On Windows with PowerShell 7:
 
+Use an installation path containing ASCII characters; spaces are supported. Non-ASCII installation paths are outside this POC's validated scope because the Windows JDK launcher can reject characters outside the system code page.
+
 ```powershell
 $archive = Get-Item ./scouterctl-*-poc.zip
 $expected = (Get-Content ./SHA256SUMS -Raw).Trim()
@@ -180,7 +182,7 @@ unset SCOUTERCTL_PASSWORD
 - `--include-text` is supported by `profile get`, `capture --include-profiles`, and `inspect`. V2 pages contain XLogs, profile availability, profiles, and optional dictionary snapshots. Inspect uses only these stored values.
 - Profile capture is limited to 10,000 pages and 16 MiB per page. A smaller page size may be needed for large profiles; changing the query requires a new capture. Resume may leave unreferenced page files, which are ignored. Checksums detect accidental corruption; the manifest is not signed.
 - Capture completion indicates that the requested execution has finished, not that all traffic is included. Concurrent writes and durability during power loss are not guaranteed.
-- Runtime validation has been performed on Linux/WSL. Other Collector versions, external databases, Windows, and Native Image builds are outside the validated scope.
+- The packaged CLI and Kotest suite are verified on Linux, Windows, and macOS with JDK 21. Real Collector/Agent/Spring instrumentation has been validated on Linux/WSL. Instrumentation and interactive terminal behavior on other systems, other Collector versions, external databases, non-ASCII installation paths, and Native Image builds are outside the validated scope.
 
 Exit codes: `0` success, `2` invalid input/resume conditions, `3` authentication/session error, `5` connection failure/timeout, `6` protocol error, `7` profile/transaction not found, `8` partial completion or capture limit, `9` version mismatch, `10` I/O or integrity error.
 

@@ -9,7 +9,7 @@ Use JDK 21 and the checked-in Gradle Wrapper:
 bash .github/scripts/verify-package.sh
 ```
 
-The Linux verification script requires Bash, Java, jq, unzip, and standard GNU utilities. CI builds the release package on Linux, then downloads that exact ZIP on Windows and macOS. Those jobs verify the checksum, archive contents, version/help, and run the complete Kotest suite against the extracted JAR in a path containing spaces and non-ASCII characters. Each operating system uses its native JDK 21. Release automation waits for all three platforms.
+The Linux verification script requires Bash, Java, jq, unzip, and standard GNU utilities. CI builds the release package on Linux, then downloads that exact ZIP on Windows and macOS. Those jobs verify the checksum, archive contents, version/help, and run the complete Kotest suite against the extracted JAR in a path containing spaces. Each operating system uses its native JDK 21. Release automation waits for all three platforms. Non-ASCII installation paths are outside this POC's validated scope: the Windows JDK launcher failed before entering the CLI when given a Korean path on the hosted runner.
 
 To test an extracted package locally, run `./gradlew test -PcliJar=/absolute/path/to/scouterctl-version-all.jar` (`./gradlew.bat` in PowerShell). The package version must match the checkout. The normal test task builds and uses the local JAR when this property is omitted.
 
