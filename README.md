@@ -198,7 +198,7 @@ For CI, use explicit endpoint flags or an isolated `SCOUTERCTL_CONFIG`, set the 
 
 ## Output and query scope
 
-- Regular queries return JSON. `xlog search` returns JSONL with one event per line: `start → record → complete`. On failure, it ends with an `error` event.
+- Regular queries return UTF-8 JSON. `xlog search` returns UTF-8 JSONL with one event per line: `start → record → complete`. On failure, it ends with an `error` event. Configure terminal and pipe readers to decode UTF-8.
 - `txid`, `gxid`, and `caller` are strings to preserve 64-bit precision.
 - Each query covers one date and one object. The start time is inclusive and the end time is exclusive: `[from,to)`.
 - `--timezone` must match the Collector's actual time zone.
@@ -224,7 +224,7 @@ For CI, use explicit endpoint flags or an isolated `SCOUTERCTL_CONFIG`, set the 
 - The Collector TCP connection has no built-in TLS. Use a trusted network or an SSH/VPN tunnel.
 - Profile requests are limited to 1,000 steps. Truncation detection and method-name resolution are not supported yet. Text resolution depends on the Collector's retained dictionaries; hashes are not collision-free identities.
 - Offline search supports request filters, top N and summary counts/durations. Service summaries group captured XLogs by service hash. Percentiles, SQL-level ranking and bundle comparison are not implemented.
-- File durability during power loss, load from long-running exports, non-ASCII installation paths, and Native Image builds have not been validated. On Windows, use an installation path containing ASCII characters (spaces are supported); the JDK launcher can reject paths containing characters outside the system code page.
+- File durability during power loss, load from long-running exports, non-ASCII installation paths, and Native Image builds have not been validated. On Windows, use ASCII installation paths and command-line arguments (spaces are supported); the JDK launcher can replace characters outside the system code page before the CLI starts. Use `--service-hash` when a service name contains such characters. Unicode text inside captures and JSON output is preserved.
 - Server configuration changes and administrative commands are not available.
 
 ## Documentation

@@ -30,7 +30,7 @@ On macOS, use `shasum -a 256 -c SHA256SUMS` instead of `sha256sum -c SHA256SUMS`
 
 On Windows with PowerShell 7:
 
-Use an installation path containing ASCII characters; spaces are supported. Non-ASCII installation paths are outside this POC's validated scope because the Windows JDK launcher can reject characters outside the system code page.
+Use ASCII installation paths and command-line arguments; spaces are supported. The Windows JDK launcher can replace characters outside the system code page before the CLI starts. Use `--service-hash` instead of a non-ASCII `--service-name`. Unicode text inside captures and JSON output is preserved.
 
 ```powershell
 $archive = Get-Item ./scouterctl-*-poc.zip
@@ -175,7 +175,7 @@ unset SCOUTERCTL_PASSWORD
 ## Output and support scope
 
 - `doctor`, `object list`, `xlog search`, `profile get`, and `capture` (including `--resume`) are read-only.
-- Results use JSON or JSONL, with 64-bit transaction IDs represented as strings. Help and version output use plain text.
+- Results use UTF-8 JSON or JSONL, with 64-bit transaction IDs represented as strings. Configure terminal and pipe readers to decode UTF-8. Help and version output use plain text.
 - SQL steps include `hash`, `elapsedMs`, `errorHash`, and `updated`. To investigate application errors, inspect the XLog's `errorHash` and the profile for the same `txid`.
 - Text is excluded by default. `profile get --include-text` adds `transaction.service`, `transaction.error`, `steps[].sql.statement`, and `steps[].sql.error`. Entries retain their hash and report `resolved` with text or `unresolved` with null text. A zero error hash has no error entry; an unavailable XLog sets `transaction.status` to `unavailable` while SQL resolution continues. Lookup uses the requested date; connection/protocol failures return a nonzero exit code.
 - Opt-in text is returned as stored and may contain sensitive values, SQL literals, or exception details. Separate SQL bind fields and other free-text steps remain excluded. Profile requests are limited to 1,000 steps; truncation detection and method-name resolution are not supported.

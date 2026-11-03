@@ -9,6 +9,30 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 class ServiceSummaryTest : FunSpec({
+    test("multilingual captured text survives UTF-8 summary and detail output") {
+        val work = tempdir().toPath()
+        val directory = searchFixture(work, empty = true)
+        val store = EvidenceStore(directory)
+        val manifest = store.load()
+        val text = "한글 服务 café 😀"
+        val profile = ProfileRecord("1", listOf(ProfileStep("SQL3", 1,
+            SqlProfile(123, 1, 8, statement = DictionaryText(123, "SELECT '$text'"),
+                error = DictionaryText(8, text)))),
+            transaction = ProfileTransaction("available", DictionaryText(7, text), DictionaryText(8, text)))
+        val record = EvidenceRecord(XLogRecord("1", "0", "0", manifest.query.from, 42, 7, 1, 8),
+            ProfileAvailability.AVAILABLE, profile)
+        store.save(manifest.copy(pages = listOf(store.writePage(0, listOf(record)))))
+
+        val summary = summaryCli(work, directory, listOf("--include-text"))
+        summary.exit shouldBe 0
+        summary.stderr shouldBe ""
+        summary.data()["services"]!!.jsonArray.single().jsonObject["serviceName"]!!.jsonPrimitive.content shouldBe text
+        val detail = runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", "1", "--include-text"))
+        detail.exit shouldBe 0
+        detail.stderr shouldBe ""
+        json.decodeFromJsonElement<ProfileRecord>(detail.data()["record"]!!.jsonObject["profile"]!!) shouldBe profile
+    }
+
     test("zero-error service has no error representative and totals do not overflow 32 bits") {
         val work = tempdir().toPath()
         val directory = searchFixture(work, text = false, empty = true)
