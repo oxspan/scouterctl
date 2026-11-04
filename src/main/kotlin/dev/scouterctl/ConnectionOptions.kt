@@ -24,7 +24,8 @@ class ConnectionOptions {
         val console = if (!noInput && (interactive || login)) System.console() else null
         if (console == null) throw CliFailure(ErrorCode.INVALID_ARGUMENT,
             "Set SCOUTERCTL_PASSWORD, or use --interactive on a terminal for hidden input")
-        System.err.print("Collector password (hidden; Ctrl+D or Ctrl+C cancels): ")
+        val eof = if (System.getProperty("os.name").startsWith("Windows")) "Ctrl+Z then Enter" else "Ctrl+D"
+        System.err.print("Collector password (hidden; $eof or Ctrl+C cancels): ")
         System.err.flush()
         val chars = try { console.readPassword() } catch (_: IOError) {
             throw CliFailure(ErrorCode.IO_ERROR, "Could not read terminal password")
