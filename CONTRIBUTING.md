@@ -13,7 +13,7 @@ The Linux verification script requires Bash, Java, jq, unzip, and standard GNU u
 
 To test an extracted package locally, run `./gradlew test -PcliJar=/absolute/path/to/scouterctl-version-all.jar` (`./gradlew.bat` in PowerShell). The package version must match the checkout. The normal test task builds and uses the local JAR when this property is omitted.
 
-The real Collector/Agent/Spring smoke tests require a separately built Scouter checkout and are not part of this CI workflow. Hosted-runner CLI checks do not establish real Collector instrumentation or interactive terminal behavior on every OS.
+The real Collector/Agent/Spring smoke tests require a separately built Scouter checkout and are not part of this CI workflow. The Kotest suite uses native pseudo-terminals (PTY on Linux/macOS, ConPTY on Windows) to exercise hidden password input, cancellation, and saved connections against a protocol fixture. This verifies console behavior, not a specific desktop terminal application or real Collector instrumentation on every OS. The terminal library is test-only and is not included in the release JAR.
 
 ## Branches
 
