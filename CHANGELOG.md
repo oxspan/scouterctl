@@ -1,5 +1,12 @@
 # 변경 기록
 
+## [0.2.1](https://github.com/oxspan/scouterctl/compare/v0.2.0...v0.2.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* 🐛 Verify native terminal input and correct Windows cancellation hint ([#23](https://github.com/oxspan/scouterctl/issues/23)) ([f0d8edd](https://github.com/oxspan/scouterctl/commit/f0d8edd84e4fd520466dab049e6623ce5632cd88))
+
 ## [0.2.0](https://github.com/oxspan/scouterctl/compare/v0.1.0...v0.2.0) (2026-11-03)
 
 
