@@ -18,7 +18,7 @@ class OfflineCaptureTest : FunSpec({
             val cli = ContractCli(work)
             val textArgs = if (text) listOf("--include-text") else emptyList()
             WireFixture().use { server ->
-                cli.run(server.port, listOf("capture", "--include-profiles", "--directory", directory.toString()) + evidenceWindow + textArgs).exit shouldBe 0
+                cli.run(server, listOf("capture", "--include-profiles", "--directory", directory.toString()) + evidenceWindow + textArgs).exit shouldBe 0
             }
             WireFixture.ids.forEach { txid ->
                 val args = listOf("inspect", "--directory", directory.toString(), "--txid", txid.toString())
@@ -53,11 +53,11 @@ class OfflineCaptureTest : FunSpec({
         val cli = ContractCli(work)
         WireFixture().use { server ->
             val args = listOf("capture", "--include-profiles", "--directory", directory.toString(), "--max-pages", "1") + evidenceWindow
-            cli.run(server.port, args).exit shouldBe 8
+            cli.run(server, args).exit shouldBe 8
             Files.writeString(directory.resolve("unreferenced.partial"), "unfinished page data")
             runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", WireFixture.ids.first().toString())).exit shouldBe 8
             runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", WireFixture.ids.last().toString())).exit shouldBe 7
-            cli.run(server.port, args + "--resume").exit shouldBe 0
+            cli.run(server, args + "--resume").exit shouldBe 0
             val store = EvidenceStore(directory)
             val manifest = store.load()
             manifest.pages.flatMapIndexed { index, _ -> store.readPage(manifest, index) }.map { it.xlog.txid } shouldBe WireFixture.ids.map(Long::toString)
@@ -71,12 +71,12 @@ class OfflineCaptureTest : FunSpec({
             val cli = ContractCli(work)
             WireFixture(fault).use { server ->
                 val args = listOf("capture", "--include-profiles", "--directory", directory.toString()) + evidenceWindow
-                cli.run(server.port, args).exit shouldBe 10
+                cli.run(server, args).exit shouldBe 10
                 val checkpoint = EvidenceStore(directory).load()
                 checkpoint.pages.sumOf { it.records } shouldBe 2
                 checkpoint.executionComplete shouldBe false
                 checkpoint.lastFailure shouldBe ErrorCode.IO_ERROR
-                cli.run(server.port, args + "--resume").exit shouldBe 0
+                cli.run(server, args + "--resume").exit shouldBe 0
                 EvidenceStore(directory).load().pages.sumOf { it.records } shouldBe 3
             }
             runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", WireFixture.ids.last().toString())).exit shouldBe 0
@@ -90,7 +90,7 @@ class OfflineCaptureTest : FunSpec({
             val cli = ContractCli(work)
             WireFixture(fault).use { server ->
                 val args = listOf("capture", "--include-profiles", "--directory", directory.toString()) + evidenceWindow
-                cli.run(server.port, args).exit shouldBe 8
+                cli.run(server, args).exit shouldBe 8
                 val missing = runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", WireFixture.ids[1].toString()))
                 missing.exit shouldBe 8
                 val inspection = json.decodeFromJsonElement<Inspection>(missing.data())
@@ -99,7 +99,7 @@ class OfflineCaptureTest : FunSpec({
                 inspection.record.profileStatus shouldBe ProfileAvailability.UNAVAILABLE
                 inspection.record.profile shouldBe null
                 val expected = if (fault == Fault.PROFILE_MISSING_ONCE) 0 else 8
-                cli.run(server.port, args + "--resume").exit shouldBe expected
+                cli.run(server, args + "--resume").exit shouldBe expected
                 runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", WireFixture.ids[1].toString())).exit shouldBe expected
             }
         }
@@ -111,10 +111,10 @@ class OfflineCaptureTest : FunSpec({
         val cli = ContractCli(work)
         WireFixture().use { server ->
             val args = listOf("capture", "--include-profiles", "--directory", directory.toString()) + evidenceWindow
-            cli.run(server.port, args).exit shouldBe 0
-            cli.run(server.port, args + listOf("--resume", "--include-text")).exit shouldBe 2
+            cli.run(server, args).exit shouldBe 0
+            cli.run(server, args + listOf("--resume", "--include-text")).exit shouldBe 2
             val changed = args.toMutableList().apply { set(indexOf("--object-hash") + 1, "43") }
-            cli.run(server.port, changed + "--resume").exit shouldBe 2
+            cli.run(server, changed + "--resume").exit shouldBe 2
         }
     }
 })

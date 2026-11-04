@@ -54,7 +54,7 @@ class ConnectionInputTest : FunSpec({
 
     test("authenticated Collector without objects returns successful empty discovery") {
         WireFixture(Fault.EMPTY_OBJECTS).use { server ->
-            val result = ContractCli(tempdir().toPath()).run(server.port, listOf("object", "list"))
+            val result = ContractCli(tempdir().toPath()).run(server, listOf("object", "list"))
             result.exit shouldBe 0
             result.events.single()["data"]!!.jsonArray.size shouldBe 0
             result.events.single()["executionComplete"]!!.jsonPrimitive.boolean shouldBe true

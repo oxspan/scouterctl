@@ -14,7 +14,7 @@ class OfflineIntegrityTest : FunSpec({
             val cli = ContractCli(work)
             WireFixture().use { server ->
                 val args = listOf("capture", "--include-profiles", "--directory", directory.toString()) + evidenceWindow
-                cli.run(server.port, args).exit shouldBe 0
+                cli.run(server, args).exit shouldBe 0
                 val store = EvidenceStore(directory)
                 val manifest = store.load()
                 val first = directory.resolve(manifest.pages.first().name)
@@ -53,7 +53,7 @@ class OfflineIntegrityTest : FunSpec({
                 val inspected = runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", WireFixture.ids.last().toString()))
                 inspected.exit shouldBe 10
                 inspected.events.single()["type"]!!.jsonPrimitive.content shouldBe "error"
-                cli.run(server.port, args + "--resume").exit shouldBe 10
+                cli.run(server, args + "--resume").exit shouldBe 10
             }
         }
     }
@@ -62,7 +62,7 @@ class OfflineIntegrityTest : FunSpec({
         val work = tempdir().toPath()
         val directory = work.resolve("legacy")
         WireFixture().use { server ->
-            ContractCli(work).run(server.port, listOf("capture", "--directory", directory.toString()) + evidenceWindow).exit shouldBe 0
+            ContractCli(work).run(server, listOf("capture", "--directory", directory.toString()) + evidenceWindow).exit shouldBe 0
         }
         json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json"))).schemaVersion shouldBe "scouterctl.capture/v1"
         val result = runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", WireFixture.ids.first().toString()))
@@ -81,7 +81,7 @@ class OfflineIntegrityTest : FunSpec({
                 else -> error("Unknown option combination")
             }
             WireFixture().use { server ->
-                val result = ContractCli(work).run(server.port, args)
+                val result = ContractCli(work).run(server, args)
                 result.exit shouldBe 2
                 result.events.single()["error"]!!.jsonObject["code"]!!.jsonPrimitive.content shouldBe "INVALID_ARGUMENT"
             }
