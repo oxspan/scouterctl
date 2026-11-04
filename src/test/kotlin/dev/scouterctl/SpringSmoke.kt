@@ -26,6 +26,7 @@ fun main(args: Array<String>) {
     val upstream = Path.of(args.single()).toAbsolutePath().normalize()
     val work = Files.createTempDirectory("scouterctl-spring-smoke-")
     val offline = SpringOfflineCheck(work)
+    val comparison = SpringComparisonCheck(work)
     Files.createDirectory(work.resolve("conf"))
     val port = ServerSocket(0).use { it.localPort }
     val udp = DatagramSocket(0).use { it.localPort }
@@ -155,6 +156,7 @@ fun main(args: Array<String>) {
         }
         Files.writeString(work.resolve("profile-checks.json"), json.encodeToString(verified))
         offline.capture(cli, window)
+        comparison.capture(cli, httpPort, objectHash)
         Files.list(work).use { files -> files.filter { it.toString().endsWith(".jsonl") }.forEach { file ->
             val output = Files.readString(file)
             val excluded = listOf(password, CipherUtil.sha256(password)) +
@@ -188,6 +190,7 @@ fun main(args: Array<String>) {
         println("Fixture processes stopped")
     }
     offline.verify()
+    comparison.verify()
 }
 
 private fun awaitSpring(label: String, predicate: () -> Boolean) {

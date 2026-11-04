@@ -7,6 +7,11 @@ on:
     branches: [master, develop]
   workflow_dispatch:
     inputs:
+      scale_validation:
+        description: 'Measure offline comparison scale on Linux, Windows and macOS'
+        required: false
+        type: boolean
+        default: false
       release_tag:
         description: 'Existing release tag to repair missing assets (blank runs checks only)'
         required: false
@@ -50,6 +55,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Build, test, and package
         run: ./gradlew --no-daemon test pocRelease
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: test-results-ubuntu-latest
+          path: build/test-results/test/*.xml
+          if-no-files-found: warn
+          retention-days: 14
       - name: Verify package
         id: package
         env:
@@ -110,6 +122,12 @@ jobs:
           name: test-results-${{ matrix.os }}
           path: build/test-results/test/*.xml
           if-no-files-found: warn
+          retention-days: 14
+
+  scale:
+    name: Optional capture scale validation
+    if: github.event_name == 'workflow_dispatch' && inputs.scale_validation
+    uses: ./.github/workflows/capture-scale.yml
 
   release:
     name: Manage release

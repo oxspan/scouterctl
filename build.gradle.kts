@@ -115,3 +115,15 @@ tasks.register("pocRelease") {
         checksums.get().asFile.writeText("$hash  ${file.name}\n")
     }
 }
+
+listOf("scaleFixtures" to "generate", "scaleCheck" to "run").forEach { (taskName, mode) ->
+    tasks.register<JavaExec>(taskName) {
+        dependsOn(tasks.testClasses)
+        val externalJar = providers.gradleProperty("cliJar")
+        if (!externalJar.isPresent) dependsOn("fatJar")
+        classpath = sourceSets.test.get().runtimeClasspath
+        mainClass.set("dev.scouterctl.ScaleCheckKt")
+        args(mode, providers.gradleProperty("scaleInputs").getOrElse("build/scale-inputs"))
+        systemProperty("cli.jar", externalJar.getOrElse(layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
+    }
+}

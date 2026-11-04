@@ -1,0 +1,84 @@
+name: Capture scale validation
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  inputs:
+    name: Prepare identical CLI and captures
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Build CLI and generate synthetic captures
+        run: ./gradlew --no-daemon scaleFixtures
+      - name: Archive inputs and JAR
+        run: |
+          cp build/libs/scouterctl-*-all.jar build/scale-inputs/cli.jar
+          cd build
+          tar -czf scale-inputs.tar.gz scale-inputs
+          sha256sum scale-inputs.tar.gz > scale-inputs.sha256
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: scale-inputs
+          path: |
+            build/scale-inputs.tar.gz
+            build/scale-inputs.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  measure:
+    name: Compare captures (${{ matrix.os }})
+    needs: inputs
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: scale-inputs
+          path: build
+      - name: Verify identical archive and run measurements
+        shell: pwsh
+        run: |
+          $expected = (Get-Content build/scale-inputs.sha256).Split(' ')[0]
+          $actual = (Get-FileHash build/scale-inputs.tar.gz -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) { throw 'Input archive checksum mismatch' }
+          Write-Output "Input archive SHA256: $actual"
+          tar -xzf build/scale-inputs.tar.gz -C build
+          if ($LASTEXITCODE -ne 0) { throw 'Input extraction failed' }
+          $jar = (Resolve-Path build/scale-inputs/cli.jar).Path
+          Move-Item $jar build/scale-cli.jar
+          $jar = (Resolve-Path build/scale-cli.jar).Path
+          if ($IsWindows) { ./gradlew.bat --no-daemon scaleCheck "-PcliJar=$jar" }
+          else { ./gradlew --no-daemon scaleCheck "-PcliJar=$jar" }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: scale-results-${{ matrix.os }}
+          path: build/scale-results
+          if-no-files-found: warn
+          retention-days: 14

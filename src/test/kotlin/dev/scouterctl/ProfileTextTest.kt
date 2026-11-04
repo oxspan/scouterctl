@@ -13,7 +13,7 @@ class ProfileTextTest : FunSpec({
         test("opt-in profile resolves available text and preserves unavailable context with $fault") {
             val cli = ContractCli(tempdir().toPath())
             WireFixture(fault).use { server ->
-                val result = cli.run(server.port, arguments)
+                val result = cli.run(server, arguments)
                 result.exit shouldBe 0
                 val profile = json.decodeFromJsonElement<ProfileRecord>(result.data())
                 profile.txid shouldBe WireFixture.ids.first().toString()
@@ -38,7 +38,7 @@ class ProfileTextTest : FunSpec({
     test("dictionary batching preserves all 101 SQL statements including hash zero") {
         val cli = ContractCli(tempdir().toPath())
         WireFixture(Fault.MANY_SQL).use { server ->
-            val result = cli.run(server.port, arguments)
+            val result = cli.run(server, arguments)
             result.exit shouldBe 0
             val profile = json.decodeFromJsonElement<ProfileRecord>(result.data())
             profile.steps.map { it.sql?.statement } shouldBe (0..100).map { DictionaryText(it, "statement $it") }
@@ -48,7 +48,7 @@ class ProfileTextTest : FunSpec({
     test("empty dictionaries preserve service SQL and error hashes as unresolved") {
         val cli = ContractCli(tempdir().toPath())
         WireFixture(Fault.EMPTY_TEXT).use { server ->
-            val result = cli.run(server.port, arguments)
+            val result = cli.run(server, arguments)
             result.exit shouldBe 0
             val profile = json.decodeFromJsonElement<ProfileRecord>(result.data())
             profile.transaction shouldBe ProfileTransaction("available", DictionaryText(10), DictionaryText(-789))
@@ -67,7 +67,7 @@ class ProfileTextTest : FunSpec({
             test("text lookup failure $fault fails with exit $exit instead of reporting unresolved") {
                 val cli = ContractCli(tempdir().toPath())
                 WireFixture(fault).use { server ->
-                    val result = cli.run(server.port, arguments)
+                    val result = cli.run(server, arguments)
                     result.exit shouldBe exit
                     result.events.single()["type"]!!.jsonPrimitive.content shouldBe "error"
                     result.output shouldNotContain "fixture duplicate key error"
@@ -79,7 +79,7 @@ class ProfileTextTest : FunSpec({
     test("text opt-in on a different command is rejected") {
         val cli = ContractCli(tempdir().toPath())
         WireFixture().use { server ->
-            val result = cli.run(server.port, listOf("doctor", "--include-text"))
+            val result = cli.run(server, listOf("doctor", "--include-text"))
             result.exit shouldBe 2
             result.events.single()["error"]!!.jsonObject["code"]!!.jsonPrimitive.content shouldBe "INVALID_ARGUMENT"
         }
