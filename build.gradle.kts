@@ -19,6 +19,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     testImplementation("io.kotest:kotest-runner-junit5:6.2.6")
     testImplementation("io.kotest:kotest-assertions-core:6.2.6")
+    testImplementation("org.jetbrains.pty4j:pty4j:0.13.12")
     testImplementation("com.h2database:h2:2.3.232")
     testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.5.16"))
     testImplementation("org.springframework.boot:spring-boot-starter-web")
