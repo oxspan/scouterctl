@@ -7,6 +7,11 @@ on:
     branches: [master, develop]
   workflow_dispatch:
     inputs:
+      scale_validation:
+        description: 'Measure offline comparison scale on Linux, Windows and macOS'
+        required: false
+        type: boolean
+        default: false
       release_tag:
         description: 'Existing release tag to repair missing assets (blank runs checks only)'
         required: false
@@ -118,6 +123,11 @@ jobs:
           path: build/test-results/test/*.xml
           if-no-files-found: warn
           retention-days: 14
+
+  scale:
+    name: Optional capture scale validation
+    if: github.event_name == 'workflow_dispatch' && inputs.scale_validation
+    uses: ./.github/workflows/capture-scale.yml
 
   release:
     name: Manage release
