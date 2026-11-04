@@ -164,13 +164,32 @@ java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles \
 
 Results contain `records[].xlog.txid`; pass one to `inspect --txid` for details. All filters combine with AND. Service names match exactly and require stored text plus `--include-text`; use `--service-hash` without text. Unknown names are counted separately and do not match name filters. Results sort by request duration descending, end time ascending, then numeric txid ascending. `--errors-only` means a nonzero XLog error hash, not HTTP status or SQL error classification.
 
-Search defaults to 20 results (limit 1..1000), scans and validates every referenced page, and summarizes all matches rather than only the displayed top N. `truncated` means the result limit omitted matches. Empty matches return an empty result. Partial captures, missing profiles or a saved failure return `8` with data; otherwise search returns `0`. No Collector account or connection is needed. Use `inspect summary` for service-level aggregation; comparisons across bundles are not supported.
+Search defaults to 20 results (limit 1..1000), scans and validates every referenced page, and summarizes all matches rather than only the displayed top N. `truncated` means the result limit omitted matches. Empty matches return an empty result. Partial captures, missing profiles or a saved failure return `8` with data; otherwise search returns `0`. No Collector account or connection is needed. Use `inspect summary` for service-level aggregation or `inspect compare` to compare two v2 bundles.
 
 Unset the password environment variable when you finish:
 
 ```sh
 unset SCOUTERCTL_PASSWORD
 ```
+
+## Compare saved captures
+
+```sh
+java -jar "$SCOUTERCTL_JAR" inspect compare --before ./before --after ./after
+java -jar "$SCOUTERCTL_JAR" inspect compare --before ./before --after ./after --include-text --limit 100
+```
+
+Both directories must contain v2 captures created with `capture --include-profiles`. The command reads every referenced page, needs no credentials or Collector connection, and leaves both captures unchanged. Use completed captures that are no longer being written.
+
+Each service is matched by its numeric service hash. `before` and `after` contain the captured metrics; `delta` is **after minus before** for request/error counts, total/average/maximum request duration, and error-rate **percentage points**. For example, 25% to 75% produces `errorRatePercentagePoints: 50`, not a relative percent change. Durations are milliseconds for the entire request, not SQL time. No throughput normalization, percentiles, or automatic improvement/regression verdict is calculated.
+
+`presence` is `both`, `before-only`, or `after-only`. A service seen on just one side has a null counterpart and null delta: absence from a capture does not prove that a service was added or removed. Known name conflicts within or between captures set `identityConflict` and suppress the delta, even when names are omitted from output. Unresolved names and undetected hash collisions can still make identity uncertain.
+
+Source identity, query window, window duration, object hash, sampling, coverage, capture completion, and unavailable-profile counts are retained for each side. `warnings` calls out differing scopes, overlapping windows, partial captures and identity uncertainty. Matching identifiers do not prove equal workloads or complete traffic coverage; this remains a comparison of **captured XLogs**, including any error dispatches.
+
+Output sorts by service hash ascending. `--limit` selects 1..1000 rows (default 20); totals and warnings cover all observed services. `truncated` describes only the output limit. Each input is limited to 1,000 services; exceeding that returns exit `8` with an error instead of comparing truncated aggregates. Partial captures, saved failures or unavailable profiles return data and exit `8`; intact complete captures return `0`. Scope warnings alone do not change the exit code, and exit `0` does not establish comparability. Corruption on either side returns an error without comparison data.
+
+Names are omitted unless `--include-text` is set, which requires stored text in both captures. SQL and exception text are not included in the comparison. Use a returned representative transaction ID with `inspect --directory` on the corresponding capture for detail.
 
 ## Output and support scope
 

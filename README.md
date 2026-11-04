@@ -10,8 +10,23 @@ scouterctl is an early-stage, read-only tool. Commands and output formats may ch
 - Inspect profiles, SQL statements, and application or SQL errors.
 - Capture transactions and profiles for offline investigation; resume interrupted captures.
 - Find slow or failed requests and summarize errors and latency by service.
+- Compare service counts, error ratios, and request durations between saved captures.
 - Save named Collector connections without storing passwords or sessions.
 - Use UTF-8 JSON/JSONL output in scripts and other tools.
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    Agent[Scouter Agent] -->|telemetry| Collector[Scouter Collector]
+    CLI[scouterctl] <-->|Collector TCP| Collector
+    CLI -->|capture| Files[Capture directory]
+    Files -->|offline analysis| Inspect[scouterctl inspect]
+```
+
+The Agent instruments the application; the Collector receives and stores its telemetry. scouterctl queries the Collector and exports captures. Offline inspection, summaries, and comparisons read those files without connecting to the Collector.
+
+See [Architecture](docs/architecture.md) for the application components and capture format.
 
 ## Requirements
 
@@ -50,6 +65,7 @@ Use a capture created with `capture --include-profiles`:
 java -jar "$SCOUTERCTL_JAR" inspect search --directory ./capture --errors-only
 java -jar "$SCOUTERCTL_JAR" inspect summary --directory ./capture --sort elapsed
 java -jar "$SCOUTERCTL_JAR" inspect --directory ./capture --txid '<TXID>'
+java -jar "$SCOUTERCTL_JAR" inspect compare --before ./before --after ./after
 ```
 
 Use a transaction ID returned by the search to open its profile. Add `--include-text` to include stored service names, SQL statements, and error messages when the capture contains them. This text may contain sensitive application data.
@@ -69,6 +85,7 @@ The executable JAR is written to `build/libs/`. On Windows, use `gradlew.bat`.
 ## Documentation
 
 - [Quick start and command usage](QUICKSTART.md)
+- [Architecture](docs/architecture.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Scouter library provenance and license](vendor/README.md)

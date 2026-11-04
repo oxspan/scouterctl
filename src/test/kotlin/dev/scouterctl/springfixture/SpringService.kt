@@ -6,6 +6,7 @@ import org.springframework.boot.web.servlet.context.ServletWebServerApplicationC
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.bind.annotation.RequestParam
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -22,6 +23,13 @@ class FixtureController(private val jdbc: JdbcTemplate) {
 
     @GetMapping("/poc/slow-sql")
     fun slowSql(): Int = jdbc.queryForObject("call fixture_delay(?)", Int::class.java, 350L)!!
+
+    @GetMapping("/poc/comparison")
+    fun comparison(@RequestParam fail: Boolean, @RequestParam delayMs: Long): String {
+        jdbc.queryForObject("call fixture_delay(?)", Int::class.java, delayMs)
+        if (fail) throw IllegalStateException("comparison-error-marker")
+        return "ok"
+    }
 
     @GetMapping("/poc/app-error")
     fun applicationError(): String {
