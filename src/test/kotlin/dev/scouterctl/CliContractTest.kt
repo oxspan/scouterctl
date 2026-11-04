@@ -19,9 +19,9 @@ class CliContractTest : FunSpec({
     test("profile preserves SQL outcomes while discovery and profile exclude credentials and free text") {
         val cli = ContractCli(tempdir().toPath())
         WireFixture(Fault.STRUCTURAL_ONLY).use { server ->
-            val doctor = cli.run(server.port, listOf("doctor"))
-            val objects = cli.run(server.port, listOf("object", "list"))
-            val profile = cli.run(server.port, listOf("profile", "get", "--date", "20261101", "--txid", WireFixture.ids[0].toString()))
+            val doctor = cli.run(server, listOf("doctor"))
+            val objects = cli.run(server, listOf("object", "list"))
+            val profile = cli.run(server, listOf("profile", "get", "--date", "20261101", "--txid", WireFixture.ids[0].toString()))
             listOf(doctor, objects, profile).forEach { it.exit shouldBe 0 }
             doctor.data()["group"]?.jsonPrimitive?.content shouldBe "guest"
             objects.events.single()["data"]!!.jsonArray.single().jsonObject["objName"]!!.jsonPrimitive.content shouldBe "/fixture"
@@ -42,7 +42,7 @@ class CliContractTest : FunSpec({
     test("paged JSONL preserves every 64 bit identifier and terminates once") {
         val cli = ContractCli(tempdir().toPath())
         WireFixture().use { server ->
-            val result = cli.run(server.port, listOf("xlog", "search") + window)
+            val result = cli.run(server, listOf("xlog", "search") + window)
             result.exit shouldBe 0
             result.events.map { it["type"]!!.jsonPrimitive.content } shouldContainExactly
                 listOf("start", "record", "record", "record", "complete")
@@ -62,13 +62,13 @@ class CliContractTest : FunSpec({
         WireFixture().use { server ->
             val directory = temp.resolve("capture")
             val args = listOf("capture", "--directory", directory.toString(), "--max-pages", "1") + window
-            cli.run(server.port, args).exit shouldBe 8
+            cli.run(server, args).exit shouldBe 8
             val changedQuery = args.toMutableList().apply { set(indexOf("--object-hash") + 1, "43") }
-            val changed = cli.run(server.port, changedQuery + "--resume")
+            val changed = cli.run(server, changedQuery + "--resume")
             changed.exit shouldBe 2
             changed.events.single()["error"]!!.jsonObject["message"]!!.jsonPrimitive.content shouldBe
                 "Resume source or query differs from manifest"
-            cli.run(server.port, args + "--resume").exit shouldBe 0
+            cli.run(server, args + "--resume").exit shouldBe 0
             val manifest = json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json")))
             val rows = manifest.files.flatMap { Files.readAllLines(directory.resolve(it.name)) }
                 .map { json.decodeFromString<XLogRecord>(it).txid }
@@ -76,7 +76,7 @@ class CliContractTest : FunSpec({
             manifest.executionComplete.shouldBeTrue()
             manifest.sampling shouldBe "unknown"
             Files.writeString(directory.resolve(manifest.files.first().name), "corrupted")
-            cli.run(server.port, args + "--resume").exit shouldBe 10
+            cli.run(server, args + "--resume").exit shouldBe 10
         }
     }
 
@@ -86,7 +86,7 @@ class CliContractTest : FunSpec({
             test("wire failure $fault returns exit $expectedExit without success completion") {
                 val cli = ContractCli(tempdir().toPath())
                 WireFixture(fault).use { server ->
-                    val result = cli.run(server.port, listOf("xlog", "search") + window)
+                    val result = cli.run(server, listOf("xlog", "search") + window)
                     result.exit shouldBe expectedExit
                     result.events.last()["type"]!!.jsonPrimitive.content shouldBe "error"
                     result.events.any { it["type"]?.jsonPrimitive?.content == "complete" }.shouldBeFalse()
@@ -100,11 +100,11 @@ class CliContractTest : FunSpec({
         val directory = temp.resolve("interrupted")
         WireFixture(Fault.DISCONNECT).use { server ->
             val args = listOf("capture", "--directory", directory.toString()) + window
-            cli.run(server.port, args).exit shouldBe 10
+            cli.run(server, args).exit shouldBe 10
             val manifest = json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json")))
             manifest.executionComplete.shouldBeFalse()
             manifest.files.sumOf { it.records } shouldBe 2
-            cli.run(server.port, args + "--resume").exit shouldBe 0
+            cli.run(server, args + "--resume").exit shouldBe 0
             val resumed = json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json")))
             resumed.files.sumOf { it.records } shouldBe 3
             resumed.executionComplete.shouldBeTrue()
@@ -114,18 +114,22 @@ class CliContractTest : FunSpec({
     test("page budget and invalid input have structured nonzero outcomes") {
         val cli = ContractCli(tempdir().toPath())
         WireFixture().use { server ->
-            cli.run(server.port, listOf("xlog", "search", "--max-pages", "1") + window).exit shouldBe 8
-            cli.run(server.port, listOf("xlog", "search") + window + listOf("--page-size", "0")).exit shouldBe 2
-            cli.run(server.port, listOf("raw", "call")).exit shouldBe 2
+            cli.run(server, listOf("xlog", "search", "--max-pages", "1") + window).exit shouldBe 8
+            cli.run(server, listOf("xlog", "search") + window + listOf("--page-size", "0")).exit shouldBe 2
+            cli.run(server, listOf("raw", "call")).exit shouldBe 2
         }
     }
 })
 
 internal class ContractCli(private val temp: Path) {
+    fun run(server: WireFixture, args: List<String>): Outcome =
+        run(args + listOf("--port", server.port.toString(), "--user", "guest"), fixture = server::diagnostics)
+
     fun run(port: Int, args: List<String>): Outcome =
         run(args + listOf("--port", port.toString(), "--user", "guest"))
 
-    fun run(args: List<String>, password: String? = "fixture-password"): Outcome {
+    fun run(args: List<String>, password: String? = "fixture-password", fixture: (() -> JsonObject)? = null): Outcome {
+        val started = System.nanoTime()
         val stderr = Files.createTempFile(temp, "stderr", ".txt")
         val stdout = Files.createTempFile(temp, "stdout", ".jsonl")
         val process = ProcessBuilder(listOf(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
@@ -138,13 +142,22 @@ internal class ContractCli(private val temp: Path) {
             }.start()
         process.outputStream.close()
         try {
-            check(process.waitFor(15, TimeUnit.SECONDS)) { "CLI did not terminate" }
-            return Outcome(process.exitValue(), Files.readString(stdout), Files.readString(stderr))
+            val finished = process.waitFor(15, TimeUnit.SECONDS)
+            val exit = if (finished) process.exitValue() else null
+            val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+            val fixtureState = if (exit != 0) fixture?.invoke() else null
+            if (!finished) process.destroyForcibly().waitFor(5, TimeUnit.SECONDS)
+            val output = Files.readString(stdout)
+            val errors = Files.readString(stderr)
+            val diagnostic = if (exit != 0) connectionDiagnostic(exit, elapsedMs, output, errors, fixtureState) else null
+            diagnostic?.let { println("CLI_DIAGNOSTIC $it") }
+            check(finished) { "CLI did not terminate; $diagnostic" }
+            return Outcome(checkNotNull(exit), output, errors, diagnostic)
         } finally { process.destroyForcibly() }
     }
 }
 
-internal data class Outcome(val exit: Int, val output: String, val stderr: String) {
+internal data class Outcome(val exit: Int, val output: String, val stderr: String, val diagnostic: JsonObject? = null) {
     val events = output.lineSequence().filter { it.isNotBlank() }.map { json.parseToJsonElement(it).jsonObject }.toList()
     fun data() = events.single()["data"]!!.jsonObject
 }

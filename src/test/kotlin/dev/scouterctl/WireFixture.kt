@@ -9,10 +9,13 @@ import scouter.lang.step.Step
 import scouter.net.NetCafe
 import scouter.net.RequestCmd
 import scouter.net.TcpFlag
+import kotlinx.serialization.json.*
 import java.io.EOFException
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.SocketException
+import java.net.SocketTimeoutException
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -20,7 +23,7 @@ enum class Fault {
     NONE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
-    PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT,
+    PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, TEXT_TIMEOUT,
 }
 
 class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPassword: String? = null) : AutoCloseable {
@@ -29,17 +32,70 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
     private val executor = Executors.newSingleThreadExecutor()
     private var disconnected = false
     private var profileMissed = false
+    private val releaseResponse = CountDownLatch(1)
+    @Volatile private var state = FixtureState()
+
+    internal fun diagnostics(): JsonObject {
+        val observed = state
+        return buildJsonObject {
+            put("phase", observed.phase)
+            put("command", observed.command)
+            put("connections", observed.connections)
+            put("requests", observed.requests)
+            put("completedRequests", observed.completedRequests)
+            put("responsePackets", observed.responsePackets)
+            put("phaseElapsedMs", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - observed.changedAt))
+            put("failure", observed.failure)
+            put("listening", !server.isClosed)
+        }
+    }
+
+    private fun phase(value: String) { state = state.copy(phase = value, changedAt = System.nanoTime()) }
+    private fun send(out: DataOutputX, pack: Pack) {
+        phase("writing_packet")
+        out.writeByte(TcpFlag.HasNEXT.toInt()); out.writePack(pack)
+        state = state.copy(responsePackets = state.responsePackets + 1)
+    }
+
     private val future = executor.submit {
+        try { serve() } catch (failure: Throwable) {
+            state = state.copy(failure = when (failure) {
+                is SocketTimeoutException -> "socket_timeout"
+                is SocketException -> "socket_failure"
+                is EOFException -> "eof"
+                is IllegalStateException, is AssertionError -> "assertion"
+                else -> "other"
+            })
+            phase("failed")
+            throw failure
+        }
+    }
+
+    private fun serve() {
         while (!server.isClosed) {
+            phase("accepting")
             val socket = try { server.accept() } catch (_: SocketException) { break }
+            state = state.copy(connections = state.connections + 1)
             socket.use {
+                phase("reading_header")
                 it.soTimeout = 5000
                 val input = DataInputX(java.io.BufferedInputStream(it.getInputStream()))
                 val output = DataOutputX(java.io.BufferedOutputStream(it.getOutputStream()))
                 check(input.readInt() == NetCafe.TCP_CLIENT)
                 try {
                     while (true) {
+                        phase("reading_command")
                         val command = input.readText()
+                        state = state.copy(command = when (command) {
+                            RequestCmd.LOGIN -> "login"
+                            RequestCmd.OBJECT_LIST_REAL_TIME -> "objects"
+                            RequestCmd.TRANX_LOAD_TIME_GROUP_V2 -> "xlog_page"
+                            RequestCmd.TRANX_PROFILE -> "profile"
+                            RequestCmd.XLOG_READ_BY_TXID -> "xlog_context"
+                            RequestCmd.GET_TEXT_PACK -> "dictionary"
+                            else -> "unknown"
+                        }, requests = state.requests + 1, responsePackets = 0)
+                        phase("reading_request")
                         input.readLong()
                         if (command != RequestCmd.LOGIN && fault == Fault.SESSION) {
                             output.writeByte(TcpFlag.INVALID_SESSION.toInt()); output.flush(); break
@@ -120,7 +176,12 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 val type = request.getText("type")
                                 val hashes = request.getList("hash")
                                 check(hashes.size() in 1..100)
-                                if (fault == Fault.TEXT_DISCONNECT) break
+                                if (fault == Fault.TEXT_TIMEOUT) {
+                                    phase("holding_response")
+                                    releaseResponse.await()
+                                    break
+                                }
+                                if (fault == Fault.TEXT_DISCONNECT) { phase("closing_connection"); break }
                                 if (fault == Fault.TEXT_SESSION) {
                                     output.writeByte(TcpFlag.INVALID_SESSION.toInt()); output.flush(); break
                                 }
@@ -148,7 +209,9 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                             }
                             else -> error("Unexpected or unsafe command: $command")
                         }
+                        phase("flushing_response")
                         output.writeByte(TcpFlag.NoNEXT.toInt()); output.flush()
+                        state = state.copy(completedRequests = state.completedRequests + 1)
                     }
                 } catch (_: EOFException) {
                     // Client closes its connection after each command invocation.
@@ -158,11 +221,17 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
     }
     override fun close() {
         server.close()
+        releaseResponse.countDown()
         try { future.get(10, TimeUnit.SECONDS) } finally { executor.shutdownNow() }
     }
     companion object {
         val ids = listOf(9223372036854775804L, 9223372036854775805L, 9223372036854775806L)
         const val baseTime = 1793491200000L // 2026-11-01T00:00:00Z
-        private fun send(out: DataOutputX, pack: Pack) { out.writeByte(TcpFlag.HasNEXT.toInt()); out.writePack(pack) }
     }
 }
+
+private data class FixtureState(
+    val phase: String = "starting", val command: String = "none",
+    val connections: Int = 0, val requests: Int = 0, val completedRequests: Int = 0,
+    val responsePackets: Int = 0, val failure: String = "none", val changedAt: Long = System.nanoTime(),
+)

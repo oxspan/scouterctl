@@ -101,7 +101,7 @@ class ContextCliTest : FunSpec({
             result.stderr shouldBe ""
         }
         WireFixture().use { server ->
-            cli.run(server.port, listOf("auth", "login", "--no-input")).exit shouldBe 0
+            cli.run(server, listOf("auth", "login", "--no-input")).exit shouldBe 0
         }
     }
 
