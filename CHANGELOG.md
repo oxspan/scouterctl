@@ -1,5 +1,12 @@
 # 변경 기록
 
+## [0.3.0](https://github.com/oxspan/scouterctl/compare/v0.2.1...v0.3.0) (2026-11-04)
+
+
+### Features
+
+* 🔀 Include saved capture comparison in the next release ([db31d44](https://github.com/oxspan/scouterctl/commit/db31d44a83c489553259e612acf2fb60da8420e6))
+
 ## [0.2.1](https://github.com/oxspan/scouterctl/compare/v0.2.0...v0.2.1) (2026-11-04)
 
 
