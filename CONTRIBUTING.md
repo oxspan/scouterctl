@@ -54,7 +54,7 @@ For squash merges, use a Conventional Commit PR title with the Gitmoji **after**
 - `feat!: ...` (or another type with `!`) for a breaking change. Before 1.0, breaking changes bump the minor version.
 - `test: ...`, `docs: ...`, `ci: ...`, and `chore: ...` do not trigger a release on their own.
 
-For promotion and synchronization PRs, use descriptive titles such as `chore: 🔀 Promote develop to master` and preserve the underlying commits with a merge commit. Keep automated release-please and Dependabot messages in their generated format. Do not rewrite published history solely to add Gitmoji.
+For `develop → master` promotions, choose the merge commit's Conventional Commit type from the unreleased changes: `feat: 🔀 Promote capture comparison` for new features, or `fix: 🔀 Promote connection fixes` for fixes only. Preserve the underlying commits with a merge commit. Use `chore: 🔀 Sync master into develop` for synchronization without a new release intent. Keep automated release-please and Dependabot messages in their generated format. Do not rewrite published history solely to add Gitmoji.
 
 ## Pull request descriptions
 
@@ -88,6 +88,10 @@ GitHub에서 먼저 대상(base)·작업(compare) 브랜치를 선택하고, PR 
 2. Release-please maintains a PR against `master` with the proposed version, `CHANGELOG.md`, and `.release-please-manifest.json`. The manifest is release-please's bookkeeping; do not edit it independently of the version file.
 3. Review and squash merge that release PR when ready to release. A successful build is followed by creation of a `vX.Y.Z` tag and GitHub Release, then attachment of the verified ZIP and `SHA256SUMS` from the same run. Releases below 1.0 are marked as prereleases.
 4. Synchronize `master → develop` using a merge commit.
+
+Check the generated candidate against all changes since the latest release tag. Release-please can stop scanning history at that release commit before reaching older feature commits newly promoted from `develop`. Preserving ancestry alone does not guarantee those commits appear in the release notes; the promotion merge commit must describe the release intent.
+
+If a promotion produces no candidate, inspect the release job log before retrying. A reviewed recovery commit can use the [supported `Release-As` footer](https://github.com/googleapis/release-please#how-do-i-change-the-version-number) to request the intended version, with a user-facing Conventional Commit message describing the omitted feature or fix. Review the resulting changelog; do not rewrite release tags or edit version metadata independently.
 
 The existing `v0.0.0` is the bootstrap baseline. It is not rebuilt or replaced by this setup. Release PRs are not automatically merged.
 
