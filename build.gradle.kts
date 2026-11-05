@@ -90,6 +90,15 @@ tasks.register<JavaExec>("springSmoke") {
     systemProperty("cli.jar", layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath)
 }
 
+tasks.register<JavaExec>("recoverySmoke") {
+    dependsOn(tasks.testClasses, "fatJar")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.SpringSmokeKt")
+    args(providers.gradleProperty("scouterRoot").getOrElse("../scouter"), "--recovery")
+    systemProperty("cli.jar", providers.gradleProperty("cliJar").getOrElse(
+        layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
+}
+
 val pocDist = tasks.register<Zip>("pocDist") {
     dependsOn(tasks.test)
     archiveFileName.set("scouterctl-${project.version}-poc.zip")
