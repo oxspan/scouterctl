@@ -5,8 +5,6 @@ import dev.scouterctl.application.EvidenceRepository
 import dev.scouterctl.adapters.serialization.*
 
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
@@ -21,9 +19,7 @@ class EvidenceStore(private val directory: Path) : EvidenceRepository {
 
     override fun load(): EvidenceManifest = fileOperation {
         val content = read("manifest.json", 8_388_608)
-        if (json.parseToJsonElement(content).jsonObject["schemaVersion"]?.jsonPrimitive?.content != "scouterctl.capture/v2") {
-            throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Use a v2 capture created with --include-profiles")
-        }
+        requireCaptureSchema(content, "scouterctl.capture/v2", "scouterctl.capture/v3")
         val manifest = json.decodeFromString<EvidenceManifestDto>(content).toModel()
         manifest.query.validate()
         if (manifest.query.pageSize > 100 || manifest.pages.size > 10000) damaged()

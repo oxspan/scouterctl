@@ -7,6 +7,9 @@ fun captureEvidence(source: ObservationSource, query: Query, request: CaptureOpt
     if (query.pageSize > 100) throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Profile capture page-size must be 1..100")
     val reader = EvidenceReader(source, query.date, request.includeText)
     var manifest = if (request.resume) store.load().also {
+        if (it.schemaVersion != "scouterctl.capture/v3") {
+            throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Resume requires a v3 profile capture; preserve this capture and start a new directory")
+        }
         if (it.source != source.info || it.query != query || it.endpoint != request.endpoint || it.textIncluded != request.includeText) {
             throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Resume source, query or text policy differs from manifest")
         }

@@ -54,12 +54,13 @@ class ProfileCompletenessTest : FunSpec({
         val manifest = store.load()
         val pages = manifest.pages.mapIndexed { index, page ->
             val content = Files.readString(directory.resolve(page.name)).replace(",\"completeness\":\"unknown\"", "")
+            content shouldNotContain "completeness"
             val hash = java.security.MessageDigest.getInstance("SHA-256").digest(content.toByteArray()).joinToString("") { "%02x".format(it) }
             val name = "page-%06d-%s.jsonl".format(index + 1, hash)
             Files.writeString(directory.resolve(name), content)
             page.copy(name = name, sha256 = hash)
         }
-        store.save(manifest.copy(pages = pages))
+        store.save(manifest.copy(schemaVersion = "scouterctl.capture/v2", pages = pages))
         val before = pages.associate { it.name to Files.readString(directory.resolve(it.name)) }
         val result = runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", WireFixture.ids.first().toString()))
         result.exit shouldBe 0

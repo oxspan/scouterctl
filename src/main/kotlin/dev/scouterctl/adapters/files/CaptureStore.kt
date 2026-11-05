@@ -14,7 +14,9 @@ import java.security.MessageDigest
 class CaptureStore(private val directory: Path) : CaptureRepository {
     override fun create() = fileOperation { Files.createDirectory(directory); Unit }
     override fun load(): CaptureManifest = fileOperation {
-        json.decodeFromString<CaptureManifestDto>(Files.readString(directory.resolve("manifest.json"))).toModel()
+        val content = Files.readString(directory.resolve("manifest.json"))
+        requireCaptureSchema(content, "scouterctl.capture/v1")
+        json.decodeFromString<CaptureManifestDto>(content).toModel()
     }
     override fun save(manifest: CaptureManifest) = fileOperation {
         atomicWrite(directory.resolve("manifest.json"), json.encodeToString(manifest.toDto()))

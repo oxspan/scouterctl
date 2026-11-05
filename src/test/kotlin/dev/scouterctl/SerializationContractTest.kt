@@ -16,7 +16,7 @@ class SerializationContractTest : FunSpec({
         val source = ServerInfo("1", "2.21.3", "UTC", "test")
         val query = Query("20260101", 1767225600000, 1767225601000, "UTC", 1, 25)
         json.encodeToString(EvidenceManifest(source = source, endpoint = "localhost:6100", query = query, textIncluded = false).toDto()) shouldBe
-            """{"schemaVersion":"scouterctl.capture/v2","source":{"serverId":"1","version":"2.21.3","timezoneDisplayName":"UTC","group":"test","source":"collector-tcp","effectivePermission":"unknown","nativeTls":false},"endpoint":"localhost:6100","query":{"date":"20260101","from":1767225600000,"to":1767225601000,"timezone":"UTC","objHash":1,"pageSize":25},"textIncluded":false,"cursor":{"bucketTime":0,"txid":"0"},"executionComplete":false,"pages":[],"lastFailure":null,"upstreamCoverage":"unknown","sampling":"unknown","timezoneVerification":"operator-declared"}"""
+            """{"schemaVersion":"scouterctl.capture/v3","source":{"serverId":"1","version":"2.21.3","timezoneDisplayName":"UTC","group":"test","source":"collector-tcp","effectivePermission":"unknown","nativeTls":false},"endpoint":"localhost:6100","query":{"date":"20260101","from":1767225600000,"to":1767225601000,"timezone":"UTC","objHash":1,"pageSize":25},"textIncluded":false,"cursor":{"bucketTime":0,"txid":"0"},"executionComplete":false,"pages":[],"lastFailure":null,"upstreamCoverage":"unknown","sampling":"unknown","timezoneVerification":"operator-declared"}"""
     }
     test("v1 defaults and signed transaction identifiers retain their wire bytes") {
         json.encodeToString(XLogRecord("-9223372036854775808", "9223372036854775807", "0", 1, 2, 3, 4, 0).toDto()) shouldBe

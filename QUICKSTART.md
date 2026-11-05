@@ -24,7 +24,7 @@ java -jar "$SCOUTERCTL_JAR" --version
 java -jar "$SCOUTERCTL_JAR" --help
 ```
 
-The version output matches the included `version.txt`. Offline `inspect` needs only JDK 21 and a v2 capture, with no account or Collector connection.
+The version output matches the included `version.txt`. Offline `inspect` needs only JDK 21 and a v2 or v3 capture, with no account or Collector connection.
 
 On macOS, use `shasum -a 256 -c SHA256SUMS` instead of `sha256sum -c SHA256SUMS`, then use the same unzip and Bash commands.
 
@@ -110,7 +110,7 @@ java -jar "$SCOUTERCTL_JAR" inspect summary --directory ./capture --sort request
 java -jar "$SCOUTERCTL_JAR" inspect --directory ./capture --txid '<TXID>' --include-text
 ```
 
-`inspect summary` scans a v2 capture offline and groups by XLog `serviceHash` within the capture's source/object/time window. Each service includes `requests`, `errors`, `errorRate` (a fraction from 0 to 1), `elapsedTotalMs`, `averageElapsedMs`, `maxElapsedMs`, missing-profile/name counts and representative requests. Errors mean nonzero XLog error hashes, not HTTP status codes. Durations describe entire requests, not SQL durations. Every captured XLog counts, including separate Servlet error dispatches; these counts are not necessarily the number of incoming HTTP requests.
+`inspect summary` scans a v2 or v3 capture offline and groups by XLog `serviceHash` within the capture's source/object/time window. Each service includes `requests`, `errors`, `errorRate` (a fraction from 0 to 1), `elapsedTotalMs`, `averageElapsedMs`, `maxElapsedMs`, missing-profile/name counts and representative requests. Errors mean nonzero XLog error hashes, not HTTP status codes. Durations describe entire requests, not SQL durations. Every captured XLog counts, including separate Servlet error dispatches; these counts are not necessarily the number of incoming HTTP requests.
 
 `--sort errors` (default) orders by error count, then maximum duration, descending. `--sort elapsed` orders by maximum duration, then error count, descending. `--sort requests` orders by request count, then error count, descending. Ties use ascending numeric service hash. `--limit` returns the first 1..1000 services (default 20); global counts and per-service statistics still cover **all captured records**, not only the displayed services. No search filters are accepted, so the denominator cannot silently change. `truncated` describes the display limit, not missing capture data.
 
@@ -164,7 +164,7 @@ Run these commands with the password environment variable set. Replace the examp
 
 The destination directory must not exist for a new export. If the export is interrupted or partially completes, add `--resume` to the same capture command. Each query covers one date and one object over `[from,to)`. Set `--timezone` to the Collector's actual time zone.
 
-To save profiles as well, add `--include-profiles` to capture. Add `--include-text` only when you intend to store potentially sensitive dictionary text. This creates a v2 bundle; the default page size is 25 and the maximum is 100. Resume with the same flags and query. Missing profiles are recorded and retried on resume; connection failures preserve earlier page checkpoints.
+To save profiles as well, add `--include-profiles` to capture. Add `--include-text` only when you intend to store potentially sensitive dictionary text. This creates a v3 bundle; the default page size is 25 and the maximum is 100. Resume v3 with the same flags and query. Existing v2 bundles remain readable but cannot be resumed by this version; see [Capture compatibility](https://github.com/oxspan/scouterctl/blob/develop/docs/capture-compatibility.md). Missing profiles are recorded and retried on resume; connection failures preserve earlier page checkpoints.
 
 Profile results now include `completeness`: `truncated` means the Collector explicitly reported omitted blocks; `unknown` does not certify completeness. Known truncation makes `profile get` and `inspect` return exit 8 with the available data. See [Profile completeness](https://github.com/oxspan/scouterctl/blob/develop/docs/profile-completeness.md), including compatibility with older capture readers.
 
@@ -176,7 +176,7 @@ java -jar "$SCOUTERCTL_JAR" inspect --directory ./incident-profiles \
   --txid 9223372036854775806 --include-text
 ```
 
-Replace the directory with the v2 bundle you created. Omit `--include-text` to exclude stored text from the output. Requesting text that was not stored returns `2`. Inspect verifies all referenced pages and returns `8` with data for partial captures or unavailable profiles. A missing transaction returns `7`; damaged files return `10`. It supports v2 only, with no implicit v1 migration.
+Replace the directory with the v3 bundle you created. Omit `--include-text` to exclude stored text from the output. Requesting text that was not stored returns `2`. Inspect verifies all referenced pages and returns `8` with data for partial captures or unavailable profiles. A missing transaction returns `7`; damaged files return `10`. It supports v2 and v3, with no implicit v1 migration.
 
 To find a transaction ID first, search the same bundle offline:
 
@@ -190,7 +190,7 @@ java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles \
 
 Results contain `records[].xlog.txid`; pass one to `inspect --txid` for details. All filters combine with AND. Service names match exactly and require stored text plus `--include-text`; use `--service-hash` without text. Unknown names are counted separately and do not match name filters. Results sort by request duration descending, end time ascending, then numeric txid ascending. `--errors-only` means a nonzero XLog error hash, not HTTP status or SQL error classification.
 
-Search defaults to 20 results (limit 1..1000), scans and validates every referenced page, and summarizes all matches rather than only the displayed top N. `truncated` means the result limit omitted matches. Empty matches return an empty result. Partial captures, missing profiles or a saved failure return `8` with data; otherwise search returns `0`. No Collector account or connection is needed. Use `inspect summary` for service-level aggregation or `inspect compare` to compare two v2 bundles.
+Search defaults to 20 results (limit 1..1000), scans and validates every referenced page, and summarizes all matches rather than only the displayed top N. `truncated` means the result limit omitted matches. Empty matches return an empty result. Partial captures, missing profiles or a saved failure return `8` with data; otherwise search returns `0`. No Collector account or connection is needed. Use `inspect summary` for service-level aggregation or `inspect compare` to compare two v2/v3 bundles.
 
 Unset the password environment variable when you finish:
 
@@ -205,7 +205,7 @@ java -jar "$SCOUTERCTL_JAR" inspect compare --before ./before --after ./after
 java -jar "$SCOUTERCTL_JAR" inspect compare --before ./before --after ./after --include-text --limit 100
 ```
 
-Both directories must contain v2 captures created with `capture --include-profiles`. The command reads every referenced page, needs no credentials or Collector connection, and leaves both captures unchanged. Use completed captures that are no longer being written.
+Both directories must contain v2 or v3 captures created with `capture --include-profiles`. The command reads every referenced page, needs no credentials or Collector connection, and leaves both captures unchanged. Use completed captures that are no longer being written.
 
 Each service is matched by its numeric service hash. `before` and `after` contain the captured metrics; `delta` is **after minus before** for request/error counts, total/average/maximum request duration, and error-rate **percentage points**. For example, 25% to 75% produces `errorRatePercentagePoints: 50`, not a relative percent change. Durations are milliseconds for the entire request, not SQL time. No throughput normalization, percentiles, or automatic improvement/regression verdict is calculated.
 

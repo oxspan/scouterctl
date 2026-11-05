@@ -18,8 +18,8 @@ java -jar scouterctl-VERSION-all.jar inspect --directory CAPTURE --txid TXID
 
 ## Capture compatibility and limits
 
-The completeness value is stored with profiles in newly written v2 captures and survives text redaction during inspection. Existing captures without the field read as `unknown`; their former control-step text/code was not stored, so it cannot reliably be reconstructed. Reading an old capture does not rewrite it.
+The completeness value is stored with profiles in newly written v3 captures and survives text redaction during inspection. Existing captures without the field read as `unknown`; their former control-step text/code was not stored, so it cannot reliably be reconstructed. Reading an old capture does not rewrite it.
 
-This adds a JSON field to profile records. Readers that reject unknown JSON fields, including older scouterctl versions, may reject newly written profile captures. Keep originals when evaluating the new version and use the current reader for new captures. XLog-only v1 captures and v2 manifest fields are unchanged.
+New profile bundles declare `scouterctl.capture/v3` because older strict readers cannot consume the new profile field. The current reader accepts existing v2 captures without rewriting them, but refuses v2 resume. Use the current reader for v3 captures and keep existing originals. XLog-only v1 captures are unchanged. See [Capture compatibility](capture-compatibility.md) for the version matrix and migration options.
 
 Capture completion and search/summary/comparison completion retain their existing meanings. A completed XLog export does not certify complete profiles. Inspect a representative profile's completeness before interpreting its SQL steps as exhaustive. This change does not fetch unlimited blocks, automatically retry truncation, infer agent-side loss, or restore omitted data.

@@ -30,9 +30,9 @@ The project remains one Gradle module with the `dev.scouterctl.MainKt` entrypoin
 
 Core and application use Kotlin/JDK value, time and collection utilities. They do not use filesystem/network APIs, process access, reflection-based lookup, Scouter classes, picocli or serialization. CLI handlers receive port factories; local and offline dispatch never resolves online credentials or connections. `Main.kt` delegates entry only. The flat command words and picocli option facade preserve command parsing and help layout.
 
-[Ports.kt](../src/main/kotlin/dev/scouterctl/application/Ports.kt) declares `ObservationSource`, `CaptureRepository` (v1), `EvidenceRepository` (v2) and `ContextRepository`. Repositories are bound to directories externally, so use cases receive records and manifests rather than paths or JSON. `ContextRepository.update` executes its read/modify/write callback while the file adapter holds the lock. An online handler owns the source's `use` lifetime, including when a streaming output callback fails.
+[Ports.kt](../src/main/kotlin/dev/scouterctl/application/Ports.kt) declares `ObservationSource`, `CaptureRepository` (v1), `EvidenceRepository` (v2/v3) and `ContextRepository`. Repositories are bound to directories externally, so use cases receive records and manifests rather than paths or JSON. `ContextRepository.update` executes its read/modify/write callback while the file adapter holds the lock. An online handler owns the source's `use` lifetime, including when a streaming output callback fails.
 
-Capture writes each page before publishing its manifest checkpoint. Resume validates the stored source/query/text policy and all referenced pages before updating anything. Offline traversal continues through every page even after a search limit is filled. Search keeps a bounded priority queue; summary and comparison retain the existing service limits and full integrity checks. Atomic moves, v2 no-follow file access and per-page size limits remain in the file adapters.
+Capture writes each page before publishing its manifest checkpoint. Resume validates the stored source/query/text policy and all referenced pages before updating anything. Offline traversal continues through every page even after a search limit is filled. Search keeps a bounded priority queue; summary and comparison retain the existing service limits and full integrity checks. Atomic moves, profile-capture no-follow file access and per-page size limits remain in the file adapters.
 
 ## Wire formats and failures
 
@@ -62,7 +62,7 @@ The separate Spring smoke requires built Collector/agent artifacts and verifies 
 
 Named connections store host, port and account plus the selected context. They do not store passwords, password hashes or sessions. An online invocation obtains its password from `SCOUTERCTL_PASSWORD` or explicit terminal input and disconnects after the operation.
 
-A profile capture uses `scouterctl.capture/v2`: a manifest records the source, query, cursor, completion and page checksums; JSONL pages contain XLogs, profile availability and profiles. Dictionary text is optional and may contain sensitive application data. Offline analysis accepts v2; it does not silently migrate transaction-only v1 captures.
+A profile capture uses `scouterctl.capture/v3`: a manifest records the source, query, cursor, completion and page checksums; JSONL pages contain XLogs, profile availability and profiles. Dictionary text is optional and may contain sensitive application data. Offline analysis accepts existing v2 and new v3; it does not silently migrate transaction-only v1 captures. The current writer resumes v3 only. See [Capture compatibility](capture-compatibility.md) for the format policy.
 
 Checksums detect changed page contents, not authenticity. The manifest is unsigned. Capture completion describes the extraction, not total traffic coverage: sampling and upstream coverage remain explicit metadata. Service statistics and comparisons use captured XLogs rather than incoming HTTP request counts. Known service-name conflicts are reported, but numeric service hashes cannot distinguish every collision.
 
