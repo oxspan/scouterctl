@@ -14,7 +14,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $archive))
 try {
     $actual = @($zip.Entries.FullName | Where-Object { -not $_.EndsWith('/') } | Sort-Object)
-    $expected = @('README.md', 'CHANGELOG.md', 'version.txt', "$prefix-all.jar", 'vendor/README.md', 'vendor/SCOUTER-LICENSE.txt') |
+    $expected = @('README.md', 'CHANGELOG.md', 'version.txt', 'LICENSE', 'SECURITY.md', "$prefix-all.jar", 'vendor/README.md', 'vendor/SCOUTER-LICENSE.txt') |
         ForEach-Object { "$prefix/$_" } | Sort-Object
     if (Compare-Object $expected $actual -CaseSensitive) { throw 'Unexpected archive contents' }
 } finally { $zip.Dispose() }
@@ -22,7 +22,7 @@ try {
 $destination = [IO.Path]::GetFullPath('build/portable install')
 Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force
 $package = Join-Path $destination $prefix
-foreach ($pair in @(@('QUICKSTART.md', 'README.md'), @('version.txt', 'version.txt'))) {
+foreach ($pair in @(@('QUICKSTART.md', 'README.md'), @('version.txt', 'version.txt'), @('LICENSE', 'LICENSE'), @('SECURITY.md', 'SECURITY.md'))) {
     if ((Get-FileHash $pair[0]).Hash -ne (Get-FileHash (Join-Path $package $pair[1])).Hash) { throw 'Packaged metadata differs' }
 }
 $jar = Join-Path $package "$prefix-all.jar"

@@ -106,7 +106,7 @@ val pocDist = tasks.register<Zip>("pocDist") {
     into("scouterctl-${project.version}") {
         from(tasks.named("fatJar"))
         from("QUICKSTART.md") { rename { "README.md" } }
-        from("CHANGELOG.md", "version.txt")
+        from("CHANGELOG.md", "version.txt", "LICENSE", "SECURITY.md")
         from("vendor") {
             include("README.md", "SCOUTER-LICENSE.txt")
             into("vendor")
@@ -136,4 +136,21 @@ listOf("scaleFixtures" to "generate", "scaleCheck" to "run").forEach { (taskName
         args(mode, providers.gradleProperty("scaleInputs").getOrElse("build/scale-inputs"))
         systemProperty("cli.jar", externalJar.getOrElse(layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
     }
+}
+
+// Opt-in fixture for matching legacy Collector/Agent releases on Java 8.
+val legacyFixture = sourceSets.create("legacyFixture")
+configurations.named(legacyFixture.implementationConfigurationName) {
+    extendsFrom(configurations.implementation.get())
+}
+dependencies { add(legacyFixture.implementationConfigurationName, "com.h2database:h2:1.4.200") }
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>("compileLegacyFixtureKotlin") {
+    setSource(files("src/test/kotlin/dev/scouterctl/fixture/TestService.kt"))
+    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+    compilerOptions.freeCompilerArgs.add("-Xjdk-release=8")
+}
+tasks.named<JavaCompile>(legacyFixture.compileJavaTaskName) { options.release.set(8) }
+tasks.register("legacyFixtureClasspath") {
+    dependsOn(legacyFixture.classesTaskName)
+    doLast { println(legacyFixture.runtimeClasspath.asPath) }
 }

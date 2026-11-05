@@ -1,10 +1,10 @@
 # scouterctl — Quick start
 
-A CLI for querying observability data from a Scouter Collector and exporting it as JSON/JSONL files. This is an initial POC release; commands and output formats may change.
+A CLI for querying observability data from a Scouter Collector and exporting it as JSON/JSONL files. See the CLI output and capture format guides for supported behavior.
 
 ## Prerequisites
 
-You need JDK 21 and access to a Scouter Collector running **2.21.3**. The Java runtime, Collector, and Agent are not included in the package. Check `java -version` first: an older runtime cannot start this JAR and cannot return the CLI's JSON errors.
+You need JDK 21 and access to a [supported Scouter Collector release](https://github.com/oxspan/scouterctl/blob/develop/docs/supported-versions.md). The Java runtime, Collector, and Agent are not included in the package. Check `java -version` first: an older runtime cannot start this JAR and cannot return the CLI's JSON errors.
 
 Download one ZIP and its `SHA256SUMS` from the same release into an empty directory.
 
@@ -219,12 +219,14 @@ Names are omitted unless `--include-text` is set, which requires stored text in 
 
 ## Output and support scope
 
+For scripting, see the [CLI output contract](https://github.com/oxspan/scouterctl/blob/develop/docs/cli-contract.md) for envelopes, stream termination and compatibility rules.
+
 - `doctor`, `object list`, `xlog search`, `profile get`, and `capture` (including `--resume`) are read-only.
 - Results use UTF-8 JSON or JSONL, with 64-bit transaction IDs represented as strings. Configure terminal and pipe readers to decode UTF-8. Help and version output use plain text.
 - SQL steps include `hash`, `elapsedMs`, `errorHash`, and `updated`. To investigate application errors, inspect the XLog's `errorHash` and the profile for the same `txid`.
 - Text is excluded by default. `profile get --include-text` adds `transaction.service`, `transaction.error`, `steps[].sql.statement`, and `steps[].sql.error`. Entries retain their hash and report `resolved` with text or `unresolved` with null text. A zero error hash has no error entry; an unavailable XLog sets `transaction.status` to `unavailable` while SQL resolution continues. Lookup uses the requested date; connection/protocol failures return a nonzero exit code.
-- Opt-in text is returned as stored and may contain sensitive values, SQL literals, or exception details. Separate SQL bind fields and other free-text steps remain excluded. Profile requests are limited to 1,000 steps; truncation detection and method-name resolution are not supported.
-- `--include-text` is supported by `profile get`, `capture --include-profiles`, and `inspect`. V2 pages contain XLogs, profile availability, profiles, and optional dictionary snapshots. Inspect uses only these stored values.
+- Opt-in text is returned as stored and may contain sensitive values, SQL literals, or exception details. Separate SQL bind fields and other free-text steps remain excluded. Profile requests use a 1,000-block budget, which is not a decoded-step limit. Explicit Collector truncation is reported; absence of that signal leaves completeness unknown. Method-name resolution is not supported.
+- `--include-text` is supported by `profile get`, `capture --include-profiles`, and `inspect`. V3 pages contain XLogs, profile availability, profiles, completeness and optional dictionary snapshots; existing v2 pages remain readable. Inspect uses only these stored values.
 - Profile capture is limited to 10,000 pages and 16 MiB per page. A smaller page size may be needed for large profiles; changing the query requires a new capture. Resume may leave unreferenced page files, which are ignored. Checksums detect accidental corruption; the manifest is not signed.
 - Capture completion indicates that the requested execution has finished, not that all traffic is included. Concurrent writes and durability during power loss are not guaranteed.
 - Online commands require Collector 2.21.3; other versions are rejected. Run the packaged JAR with JDK 21. On Windows, use the documented relative-JAR and UTF-8 argument-file workflow for Korean paths and Unicode values.
@@ -235,3 +237,6 @@ Exit codes: `0` success, `2` invalid input/resume conditions, `3` authentication
 
 - [Changelog](CHANGELOG.md)
 - [Scouter protocol library provenance](vendor/README.md)
+
+- [Apache License 2.0](LICENSE)
+- [Security policy](SECURITY.md)

@@ -10,7 +10,7 @@ import java.nio.file.Path
 import java.util.concurrent.Callable
 
 @Command(name = "scouterctl", mixinStandardHelpOptions = true, showAtFileInUsageHelp = true,
-    description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary, inspect compare.",
+    description = ["Scouter Collector CLI. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary, inspect compare.",
         "Connect: doctor --host HOST --port PORT --user ACCOUNT, then object list with the same options.",
         "Save/select connections: context add/list/use --name NAME. Check credentials: auth login.",
         "Password: SCOUTERCTL_PASSWORD, or --interactive for hidden terminal input. Passwords are never saved.",
@@ -29,10 +29,10 @@ class Cli(private val dispatcher: CommandDispatcher, private val output: JsonOut
     @Option(names = ["--max-pages"], defaultValue = "40") var maxPages: Int = 40
     @Option(names = ["--txid"]) var txid: Long? = null
     @Option(names = ["--directory"]) var directory: Path? = null
-    @Option(names = ["--before"], description = ["inspect compare: baseline v2 capture directory"]) var before: Path? = null
-    @Option(names = ["--after"], description = ["inspect compare: candidate v2 capture directory"]) var after: Path? = null
+    @Option(names = ["--before"], description = ["inspect compare: baseline v2/v3 capture directory"]) var before: Path? = null
+    @Option(names = ["--after"], description = ["inspect compare: candidate v2/v3 capture directory"]) var after: Path? = null
     @Option(names = ["--resume"]) var resume: Boolean = false
-    @Option(names = ["--include-profiles"], description = ["Capture profiles in a v2 offline bundle"]) var includeProfiles: Boolean = false
+    @Option(names = ["--include-profiles"], description = ["Capture profiles in a v3 offline bundle"]) var includeProfiles: Boolean = false
     @Option(names = ["--include-text"], description = ["Include potentially sensitive dictionary text in profile get, profile capture or inspect"])
     var includeText: Boolean = false
     @Option(names = ["--limit"], description = ["inspect search/summary/compare: 1..1000 requests/services; default 20"]) var limit: Int? = null

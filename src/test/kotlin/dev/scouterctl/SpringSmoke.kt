@@ -68,7 +68,7 @@ fun main(args: Array<String>) {
     """.trimIndent())
     val java = Path.of(System.getProperty("java.home"), "bin/java").toString()
     val collectorJava = System.getenv("SCOUTER_COLLECTOR_JAVA") ?: java
-    val cp = listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
+    val cp = System.getenv("SCOUTER_COLLECTOR_CLASSPATH") ?: listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
         upstream.resolve("scouter.common/target/scouter-common-2.21.3.jar"), upstream.resolve("scouter.server/target/lib/*")).joinToString(":")
     var collectorStarts = 0
     fun startCollector(): Process = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")

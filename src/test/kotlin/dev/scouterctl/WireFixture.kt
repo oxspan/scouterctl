@@ -27,7 +27,8 @@ enum class Fault {
     PROFILE_TRUNCATED, PROFILE_OTHER_CONTROL, PROFILE_MANY_STEPS, PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
 }
 
-class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPassword: String? = null) : AutoCloseable {
+class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPassword: String? = null,
+    private val collectorVersion: String = "2.21.3 test") : AutoCloseable {
     private val server = ServerSocket(0, 8, InetAddress.getLoopbackAddress())
     val port: Int = server.localPort
     private val executor = Executors.newSingleThreadExecutor()
@@ -108,7 +109,7 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                     request.getText("pass") == scouter.util.CipherUtil.sha256(expectedPassword)
                                 request.put("session", if (fault == Fault.AUTH || !passwordMatches) 0L else 123L)
                                 request.put("server_id", "fixture"); request.put("type", "guest")
-                                request.put("version", if (fault == Fault.VERSION) "2.8.1 test" else "2.21.3 test")
+                                request.put("version", if (fault == Fault.VERSION) "99.0.0 test" else collectorVersion)
                                 request.put("timezone", "Coordinated Universal Time")
                                 send(output, request)
                             }
