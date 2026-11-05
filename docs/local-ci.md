@@ -14,7 +14,7 @@ Start Docker Desktop with its Linux engine and enable the current distribution u
 
 The first run downloads runner images, actions, JDK and Gradle dependencies. `--action-offline-mode` reuses already cached actions/images on later runs; it does not promise a network-free build. `ACT_IMAGE` can override the default `ghcr.io/catthehacker/ubuntu:act-24.04` image.
 
-The local workflow uses the current working tree instead of checking out GitHub source. GitHub Gradle caching is disabled under act, and artifacts use act's local server. The wrapper does not load `.env`, `.secrets` or `.vars`, and does not pass a GitHub token. The Docker socket is not mounted into the job container. On WSL with Docker Desktop, the artifact server binds to WSL loopback and the container reaches it through `host.docker.internal` and Windows localhost forwarding. Other environments use act's bridge-network address. If uploads fail, check this connection before rerunning the build.
+The local workflow uses the current working tree instead of checking out GitHub source. GitHub Gradle caching is disabled under act. Local artifact steps pin `upload-artifact v4.6.2`, which act v0.2.97 supports; hosted uploads keep v7. Recheck this compatibility before updating the local upload action. The wrapper does not load `.env`, `.secrets` or `.vars`, and does not pass a GitHub token. The Docker socket is not mounted into the job container. On WSL with Docker Desktop, the artifact server binds to WSL loopback and the container reaches it through `host.docker.internal` and Windows localhost forwarding. Other environments use act's bridge-network address. If uploads fail, check this connection before rerunning the build.
 
 ## Validation boundaries
 
