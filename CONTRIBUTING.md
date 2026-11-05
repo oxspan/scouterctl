@@ -2,6 +2,8 @@
 
 Use Kotlin for new production code and tests. The existing Java reference probe is an independent protocol comparison tool; it is not a template for new application code. Write automated tests with Kotest `FunSpec` and Kotest matchers. Kotest runs on JUnit Platform on the JVM; JUnit Jupiter annotations and assertions are not used for new tests.
 
+Prefer focused local tests during development. Use [Local CI](docs/local-ci.md) to run the Linux workflow with act before a handoff or when workflow behavior changes. Every PR receives shared Linux checks. PRs to master, master pushes and ordinary manual runs also validate Windows and macOS; develop pushes avoid repeating PR checks.
+
 Use JDK 21 and the checked-in Gradle Wrapper:
 
 ```sh
@@ -14,6 +16,8 @@ The Linux verification script requires Bash, Java, jq, unzip, and standard GNU u
 To test an extracted package locally, run `./gradlew test -PcliJar=/absolute/path/to/scouterctl-version-all.jar` (`./gradlew.bat` in PowerShell). The package version must match the checkout. The normal test task builds and uses the local JAR when this property is omitted.
 
 The real Collector/Agent/Spring smoke tests require a separately built Scouter checkout and are not part of this CI workflow. The Kotest suite uses native pseudo-terminals (PTY on Linux/macOS, ConPTY on Windows) to exercise hidden password input, cancellation, and saved connections against a protocol fixture. This verifies console behavior, not a specific desktop terminal application or real Collector instrumentation on every OS. The terminal library is test-only and is not included in the release JAR.
+
+The optional `recoverySmoke` task exercises real Collector stop/restart and capture resume; see [Capture recovery](docs/capture-recovery.md).
 
 ## Architecture boundaries
 
@@ -40,7 +44,7 @@ Create `feature/*` and `hotfix/*` branches as needed; they are not permanent bra
 - Use a **merge commit**, not squash or rebase, for `develop → master` promotion and `master → develop` synchronization. This preserves shared ancestry and the individual Conventional Commits that release-please reads.
 - After merging a hotfix or a release PR into `master`, synchronize `master → develop` with a merge-commit PR. This carries fixes, version changes, and changelog entries back into development.
 - Dependabot targets `develop`. Release-please targets `master`.
-- CI runs on PRs targeting either long-lived branch and on pushes to both. The PR route check rejects feature PRs targeting `master`. Publishing runs only from `master`.
+- CI checks PR routes and runs Linux validation on PRs to both long-lived branches. PRs to `master` also run Windows/macOS validation. Pushes to `develop` do not repeat PR checks; pushes to `master` retain cross-platform checks and release automation. Publishing runs only from `master`.
 
 A separate `release/*` branch is unnecessary while promotion to `master` is followed by a short release review. Revisit it if a release needs extended stabilization while unrelated work continues on `develop`, or if multiple release lines must be maintained. The release-please PR branch only prepares version metadata; it is not a stabilization branch.
 
@@ -103,7 +107,7 @@ If a promotion produces no candidate, inspect the release job log before retryin
 
 The existing `v0.0.0` is the bootstrap baseline. It is not rebuilt or replaced by this setup. Release PRs are not automatically merged.
 
-The workflow uses only the repository's `GITHUB_TOKEN`. Allow GitHub Actions to create pull requests in the repository's Actions settings. Bot-created PR checks may require **Approve workflows to run**; approve and check them before merging. Release assets are attached in the same workflow because tags/releases created by the default token do not trigger another workflow.
+The workflow uses only the repository's `GITHUB_TOKEN`. Allow GitHub Actions to create pull requests in the repository's Actions settings. Release PRs require the latest revision to pass the cross-platform checks before merge. Bot-created PR checks may require **Approve workflows to run**. Release assets are attached in the same workflow because tags/releases created by the default token do not trigger another workflow.
 
 ## Runner delays
 
