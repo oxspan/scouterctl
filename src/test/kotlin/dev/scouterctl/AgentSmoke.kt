@@ -65,7 +65,7 @@ fun main(args: Array<String>) {
     """.trimIndent())
     val java = Path.of(System.getProperty("java.home"), "bin/java").toString()
     val collectorJava = System.getenv("SCOUTER_COLLECTOR_JAVA") ?: java
-    val cp = listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
+    val cp = System.getenv("SCOUTER_COLLECTOR_CLASSPATH") ?: listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
         upstream.resolve("scouter.common/target/scouter-common-2.21.3.jar"), upstream.resolve("scouter.server/target/lib/*")).joinToString(":")
     val collector = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")
         .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("collector.log").toFile()).start()
@@ -74,10 +74,13 @@ fun main(args: Array<String>) {
     try {
         val endpoint = Endpoint("127.0.0.1", port, "poc", 1500)
         eventually("Collector login") { CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-agent-smoke" } }
-        val agent = upstream.resolve("scouter.agent.java/target/scouter.agent.jar")
+        val agent = System.getenv("SCOUTER_AGENT_JAR")?.let(Path::of)
+            ?: upstream.resolve("scouter.agent.java/target/scouter.agent.jar")
         check(Files.isRegularFile(agent)) { "Build Java 21 agent first: $agent" }
-        service = ProcessBuilder(java, "-Xmx128m", "-Duser.timezone=UTC", "-javaagent:$agent",
-            "-Dscouter.config=${work.resolve("agent.conf")}", "-cp", System.getProperty("java.class.path"),
+        val serviceJava = System.getenv("SCOUTER_SERVICE_JAVA") ?: java
+        val serviceClasspath = System.getenv("SCOUTER_SERVICE_CLASSPATH") ?: System.getProperty("java.class.path")
+        service = ProcessBuilder(serviceJava, "-Xmx128m", "-Duser.timezone=UTC", "-javaagent:$agent",
+            "-Dscouter.config=${work.resolve("agent.conf")}", "-cp", serviceClasspath,
             "dev.scouterctl.fixture.TestServiceKt", work.resolve("http-port").toString())
             .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("service.log").toFile()).start()
         eventually("HTTP service startup") { Files.exists(work.resolve("http-port")) }
@@ -161,7 +164,7 @@ fun main(args: Array<String>) {
                 put("methodAndJdbcProfiles", true); put("credentialsAndBindExcluded", true)
                 put("receivedAfterHttpCompletion", rows.count { it.endTime >= httpCompletedAt })
                 put("halfOpenBoundaryRecords", boundaryRows.size); put("emptyQueryComplete", true)
-                put("agentJvm", System.getProperty("java.version")); put("collectorVersion", manifest.source.version)
+                put("agentJvm", Files.readString(work.resolve("http-port.java-version"))); put("collectorVersion", manifest.source.version)
             }.toString())
             println("PASS: 36 real HTTP requests, 36 unique XLogs, 6 errors, slow timings, method/JDBC profiles, 8-page capture/resume, auth failure, redaction")
         }

@@ -1,10 +1,10 @@
 # scouterctl — Quick start
 
-A CLI for querying observability data from a Scouter Collector and exporting it as JSON/JSONL files. This is an initial POC release; commands and output formats may change.
+A CLI for querying observability data from a Scouter Collector and exporting it as JSON/JSONL files. See the CLI output and capture format guides for supported behavior.
 
 ## Prerequisites
 
-You need JDK 21 and access to a Scouter Collector running **2.21.3**. The Java runtime, Collector, and Agent are not included in the package. Check `java -version` first: an older runtime cannot start this JAR and cannot return the CLI's JSON errors.
+You need JDK 21 and access to a [supported Scouter Collector release](https://github.com/oxspan/scouterctl/blob/develop/docs/supported-versions.md). The Java runtime, Collector, and Agent are not included in the package. Check `java -version` first: an older runtime cannot start this JAR and cannot return the CLI's JSON errors.
 
 Download one ZIP and its `SHA256SUMS` from the same release into an empty directory.
 

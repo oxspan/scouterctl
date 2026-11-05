@@ -31,7 +31,7 @@ See [Architecture](docs/architecture.md) for the application components and capt
 ## Requirements
 
 - JDK 21.
-- Scouter Collector **2.21.3**, a query account, and TCP access for online commands.
+- a [supported Scouter Collector release](docs/supported-versions.md), a query account, and TCP access for online commands.
 - An existing capture for offline inspection; no Collector connection is needed.
 
 Install the Collector and Agent separately. Collector connections do not provide built-in TLS; use a trusted network or a tunnel. For Windows paths and arguments containing non-ASCII characters, follow the [Unicode usage instructions](QUICKSTART.md#windows-unicode-paths-and-arguments).

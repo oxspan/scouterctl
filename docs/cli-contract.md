@@ -1,6 +1,6 @@
 # CLI output and compatibility contract
 
-This contract describes the current CLI boundary for scripts. It is separate from the CLI release version and the on-disk [capture format](capture-compatibility.md). It does not turn this POC into a general Scouter protocol client: online access still supports Collector 2.21.3 only.
+This contract describes the current CLI boundary for scripts. It is separate from the CLI release version and the on-disk [capture format](capture-compatibility.md). It does not turn this POC into a general Scouter protocol client: online access supports the [listed Collector releases](supported-versions.md).
 
 ## Process and channels
 

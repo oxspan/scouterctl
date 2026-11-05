@@ -67,9 +67,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
         if (session == 0L) throw OperationFailure(ErrorCode.AUTH_FAILED,
             "Collector authentication failed; check --user and SCOUTERCTL_PASSWORD with the Collector administrator")
         val version = reply.getText("version") ?: "unknown"
-        if (version.substringBefore(' ') != "2.21.3") {
-            throw OperationFailure(ErrorCode.VERSION_MISMATCH, "This POC requires Collector 2.21.3")
-        }
+        requireSupportedCollector(version)
         info = ServerInfo(reply.getText("server_id") ?: "unknown", version,
             reply.getText("timezone") ?: "unknown", reply.getText("type") ?: "unknown")
     }

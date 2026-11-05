@@ -10,7 +10,7 @@ import java.nio.file.Path
 import java.util.concurrent.Callable
 
 @Command(name = "scouterctl", mixinStandardHelpOptions = true, showAtFileInUsageHelp = true,
-    description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary, inspect compare.",
+    description = ["Scouter Collector CLI. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary, inspect compare.",
         "Connect: doctor --host HOST --port PORT --user ACCOUNT, then object list with the same options.",
         "Save/select connections: context add/list/use --name NAME. Check credentials: auth login.",
         "Password: SCOUTERCTL_PASSWORD, or --interactive for hidden terminal input. Passwords are never saved.",

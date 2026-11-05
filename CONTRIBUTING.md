@@ -21,6 +21,8 @@ bash .github/scripts/verify-package.sh
 
 The package verification script requires Linux, Bash, JDK 21, jq, unzip and standard GNU utilities. Windows package verification uses `.github/scripts/verify-portable-package.ps1`; see [Local CI](docs/local-ci.md) for native Windows checks and the optional Linux act workflow. Real Collector/Agent/Spring checks are separate, opt-in integration scenarios described in [Capture recovery](docs/capture-recovery.md).
 
+For matching older Collector/Agent releases on Java 8, see [Supported versions](docs/supported-versions.md#reproduce-the-checks). The optional fixture has a separate Java 8 compilation and test-only JDBC dependency.
+
 ## Code and tests
 
 - Write production code and tests in Kotlin. Use Kotest `FunSpec` and Kotest matchers. Kotest uses JUnit Platform; new tests should not use JUnit Jupiter annotations or assertions.
