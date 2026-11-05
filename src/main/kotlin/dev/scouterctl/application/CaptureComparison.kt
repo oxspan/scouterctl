@@ -1,70 +1,9 @@
-package dev.scouterctl
+package dev.scouterctl.application
 
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import java.nio.file.Path
+import dev.scouterctl.core.*
 
-@Serializable
-enum class ComparisonWarning {
-    @SerialName("traffic-coverage-unverified") TRAFFIC_COVERAGE_UNVERIFIED,
-    @SerialName("different-server") DIFFERENT_SERVER,
-    @SerialName("different-collector-version") DIFFERENT_COLLECTOR_VERSION,
-    @SerialName("different-object") DIFFERENT_OBJECT,
-    @SerialName("different-timezone") DIFFERENT_TIMEZONE,
-    @SerialName("different-duration") DIFFERENT_DURATION,
-    @SerialName("overlapping-windows") OVERLAPPING_WINDOWS,
-    @SerialName("incomplete-capture") INCOMPLETE_CAPTURE,
-    @SerialName("unavailable-profiles") UNAVAILABLE_PROFILES,
-    @SerialName("unresolved-service-names") UNRESOLVED_SERVICE_NAMES,
-    @SerialName("service-identity-conflict") SERVICE_IDENTITY_CONFLICT,
-}
-
-@Serializable
-enum class ServicePresence {
-    @SerialName("both") BOTH,
-    @SerialName("before-only") BEFORE_ONLY,
-    @SerialName("after-only") AFTER_ONLY,
-}
-
-data class ComparisonOptions(val limit: Int = 20, val includeText: Boolean = false)
-
-@Serializable
-data class ComparisonCapture(
-    val source: ServerInfo, val query: Query, val durationMs: Long,
-    val captureExecutionComplete: Boolean, val lastFailure: ErrorCode?, val textStored: Boolean,
-    val upstreamCoverage: String, val sampling: String,
-    val capturedRecords: Int, val capturedErrors: Int, val unavailableProfiles: Int,
-    val unknownServiceNames: Int, val totalServices: Int,
-)
-
-@Serializable
-data class ServiceDelta(
-    val requests: Int, val errors: Int, val errorRatePercentagePoints: Double,
-    val elapsedTotalMs: Long, val averageElapsedMs: Double, val maxElapsedMs: Long,
-)
-
-@Serializable
-data class ComparedService(
-    val serviceHash: Int, val presence: ServicePresence, val identityConflict: Boolean,
-    val before: ServiceAggregate?, val after: ServiceAggregate?, val delta: ServiceDelta?,
-)
-
-@Serializable
-data class CaptureComparison(
-    val before: ComparisonCapture, val after: ComparisonCapture,
-    val warnings: List<ComparisonWarning>, val textIncluded: Boolean,
-    val totalServices: Int, val limit: Int, val truncated: Boolean,
-    val services: List<ComparedService>,
-    val basis: String = "captured-xlogs", val matching: String = "service-hash",
-    val order: String = "service-hash-asc", val deltaDirection: String = "after-minus-before",
-) {
-    val complete: Boolean get() = listOf(before, after).all {
-        it.captureExecutionComplete && it.lastFailure == null && it.unavailableProfiles == 0
-    }
-}
-
-fun compareCaptures(before: Path, after: Path, options: ComparisonOptions): CaptureComparison {
-    if (options.limit !in 1..1000) throw CliFailure(ErrorCode.INVALID_ARGUMENT, "Use --limit 1..1000")
+fun compareCaptures(before: EvidenceRepository, after: EvidenceRepository, options: ComparisonOptions): CaptureComparison {
+    if (options.limit !in 1..1000) throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Use --limit 1..1000")
     val baseline = comparisonSummary(before, options.includeText)
     val candidate = comparisonSummary(after, options.includeText)
     val beforeByHash = baseline.services.associateBy { it.serviceHash }
@@ -107,12 +46,12 @@ fun compareCaptures(before: Path, after: Path, options: ComparisonOptions): Capt
         services.size, options.limit, services.size > options.limit, services.take(options.limit))
 }
 
-private fun comparisonSummary(directory: Path, includeText: Boolean): ServiceSummary {
-    val manifest = EvidenceStore(directory).load()
-    if (includeText && !manifest.textIncluded) throw CliFailure(ErrorCode.INVALID_ARGUMENT, "Text was not stored in both captures")
+private fun comparisonSummary(store: EvidenceRepository, includeText: Boolean): ServiceSummary {
+    val manifest = store.load()
+    if (includeText && !manifest.textIncluded) throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Text was not stored in both captures")
     // Resolve stored names even for structural output so conflicting hash identities never receive a delta.
-    val summary = summarizeCapture(directory, ServiceSummaryOptions(limit = 1000, includeText = manifest.textIncluded))
-    if (summary.truncated) throw CliFailure(ErrorCode.PARTIAL_RESULT, "Comparison exceeds 1000 services per capture; use smaller captures")
+    val summary = summarizeCapture(store, ServiceSummaryOptions(limit = 1000, includeText = manifest.textIncluded))
+    if (summary.truncated) throw OperationFailure(ErrorCode.PARTIAL_RESULT, "Comparison exceeds 1000 services per capture; use smaller captures")
     return summary
 }
 

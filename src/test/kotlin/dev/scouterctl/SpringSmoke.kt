@@ -1,5 +1,11 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.bootstrap.BuildInfo
+import dev.scouterctl.adapters.collector.CollectorSource
+import dev.scouterctl.application.*
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.apache.catalina.util.ServerInfo
@@ -70,7 +76,7 @@ fun main(args: Array<String>) {
     println("Evidence: $work")
     try {
         val endpoint = Endpoint("127.0.0.1", port, "poc", 1500)
-        awaitSpring("Collector login") { CollectorSource.connect(endpoint, password).use { it.info.serverId == "scouterctl-spring-smoke" } }
+        awaitSpring("Collector login") { CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-spring-smoke" } }
         verifyInitialConnection(work, endpoint, password)
         val agent = upstream.resolve("scouter.agent.java/target/scouter.agent.jar")
         check(Files.isRegularFile(agent)) { "Build Java 21 agent first: $agent" }
@@ -82,7 +88,7 @@ fun main(args: Array<String>) {
         val httpPort = Files.readString(work.resolve("http-port")).trim().toInt()
         var objectHash = 0
         awaitSpring("Spring agent discovery") {
-            CollectorSource.connect(endpoint, password).use { source ->
+            CollectorSource.connect(endpoint, password, BuildInfo.version).use { source ->
                 source.objects().singleOrNull { it.objName.endsWith("/scouterctl-spring") && it.alive }
                     ?.also { objectHash = it.objHash } != null
             }
@@ -105,9 +111,9 @@ fun main(args: Array<String>) {
         val date = Instant.ofEpochMilli(from).atZone(ZoneOffset.UTC).toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
         awaitSpring("21 Servlet-generated XLogs including error dispatches persisted") {
             to = System.currentTimeMillis() + 1
-            CollectorSource.connect(endpoint, password).use {
+            CollectorSource.connect(endpoint, password, BuildInfo.version).use {
                 val observed = it.page(Query(date, from, to, "UTC", objectHash, 100), Cursor()).records
-                Files.writeString(work.resolve("ingestion-observed.json"), json.encodeToString(observed))
+                Files.writeString(work.resolve("ingestion-observed.json"), json.encodeToString(observed.map { it.toDto() }))
                 observed.size == 21
             }
         }
@@ -117,7 +123,7 @@ fun main(args: Array<String>) {
         val window = listOf("--date", date, "--from", Instant.ofEpochMilli(from).toString(), "--to", Instant.ofEpochMilli(to).toString(),
             "--timezone", "UTC", "--object-hash", objectHash.toString(), "--page-size", "5")
         val rows = cli.run("xlogs", listOf("xlog", "search") + window)
-            .filter { it["type"]?.jsonPrimitive?.content == "record" }.map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
+            .filter { it["type"]?.jsonPrimitive?.content == "record" }.map { json.decodeFromJsonElement<XLogRecordDto>(it["data"]!!).toModel() }
         check(rows.size == 21 && rows.map { it.txid }.toSet().size == 21)
         val verified = mutableListOf<JsonObject>()
         val textCheck = SpringProfileTextCheck(cli, date)
@@ -131,7 +137,7 @@ fun main(args: Array<String>) {
                 check((row.errorHash != 0) == expectedError) { "$route error flag: ${row.errorHash}" }
                 val event = cli.run("profile-${route.substringAfterLast('/')}-${index + 1}",
                     listOf("profile", "get", "--date", date, "--txid", row.txid)).single()
-                val profile = json.decodeFromJsonElement<ProfileRecord>(event["data"]!!)
+                val profile = json.decodeFromJsonElement<ProfileRecordDto>(event["data"]!!).toModel()
                 check(profile.txid == row.txid && profile.steps.isNotEmpty())
                 val sql = profile.steps.mapNotNull { it.sql }
                 if (route == "/poc/ok" || route == "/error") check(sql.isEmpty()) else {

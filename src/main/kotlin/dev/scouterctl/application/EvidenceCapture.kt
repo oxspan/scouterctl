@@ -1,17 +1,14 @@
-package dev.scouterctl
+package dev.scouterctl.application
 
-import java.io.IOException
-import java.net.SocketException
-import java.net.SocketTimeoutException
+import dev.scouterctl.core.*
 
-fun captureEvidence(source: ObservationSource, query: Query, request: CaptureRequest): EvidenceManifest {
+fun captureEvidence(source: ObservationSource, query: Query, request: CaptureOptions, store: EvidenceRepository): EvidenceManifest {
     query.validate()
-    if (query.pageSize > 100) throw CliFailure(ErrorCode.INVALID_ARGUMENT, "Profile capture page-size must be 1..100")
-    val store = EvidenceStore(request.directory)
+    if (query.pageSize > 100) throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Profile capture page-size must be 1..100")
     val reader = EvidenceReader(source, query.date, request.includeText)
     var manifest = if (request.resume) store.load().also {
         if (it.source != source.info || it.query != query || it.endpoint != request.endpoint || it.textIncluded != request.includeText) {
-            throw CliFailure(ErrorCode.INVALID_ARGUMENT, "Resume source, query or text policy differs from manifest")
+            throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Resume source, query or text policy differs from manifest")
         }
         store.validate(it)
     } else {
@@ -38,10 +35,10 @@ fun captureEvidence(source: ObservationSource, query: Query, request: CaptureReq
         val ids = mutableSetOf<String>()
         manifest.pages.indices.forEach { index -> store.readPage(manifest, index).forEach { ids.add(it.xlog.txid) } }
         repeat(request.maxPages) {
-            if (manifest.pages.size >= 10000) throw CliFailure(ErrorCode.PARTIAL_RESULT, "Evidence capture limit of 10000 pages reached")
+            if (manifest.pages.size >= 10000) throw OperationFailure(ErrorCode.PARTIAL_RESULT, "Evidence capture limit of 10000 pages reached")
             val page = source.page(query, manifest.cursor)
             val records = page.records.map { row ->
-                if (!ids.add(row.txid)) throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Duplicate transaction in capture")
+                if (!ids.add(row.txid)) throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Duplicate transaction in capture")
                 reader.fetch(row)
             }
             val saved = store.writePage(manifest.pages.size, records)
@@ -51,16 +48,10 @@ fun captureEvidence(source: ObservationSource, query: Query, request: CaptureReq
             if (!page.hasMore) return manifest
         }
         return manifest
-    } catch (error: CliFailure) {
-        store.save(manifest.copy(lastFailure = error.code))
+    } catch (error: OperationFailure) {
+        if (error !is UnexpectedFailure) store.save(manifest.copy(lastFailure = error.code))
         throw error
-    } catch (error: IOException) {
-        val code = when (error) {
-            is SocketTimeoutException, is SocketException -> ErrorCode.CONNECTION_FAILED
-            else -> ErrorCode.IO_ERROR
-        }
-        store.save(manifest.copy(lastFailure = code))
-        throw error
+
     }
 }
 
@@ -68,7 +59,7 @@ private class EvidenceReader(private val source: ObservationSource, private val 
     fun fetch(xlog: XLogRecord): EvidenceRecord {
         return try {
             EvidenceRecord(xlog, ProfileAvailability.AVAILABLE, source.profile(date, xlog.txid.toLong(), includeText))
-        } catch (error: CliFailure) {
+        } catch (error: OperationFailure) {
             if (error.code != ErrorCode.NOT_FOUND) throw error
             EvidenceRecord(xlog, ProfileAvailability.UNAVAILABLE)
         }

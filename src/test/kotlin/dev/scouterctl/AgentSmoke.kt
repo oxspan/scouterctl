@@ -1,5 +1,10 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.bootstrap.BuildInfo
+import dev.scouterctl.adapters.collector.CollectorSource
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import scouter.util.CipherUtil
@@ -68,7 +73,7 @@ fun main(args: Array<String>) {
     println("Evidence: $work")
     try {
         val endpoint = Endpoint("127.0.0.1", port, "poc", 1500)
-        eventually("Collector login") { CollectorSource.connect(endpoint, password).use { it.info.serverId == "scouterctl-agent-smoke" } }
+        eventually("Collector login") { CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-agent-smoke" } }
         val agent = upstream.resolve("scouter.agent.java/target/scouter.agent.jar")
         check(Files.isRegularFile(agent)) { "Build Java 21 agent first: $agent" }
         service = ProcessBuilder(java, "-Xmx128m", "-Duser.timezone=UTC", "-javaagent:$agent",
@@ -83,7 +88,7 @@ fun main(args: Array<String>) {
             check(http.send(request("/health"), HttpResponse.BodyHandlers.ofString()).statusCode() == 200)
             var objectHash = 0
             eventually("instrumented object discovery") {
-                CollectorSource.connect(endpoint, password).use { source ->
+                CollectorSource.connect(endpoint, password, BuildInfo.version).use { source ->
                     source.objects().singleOrNull { it.objName.endsWith("/scouterctl-fixture") && it.alive }
                         ?.also { objectHash = it.objHash } != null
                 }
@@ -102,9 +107,9 @@ fun main(args: Array<String>) {
             val date = Instant.ofEpochMilli(from).atZone(ZoneOffset.UTC).toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
             eventually("all 36 agent-generated XLogs persisted") {
                 to = System.currentTimeMillis() + 1
-                CollectorSource.connect(endpoint, password).use {
+                CollectorSource.connect(endpoint, password, BuildInfo.version).use {
                     val observed = it.page(Query(date, from, to, "UTC", objectHash, 100), Cursor()).records
-                    Files.writeString(work.resolve("ingestion-observed.json"), json.encodeToString(observed))
+                    Files.writeString(work.resolve("ingestion-observed.json"), json.encodeToString(observed.map { it.toDto() }))
                     observed.size == 36
                 }
             }
@@ -115,7 +120,7 @@ fun main(args: Array<String>) {
                 "--timezone", "UTC", "--object-hash", objectHash.toString(), "--page-size", "5")
             val events = cli.run("xlogs", listOf("xlog", "search") + window)
             val rows = events.filter { it["type"]?.jsonPrimitive?.content == "record" }
-                .map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
+                .map { json.decodeFromJsonElement<XLogRecordDto>(it["data"]!!).toModel() }
             check(rows.size == 36 && rows.map { it.txid }.toSet().size == 36)
             expected.forEach { (route, count) -> check(rows.count { it.serviceHash == HashUtil.hash(route) } == count) { "Wrong count for $route" } }
             check(rows.filter { it.serviceHash == HashUtil.hash("/poc/slow") }.all { it.elapsed >= 180 })
@@ -127,7 +132,7 @@ fun main(args: Array<String>) {
             }
             val boundaryRows = cli.run("xlogs-boundary", listOf("xlog", "search") + boundaryWindow)
                 .filter { it["type"]?.jsonPrimitive?.content == "record" }
-                .map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
+                .map { json.decodeFromJsonElement<XLogRecordDto>(it["data"]!!).toModel() }
             check(boundaryRows == rows.filter { it.endTime == boundary })
             val emptyWindow = window.toMutableList().apply { set(indexOf("--object-hash") + 1, "0") }
             val empty = cli.run("xlogs-empty", listOf("xlog", "search") + emptyWindow)
@@ -135,16 +140,16 @@ fun main(args: Array<String>) {
             for (route in expected.keys) {
                 val row = rows.first { it.serviceHash == HashUtil.hash(route) }
                 val event = cli.run("profile-${route.substringAfterLast('/')}", listOf("profile", "get", "--date", date, "--txid", row.txid)).single()
-                val profile = json.decodeFromJsonElement<ProfileRecord>(event["data"]!!)
+                val profile = json.decodeFromJsonElement<ProfileRecordDto>(event["data"]!!).toModel()
                 check(profile.steps.any { it.type.startsWith("METHOD") }) { "Missing method instrumentation: $route" }
                 if (route == "/poc/sql") check(profile.steps.any { it.type.startsWith("SQL") }) { "Missing JDBC instrumentation" }
             }
             val captureArgs = listOf("capture", "--directory", work.resolve("capture").toString()) + window
             cli.run("capture-first", captureArgs + listOf("--max-pages", "2"), 8)
             cli.run("capture-resume", captureArgs + listOf("--resume", "--max-pages", "40"))
-            val manifest = json.decodeFromString<CaptureManifest>(Files.readString(work.resolve("capture/manifest.json")))
+            val manifest = json.decodeFromString<CaptureManifestDto>(Files.readString(work.resolve("capture/manifest.json"))).toModel()
             val captured = manifest.files.flatMap { Files.readAllLines(work.resolve("capture").resolve(it.name)) }
-                .map { json.decodeFromString<XLogRecord>(it) }
+                .map { json.decodeFromString<XLogRecordDto>(it).toModel() }
             check(manifest.executionComplete && captured == rows)
             AgentCli(work, port, "invalid-fixture-password").run("wrong-password", listOf("doctor"), 3)
             val files = Files.list(work).use { paths -> paths.filter { it.toString().endsWith(".jsonl") }.toList() }

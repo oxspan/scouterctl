@@ -1,5 +1,7 @@
 package dev.scouterctl
 
+import dev.scouterctl.adapters.serialization.*
+
 import com.pty4j.PtyProcessBuilder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject

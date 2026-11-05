@@ -1,5 +1,8 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.serialization.*
+
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
@@ -13,7 +16,7 @@ class EvidenceSearchTest : FunSpec({
         val result = runOfflineCli(work, listOf("inspect", "search", "--directory", directory.toString(), "--limit", "2"))
         result.exit shouldBe 8
         result.stderr shouldBe ""
-        val search = json.decodeFromJsonElement<EvidenceSearch>(result.data())
+        val search = json.decodeFromJsonElement<EvidenceSearchDto>(result.data()).toModel()
         search.records.map { it.xlog.txid } shouldBe listOf("-9", "2")
         search.summary shouldBe EvidenceSummary(5, 2, 1, 2, 5, 2, 1610, 500)
         search.truncated shouldBe true
@@ -38,7 +41,7 @@ class EvidenceSearchTest : FunSpec({
             val directory = searchFixture(work)
             val result = runOfflineCli(work, listOf("inspect", "search", "--directory", directory.toString()) + selection.flags)
             result.exit shouldBe 8
-            val search = json.decodeFromJsonElement<EvidenceSearch>(result.data())
+            val search = json.decodeFromJsonElement<EvidenceSearchDto>(result.data()).toModel()
             search.records.map { it.xlog.txid } shouldBe selection.ids
             search.summary.matchedRecords shouldBe selection.ids.size
             search.summary.matchedElapsedTotalMs shouldBe selection.elapsed
@@ -56,7 +59,7 @@ class EvidenceSearchTest : FunSpec({
         val directory = searchFixture(work, empty = true)
         val result = runOfflineCli(work, listOf("inspect", "search", "--directory", directory.toString()))
         result.exit shouldBe 0
-        val search = json.decodeFromJsonElement<EvidenceSearch>(result.data())
+        val search = json.decodeFromJsonElement<EvidenceSearchDto>(result.data()).toModel()
         search.summary shouldBe EvidenceSummary(0, 0, 0, 0, 0, 0, 0, null)
         search.records shouldBe emptyList()
         search.truncated shouldBe false
@@ -67,7 +70,7 @@ class EvidenceSearchTest : FunSpec({
         val directory = searchFixture(work, text = false)
         val result = runOfflineCli(work, listOf("inspect", "search", "--directory", directory.toString(), "--service-hash", "10"))
         result.exit shouldBe 8
-        val search = json.decodeFromJsonElement<EvidenceSearch>(result.data())
+        val search = json.decodeFromJsonElement<EvidenceSearchDto>(result.data()).toModel()
         search.records.map { it.xlog.txid } shouldBe listOf("-9", "2", "9007199254740993")
         search.summary.unknownServiceNames shouldBe 5
         search.textStored shouldBe false

@@ -1,5 +1,9 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.files.*
+import dev.scouterctl.adapters.serialization.*
+
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
@@ -64,7 +68,7 @@ class OfflineIntegrityTest : FunSpec({
         WireFixture().use { server ->
             ContractCli(work).run(server, listOf("capture", "--directory", directory.toString()) + evidenceWindow).exit shouldBe 0
         }
-        json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json"))).schemaVersion shouldBe "scouterctl.capture/v1"
+        json.decodeFromString<CaptureManifestDto>(Files.readString(directory.resolve("manifest.json"))).toModel().schemaVersion shouldBe "scouterctl.capture/v1"
         val result = runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", WireFixture.ids.first().toString()))
         result.exit shouldBe 2
         result.events.single()["error"]!!.jsonObject["code"]!!.jsonPrimitive.content shouldBe "INVALID_ARGUMENT"

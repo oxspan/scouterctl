@@ -23,7 +23,7 @@ enum class Fault {
     NONE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
-    PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, TEXT_TIMEOUT,
+    PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
 }
 
 class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPassword: String? = null) : AutoCloseable {
@@ -146,7 +146,8 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 val missing = request.getLong("txid") == ids[1] &&
                                     (fault == Fault.PROFILE_MISSING || (fault == Fault.PROFILE_MISSING_ONCE && !profileMissed))
                                 if (missing) profileMissed = true else send(output, XLogProfilePack().apply {
-                                    profile = if (fault == Fault.MANY_SQL) Step.toBytes(Array(101) { number ->
+                                    profile = if (fault == Fault.PROFILE_MALFORMED && request.getLong("txid") == ids.last()) byteArrayOf(127)
+                                    else if (fault == Fault.MANY_SQL) Step.toBytes(Array(101) { number ->
                                         SqlStep3().apply { index = number; hash = number }
                                     }) else Step.toBytes(arrayOf(
                                         MessageStep().apply { index = 1; message = "password=secret-token" },

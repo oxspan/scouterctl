@@ -1,5 +1,10 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.bootstrap.BuildInfo
+import dev.scouterctl.adapters.files.*
+import dev.scouterctl.adapters.serialization.*
+
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
@@ -28,7 +33,7 @@ class UnicodeCliTest : FunSpec({
         val listed = cli.json(listOf("context", "list"))
         listed.exit shouldBe 0
         listed.data()["contexts"]!!.jsonObject[name]!!.jsonObject["user"]!!.jsonPrimitive.content shouldBe user
-        val stored = json.decodeFromString<ContextConfig>(Files.readString(cli.config))
+        val stored = json.decodeFromString<ContextConfigDto>(Files.readString(cli.config)).toModel()
         stored.current shouldBe name
         stored.contexts.getValue(name).user shouldBe user
     }
