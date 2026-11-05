@@ -6,7 +6,7 @@ Starting with diagnostics and data capture, the project aims to cover configurat
 
 ## Features
 
-- Discover applications and query transactions, SQL and errors.
+- Inspect Collector status and settings; query applications, transactions, SQL and errors.
 - Export resumable captures for offline investigation.
 - Search, summarize and compare saved captures.
 - Use JSON/JSONL output in scripts and other tools.

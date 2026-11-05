@@ -22,6 +22,8 @@ class OnlineCommands(
         return source(endpoint, secret).use { observation ->
             when (request) {
                 is OnlineRequest.Doctor -> output.result(json.encodeToJsonElement(observation.info.toDto()))
+                OnlineRequest.CollectorStatus -> output.result(json.encodeToJsonElement(observation.status().toDto(observation.info)))
+                is OnlineRequest.CollectorConfig -> output.result(json.encodeToJsonElement(collectorSettings(observation, request.key).toSettingsDto(observation.info)))
                 OnlineRequest.Objects -> output.result(json.encodeToJsonElement(observation.objects().map { it.toDto() }))
                 is OnlineRequest.Profile -> profile(observation, request)
                 is OnlineRequest.Search -> {

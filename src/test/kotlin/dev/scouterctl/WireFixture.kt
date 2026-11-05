@@ -21,7 +21,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 enum class Fault {
-    NONE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
+    NONE, STATUS_MALFORMED, CONFIG_MALFORMED, CONFIG_DUPLICATE, CONFIG_INVALID_VISIBLE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
     PROFILE_TRUNCATED, PROFILE_OTHER_CONTROL, PROFILE_MANY_STEPS, PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
@@ -90,6 +90,8 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                         val command = input.readText()
                         state = state.copy(command = when (command) {
                             RequestCmd.LOGIN -> "login"
+                            RequestCmd.SERVER_STATUS -> "collector_status"
+                            RequestCmd.LIST_CONFIGURE_SERVER -> "collector_config"
                             RequestCmd.OBJECT_LIST_REAL_TIME -> "objects"
                             RequestCmd.TRANX_LOAD_TIME_GROUP_V2 -> "xlog_page"
                             RequestCmd.TRANX_PROFILE -> "profile"
@@ -113,6 +115,26 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 request.put("timezone", "Coordinated Universal Time")
                                 send(output, request)
                             }
+                            RequestCmd.SERVER_STATUS -> send(output, MapPack().apply {
+                                put("used", 1024L); put("total", 4096L); put("time", baseTime)
+                                if (fault == Fault.STATUS_MALFORMED) put("used", "private-status-value")
+                            })
+                            RequestCmd.LIST_CONFIGURE_SERVER -> send(output, MapPack().apply {
+                                newList("key").apply {
+                                    add("smtp_password"); add("net_tcp_listen_port"); add("db_dir")
+                                    if (fault == Fault.CONFIG_DUPLICATE) add("db_dir")
+                                }
+                                newList("value").apply {
+                                    add("private-config-marker"); add(6100L); add("/private/collector/data")
+                                    if (fault == Fault.CONFIG_DUPLICATE) add("duplicate-private-marker")
+                                    if (fault == Fault.CONFIG_INVALID_VISIBLE) set(1, scouter.lang.value.TextValue("private-visible-marker"))
+                                }
+                                newList("default").apply {
+                                    add("private-default-marker"); add(6100L)
+                                    if (fault != Fault.CONFIG_MALFORMED) add("/private/default")
+                                    if (fault == Fault.CONFIG_DUPLICATE) add("duplicate-private-default")
+                                }
+                            })
                             RequestCmd.OBJECT_LIST_REAL_TIME -> if (fault != Fault.EMPTY_OBJECTS) send(output, ObjectPack().apply {
                                 objHash = 42; objName = "/fixture"; objType = "java"; address = "private-address"
                             })

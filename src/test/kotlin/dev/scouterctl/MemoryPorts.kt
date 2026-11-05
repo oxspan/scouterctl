@@ -40,6 +40,8 @@ internal class MemorySource(
 ) : ObservationSource {
     override val info = portSource
     var closed = false
+    override fun status() = CollectorStatus(1, 2, 3)
+    override fun settings(): List<CollectorSetting> = emptyList()
     override fun objects(): List<ObjectRecord> = emptyList()
     override fun page(query: Query, cursor: Cursor) = fetch(cursor)
     override fun profile(date: String, txid: Long, includeText: Boolean) = profile(txid)
