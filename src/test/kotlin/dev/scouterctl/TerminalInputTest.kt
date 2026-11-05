@@ -1,5 +1,7 @@
 package dev.scouterctl
 
+import dev.scouterctl.adapters.serialization.*
+
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe

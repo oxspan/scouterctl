@@ -1,5 +1,8 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.json.*
 import java.nio.file.Files
 import java.nio.file.Path
@@ -30,7 +33,7 @@ internal class SpringSearchCheck(private val work: Path, private val directory: 
         val allTop = search("top", listOf("--limit", "3"))
         check(allTop.records.size == 3 && allTop.truncated && allTop.summary.matchedRecords == 21)
         val online = Files.readAllLines(work.resolve("xlogs.jsonl")).map { json.parseToJsonElement(it).jsonObject }
-            .filter { it["type"]?.jsonPrimitive?.content == "record" }.map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
+            .filter { it["type"]?.jsonPrimitive?.content == "record" }.map { json.decodeFromJsonElement<XLogRecordDto>(it["data"]!!).toModel() }
         check(allTop.records.map { it.xlog.elapsed } == online.map { it.elapsed }.sortedDescending().take(3))
         val service = search("service", listOf("--service-name", "/poc/sql<GET>", "--include-text"))
         check(service.records.map { it.xlog.txid }.toSet() == ids("/poc/sql"))
@@ -46,12 +49,12 @@ internal class SpringSearchCheck(private val work: Path, private val directory: 
         val result = runOfflineCli(work, listOf("inspect", "search", "--directory", directory.toString()) + filters)
         check(result.exit == 0 && result.stderr.isEmpty())
         Files.writeString(work.resolve("search-$name.json"), result.output)
-        return json.decodeFromJsonElement(result.data())
+        return json.decodeFromJsonElement<EvidenceSearchDto>(result.data()).toModel()
     }
 
     private fun inspect(txid: String): Inspection {
         val result = runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", txid, "--include-text"))
         check(result.exit == 0 && result.stderr.isEmpty())
-        return json.decodeFromJsonElement(result.data())
+        return json.decodeFromJsonElement<InspectionDto>(result.data()).toModel()
     }
 }

@@ -1,18 +1,11 @@
-package dev.scouterctl
+package dev.scouterctl.core
 
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+enum class ProfileAvailability { AVAILABLE, UNAVAILABLE }
 
-@Serializable
-enum class ProfileAvailability { @SerialName("available") AVAILABLE, @SerialName("unavailable") UNAVAILABLE }
-
-@Serializable
 data class EvidenceRecord(val xlog: XLogRecord, val profileStatus: ProfileAvailability, val profile: ProfileRecord? = null)
 
-@Serializable
 data class EvidencePage(val name: String, val sha256: String, val records: Int, val unavailableProfiles: Int)
 
-@Serializable
 data class EvidenceManifest(
     val schemaVersion: String = "scouterctl.capture/v2",
     val source: ServerInfo, val endpoint: String, val query: Query, val textIncluded: Boolean,
@@ -24,7 +17,6 @@ data class EvidenceManifest(
     val complete: Boolean get() = executionComplete && pages.all { it.unavailableProfiles == 0 } && lastFailure == null
 }
 
-@Serializable
 data class Inspection(
     val source: ServerInfo, val query: Query, val captureExecutionComplete: Boolean,
     val unavailableProfiles: Int, val textStored: Boolean, val textIncluded: Boolean,

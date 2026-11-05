@@ -1,5 +1,9 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.files.*
+import dev.scouterctl.adapters.serialization.*
+
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.doubles.plusOrMinus
@@ -20,7 +24,7 @@ class CaptureComparisonTest : FunSpec({
         val result = compareCli(work)
         result.exit shouldBe 0
         result.stderr shouldBe ""
-        val comparison = json.decodeFromJsonElement<CaptureComparison>(result.data())
+        val comparison = json.decodeFromJsonElement<CaptureComparisonDto>(result.data()).toModel()
         comparison.basis shouldBe "captured-xlogs"
         comparison.before.capturedRecords shouldBe 3
         comparison.after.capturedRecords shouldBe 4
@@ -63,7 +67,7 @@ class CaptureComparisonTest : FunSpec({
         val result = ContractCli(work).run(listOf("inspect", "compare", "--before", directory.toString(),
             "--after", directory.toString(), "--limit", "1", "--include-text"), null)
         result.exit shouldBe 0
-        val comparison = json.decodeFromJsonElement<CaptureComparison>(result.data())
+        val comparison = json.decodeFromJsonElement<CaptureComparisonDto>(result.data()).toModel()
         comparison.totalServices shouldBe 2
         comparison.before.capturedRecords shouldBe 3
         comparison.after.capturedRecords shouldBe 3
@@ -87,7 +91,7 @@ class CaptureComparisonTest : FunSpec({
         val result = compareCli(work)
         result.exit shouldBe 8
         result.events.single()["executionComplete"]!!.jsonPrimitive.boolean shouldBe false
-        val comparison = json.decodeFromJsonElement<CaptureComparison>(result.data())
+        val comparison = json.decodeFromJsonElement<CaptureComparisonDto>(result.data()).toModel()
         comparison.after.lastFailure shouldBe ErrorCode.CONNECTION_FAILED
         comparison.after.durationMs shouldBe 120000
         comparison.after.sampling shouldBe "unknown"
@@ -106,7 +110,7 @@ class CaptureComparisonTest : FunSpec({
         })
         val result = compareCli(work)
         result.exit shouldBe 8
-        val comparison = json.decodeFromJsonElement<CaptureComparison>(result.data())
+        val comparison = json.decodeFromJsonElement<CaptureComparisonDto>(result.data()).toModel()
         comparison.after.unavailableProfiles shouldBe 1
         comparison.after.unknownServiceNames shouldBe 1
         comparison.services.first().delta!!.averageElapsedMs shouldBe 200.0
@@ -125,7 +129,7 @@ class CaptureComparisonTest : FunSpec({
             })
             val result = compareCli(work)
             result.exit shouldBe 0
-            val comparison = json.decodeFromJsonElement<CaptureComparison>(result.data())
+            val comparison = json.decodeFromJsonElement<CaptureComparisonDto>(result.data()).toModel()
             comparison.services.first().identityConflict shouldBe true
             comparison.services.first().delta shouldBe null
             comparison.warnings.contains(ComparisonWarning.SERVICE_IDENTITY_CONFLICT) shouldBe true
@@ -139,7 +143,7 @@ class CaptureComparisonTest : FunSpec({
         val before = comparisonFixture(work, true)
         val after = comparisonFixture(work, false)
         replaceComparisonRows(after, emptyList())
-        val oneEmpty = json.decodeFromJsonElement<CaptureComparison>(compareCli(work).data())
+        val oneEmpty = json.decodeFromJsonElement<CaptureComparisonDto>(compareCli(work).data()).toModel()
         oneEmpty.after.capturedRecords shouldBe 0
         oneEmpty.services.all { it.presence == ServicePresence.BEFORE_ONLY && it.delta == null } shouldBe true
         replaceComparisonRows(before, emptyList())
@@ -159,7 +163,7 @@ class CaptureComparisonTest : FunSpec({
         store.save(store.load().copy(textIncluded = false))
         compareCli(work).exit shouldBe 0
         compareCli(work, listOf("--include-text")).exit shouldBe 2
-        val comparison = json.decodeFromJsonElement<CaptureComparison>(compareCli(work).data())
+        val comparison = json.decodeFromJsonElement<CaptureComparisonDto>(compareCli(work).data()).toModel()
         comparison.after.textStored shouldBe false
         comparison.after.unknownServiceNames shouldBe 4
         comparison.services.first().delta!!.requests shouldBe 1

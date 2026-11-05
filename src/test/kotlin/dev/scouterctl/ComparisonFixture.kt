@@ -1,5 +1,8 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.files.*
+
 import java.nio.file.Path
 
 internal fun comparisonFixture(work: Path, before: Boolean): Path {

@@ -1,5 +1,9 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.files.*
+import dev.scouterctl.adapters.serialization.*
+
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
@@ -30,7 +34,7 @@ class ServiceSummaryTest : FunSpec({
         val detail = runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", "1", "--include-text"))
         detail.exit shouldBe 0
         detail.stderr shouldBe ""
-        json.decodeFromJsonElement<ProfileRecord>(detail.data()["record"]!!.jsonObject["profile"]!!) shouldBe profile
+        json.decodeFromJsonElement<ProfileRecordDto>(detail.data()["record"]!!.jsonObject["profile"]!!).toModel() shouldBe profile
     }
 
     test("zero-error service has no error representative and totals do not overflow 32 bits") {

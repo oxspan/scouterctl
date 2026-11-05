@@ -1,5 +1,9 @@
 package dev.scouterctl
 
+import dev.scouterctl.application.*
+import dev.scouterctl.adapters.files.*
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.json.*
 import java.nio.file.Files
 import java.nio.file.Path
@@ -25,8 +29,8 @@ internal class SpringOfflineCheck(private val work: Path) {
             val args = listOf("inspect", "--directory", directory.toString(), "--txid", txid)
             val resolved = runOfflineCli(work, args + "--include-text")
             check(resolved.exit == 0 && resolved.stderr.isEmpty())
-            val inspection = json.decodeFromJsonElement<Inspection>(resolved.data())
-            check(inspection.record.profile == json.decodeFromJsonElement<ProfileRecord>(expected))
+            val inspection = json.decodeFromJsonElement<InspectionDto>(resolved.data()).toModel()
+            check(inspection.record.profile == json.decodeFromJsonElement<ProfileRecordDto>(expected).toModel())
             check(inspection.record.xlog == saved.xlog)
             val structural = runOfflineCli(work, args)
             check(structural.exit == 0 && structural.stderr.isEmpty())

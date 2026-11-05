@@ -1,5 +1,10 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.bootstrap.BuildInfo
+import dev.scouterctl.adapters.collector.CollectorSource
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.json.*
 import scouter.io.DataOutputX
 import scouter.lang.pack.ObjectPack
@@ -53,7 +58,7 @@ fun main(args: Array<String>) {
         .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("collector.log").toFile()).start()
     try {
         val endpoint = Endpoint("127.0.0.1", port, "poc", 1000)
-        await("Collector login", server) { CollectorSource.connect(endpoint, password).use { it.info.serverId == "scouterctl-smoke" } }
+        await("Collector login", server) { CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-smoke" } }
         val now = System.currentTimeMillis()
         val from = now / 1000 * 1000
         val to = from + 10_000
@@ -77,7 +82,7 @@ fun main(args: Array<String>) {
         }
         val query = Query(date, from, to, "UTC", 42, 2)
         await("persisted telemetry", server) {
-            CollectorSource.connect(endpoint, password).use { source ->
+            CollectorSource.connect(endpoint, password, BuildInfo.version).use { source ->
                 source.objects().any { it.objHash == 42 } && source.page(query.copy(pageSize = 10), Cursor()).records.size == 3 &&
                     WireFixture.ids.all { source.profile(date, it).steps.size == 1 }
             }
@@ -109,9 +114,9 @@ fun main(args: Array<String>) {
         val captureArgs = listOf("capture", "--directory", work.resolve("capture").toString(), "--max-pages", "1") + window
         cli("capture-first", captureArgs, 8)
         cli("capture-resume", captureArgs + "--resume", 0)
-        val manifest = json.decodeFromString<CaptureManifest>(Files.readString(work.resolve("capture/manifest.json")))
+        val manifest = json.decodeFromString<CaptureManifestDto>(Files.readString(work.resolve("capture/manifest.json"))).toModel()
         val capturedIds = manifest.files.flatMap { Files.readAllLines(work.resolve("capture").resolve(it.name)) }
-            .map { json.decodeFromString<XLogRecord>(it).txid }
+            .map { json.decodeFromString<XLogRecordDto>(it).toModel().txid }
         check(capturedIds == ids)
         val referenceOutput = work.resolve("reference.txt")
         val probe = ProcessBuilder(java, "-cp", System.getProperty("java.class.path"), "dev.scouterctl.ReferenceProbe",

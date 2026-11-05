@@ -1,5 +1,8 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.json.*
 import kotlin.math.abs
 
@@ -11,7 +14,7 @@ internal fun verifyScaleOutput(scenario: ScaleScenario, output: String) {
         check(envelope["error"]!!.jsonObject["code"]!!.jsonPrimitive.content == expected)
         return
     }
-    val comparison = json.decodeFromJsonElement<CaptureComparison>(envelope["data"]!!)
+    val comparison = json.decodeFromJsonElement<CaptureComparisonDto>(envelope["data"]!!).toModel()
     val perService = scenario.records / scenario.services
     check(scenario.records % scenario.services == 0)
     check(comparison.before.capturedRecords == scenario.records && comparison.after.capturedRecords == scenario.records)

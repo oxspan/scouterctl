@@ -1,5 +1,8 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.serialization.*
+
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
@@ -15,7 +18,7 @@ class ProfileTextTest : FunSpec({
             WireFixture(fault).use { server ->
                 val result = cli.run(server, arguments)
                 result.exit shouldBe 0
-                val profile = json.decodeFromJsonElement<ProfileRecord>(result.data())
+                val profile = json.decodeFromJsonElement<ProfileRecordDto>(result.data()).toModel()
                 profile.txid shouldBe WireFixture.ids.first().toString()
                 profile.steps[0] shouldBe ProfileStep("MESSAGE", 1)
                 val sql = profile.steps.mapNotNull { it.sql }
@@ -40,7 +43,7 @@ class ProfileTextTest : FunSpec({
         WireFixture(Fault.MANY_SQL).use { server ->
             val result = cli.run(server, arguments)
             result.exit shouldBe 0
-            val profile = json.decodeFromJsonElement<ProfileRecord>(result.data())
+            val profile = json.decodeFromJsonElement<ProfileRecordDto>(result.data()).toModel()
             profile.steps.map { it.sql?.statement } shouldBe (0..100).map { DictionaryText(it, "statement $it") }
         }
     }
@@ -50,7 +53,7 @@ class ProfileTextTest : FunSpec({
         WireFixture(Fault.EMPTY_TEXT).use { server ->
             val result = cli.run(server, arguments)
             result.exit shouldBe 0
-            val profile = json.decodeFromJsonElement<ProfileRecord>(result.data())
+            val profile = json.decodeFromJsonElement<ProfileRecordDto>(result.data()).toModel()
             profile.transaction shouldBe ProfileTransaction("available", DictionaryText(10), DictionaryText(-789))
             profile.steps.mapNotNull { it.sql } shouldBe listOf(
                 SqlProfile(123, 7, 0, 1, DictionaryText(123)),

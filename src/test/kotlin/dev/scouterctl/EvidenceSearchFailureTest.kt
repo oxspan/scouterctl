@@ -1,5 +1,9 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.files.*
+import dev.scouterctl.adapters.serialization.*
+
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
@@ -54,7 +58,7 @@ class EvidenceSearchFailureTest : FunSpec({
             val result = runOfflineCli(work, listOf("inspect", "search", "--directory", directory.toString()))
             result.exit shouldBe 8
             result.events.single()["executionComplete"]!!.jsonPrimitive.boolean shouldBe false
-            val search = json.decodeFromJsonElement<EvidenceSearch>(result.data())
+            val search = json.decodeFromJsonElement<EvidenceSearchDto>(result.data()).toModel()
             search.captureExecutionComplete shouldBe finished
             search.lastFailure shouldBe ErrorCode.CONNECTION_FAILED
             search.summary.capturedRecords shouldBe 0

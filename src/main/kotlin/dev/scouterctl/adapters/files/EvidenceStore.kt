@@ -1,4 +1,8 @@
-package dev.scouterctl
+package dev.scouterctl.adapters.files
+
+import dev.scouterctl.core.*
+import dev.scouterctl.application.EvidenceRepository
+import dev.scouterctl.adapters.serialization.*
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.jsonObject
@@ -10,40 +14,44 @@ import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
 
-internal class EvidenceStore(private val directory: Path) {
-    fun create() { Files.createDirectory(directory) }
+class EvidenceStore(private val directory: Path) : EvidenceRepository {
+    override fun create(): Unit = fileOperation {
+        Files.createDirectory(directory)
+    }
 
-    fun load(): EvidenceManifest {
+    override fun load(): EvidenceManifest = fileOperation {
         val content = read("manifest.json", 8_388_608)
         if (json.parseToJsonElement(content).jsonObject["schemaVersion"]?.jsonPrimitive?.content != "scouterctl.capture/v2") {
-            throw CliFailure(ErrorCode.INVALID_ARGUMENT, "Use a v2 capture created with --include-profiles")
+            throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Use a v2 capture created with --include-profiles")
         }
-        val manifest = json.decodeFromString<EvidenceManifest>(content)
+        val manifest = json.decodeFromString<EvidenceManifestDto>(content).toModel()
         manifest.query.validate()
         if (manifest.query.pageSize > 100 || manifest.pages.size > 10000) damaged()
         if (manifest.cursor.txid.toLongOrNull() == null || manifest.cursor.bucketTime < 0) damaged()
-        return manifest
+        manifest
     }
 
-    fun save(manifest: EvidenceManifest) { write("manifest.json", json.encodeToString(manifest)) }
+    override fun save(manifest: EvidenceManifest) = fileOperation {
+        write("manifest.json", json.encodeToString(manifest.toDto()))
+    }
 
-    fun writePage(index: Int, records: List<EvidenceRecord>): EvidencePage {
-        val content = records.joinToString("") { json.encodeToString(it) + "\n" }
+    override fun writePage(index: Int, records: List<EvidenceRecord>): EvidencePage = fileOperation {
+        val content = records.joinToString("") { json.encodeToString(it.toDto()) + "\n" }
         val bytes = content.toByteArray(Charsets.UTF_8)
-        if (bytes.size > 16_777_216) throw CliFailure(ErrorCode.PARTIAL_RESULT, "Evidence page exceeds 16 MiB; use a smaller page-size")
+        if (bytes.size > 16_777_216) throw OperationFailure(ErrorCode.PARTIAL_RESULT, "Evidence page exceeds 16 MiB; use a smaller page-size")
         val hash = digest(bytes)
         val name = "page-%06d-%s.jsonl".format(index + 1, hash)
         write(name, content)
-        return EvidencePage(name, hash, records.size, records.count { it.profileStatus == ProfileAvailability.UNAVAILABLE })
+        EvidencePage(name, hash, records.size, records.count { it.profileStatus == ProfileAvailability.UNAVAILABLE })
     }
 
-    fun readPage(manifest: EvidenceManifest, index: Int): List<EvidenceRecord> {
+    override fun readPage(manifest: EvidenceManifest, index: Int): List<EvidenceRecord> = fileOperation {
         val page = manifest.pages[index]
         if (!page.sha256.matches(Regex("[0-9a-f]{64}")) ||
             page.name != "page-%06d-%s.jsonl".format(index + 1, page.sha256)) damaged()
         val content = read(page.name, 16_777_216)
         if (digest(content.toByteArray(Charsets.UTF_8)) != page.sha256) damaged()
-        val records = content.lineSequence().filter { it.isNotEmpty() }.map { json.decodeFromString<EvidenceRecord>(it) }.toList()
+        val records = content.lineSequence().filter { it.isNotEmpty() }.map { json.decodeFromString<EvidenceRecordDto>(it).toModel() }.toList()
         if (records.size != page.records || records.size > manifest.query.pageSize ||
             records.count { it.profileStatus == ProfileAvailability.UNAVAILABLE } != page.unavailableProfiles) damaged()
         records.forEach { record ->
@@ -55,12 +63,12 @@ internal class EvidenceStore(private val directory: Path) {
                 ProfileAvailability.UNAVAILABLE -> if (record.profile != null) damaged()
             }
         }
-        return records
+        records
     }
 
-    fun validate(manifest: EvidenceManifest) = forEachRecord(manifest) { }
+    override fun validate(manifest: EvidenceManifest) = forEachRecord(manifest) { }
 
-    fun forEachRecord(manifest: EvidenceManifest, consume: (EvidenceRecord) -> Unit) {
+    override fun forEachRecord(manifest: EvidenceManifest, consume: (EvidenceRecord) -> Unit) = fileOperation {
         val ids = mutableSetOf<String>()
         manifest.pages.indices.forEach { index ->
             readPage(manifest, index).forEach {
@@ -91,5 +99,5 @@ internal class EvidenceStore(private val directory: Path) {
 
     private fun digest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
         .digest(bytes).joinToString("") { "%02x".format(it) }
-    private fun damaged(): Nothing = throw CliFailure(ErrorCode.IO_ERROR, "Capture integrity or record validation failed")
+    private fun damaged(): Nothing = throw OperationFailure(ErrorCode.IO_ERROR, "Capture integrity or record validation failed")
 }

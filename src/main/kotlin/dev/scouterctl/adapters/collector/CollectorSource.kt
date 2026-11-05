@@ -1,4 +1,7 @@
-package dev.scouterctl
+package dev.scouterctl.adapters.collector
+
+import dev.scouterctl.core.*
+import dev.scouterctl.application.ObservationSource
 
 import scouter.io.DataInputX
 import scouter.io.DataOutputX
@@ -17,14 +20,13 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.net.UnknownHostException
 
-class CollectorSource private constructor(private val socket: Socket) : ObservationSource {
+class CollectorSource private constructor(private val socket: Socket, private val clientVersion: String) : ObservationSource {
     private val input = object : DataInputX(BufferedInputStream(socket.getInputStream())) {
         override fun readBlob(): ByteArray {
             val marker = readUnsignedByte()
             val length = when (marker) { 255 -> readUnsignedShort(); 254 -> readInt(); else -> marker }
-            if (length !in 0..8_388_608) throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Blob exceeds 8 MiB limit")
+            if (length !in 0..8_388_608) throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Blob exceeds 8 MiB limit")
             return read(length)
         }
     }
@@ -34,39 +36,38 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
         private set
 
     companion object {
-        fun connect(endpoint: Endpoint, password: String): CollectorSource {
+        fun connect(endpoint: Endpoint, password: String, clientVersion: String): CollectorSource = collectorOperation {
             val socket = Socket()
             try {
                 socket.connect(InetSocketAddress(endpoint.host, endpoint.port), endpoint.timeoutMs)
                 socket.soTimeout = endpoint.timeoutMs
-                val client = CollectorSource(socket)
+                val client = CollectorSource(socket, clientVersion)
                 client.output.writeInt(NetCafe.TCP_CLIENT)
                 client.output.flush()
                 client.login(endpoint.user, password)
-                return client
+                return@collectorOperation client
             } catch (error: Exception) {
                 socket.close()
-                if (error is UnknownHostException) throw CliFailure(ErrorCode.CONNECTION_FAILED,
-                    "Collector host could not be resolved; check --host and DNS")
                 throw error
             }
+
         }
     }
 
     private fun login(user: String, password: String) {
         val request = MapPack().apply {
             put("id", user); put("pass", CipherUtil.sha256(password))
-            put("version", "scouterctl/${BuildInfo.version}"); put("hostname", "scouterctl")
+            put("version", "scouterctl/$clientVersion"); put("hostname", "scouterctl")
             put("ip", socket.localAddress.hostAddress)
         }
         val reply = exchange(RequestCmd.LOGIN, request).singleOrNull() as? MapPack
-            ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Expected one login response")
+            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one login response")
         session = reply.getLong("session")
-        if (session == 0L) throw CliFailure(ErrorCode.AUTH_FAILED,
+        if (session == 0L) throw OperationFailure(ErrorCode.AUTH_FAILED,
             "Collector authentication failed; check --user and SCOUTERCTL_PASSWORD with the Collector administrator")
         val version = reply.getText("version") ?: "unknown"
         if (version.substringBefore(' ') != "2.21.3") {
-            throw CliFailure(ErrorCode.VERSION_MISMATCH, "This POC requires Collector 2.21.3")
+            throw OperationFailure(ErrorCode.VERSION_MISMATCH, "This POC requires Collector 2.21.3")
         }
         info = ServerInfo(reply.getText("server_id") ?: "unknown", version,
             reply.getText("timezone") ?: "unknown", reply.getText("type") ?: "unknown")
@@ -82,22 +83,24 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
         while (true) {
             when (input.readByte()) {
                 TcpFlag.HasNEXT -> {
-                    if (result.size >= 10001) throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Response pack limit exceeded")
-                    result.add(input.readPack() ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Missing pack"))
+                    if (result.size >= 10001) throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Response pack limit exceeded")
+                    result.add(input.readPack() ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Missing pack"))
                 }
                 TcpFlag.NoNEXT -> return result
-                TcpFlag.INVALID_SESSION -> throw CliFailure(ErrorCode.AUTH_FAILED, "Collector session expired")
-                else -> throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Unexpected response flag")
+                TcpFlag.INVALID_SESSION -> throw OperationFailure(ErrorCode.AUTH_FAILED, "Collector session expired")
+                else -> throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Unexpected response flag")
             }
         }
     }
 
-    override fun objects(): List<ObjectRecord> = exchange(RequestCmd.OBJECT_LIST_REAL_TIME).map {
-        val p = it as? ObjectPack ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Expected object pack")
-        ObjectRecord(info.serverId, p.objHash, p.objName ?: "", p.objType ?: "", p.alive)
+    override fun objects(): List<ObjectRecord> = collectorOperation {
+        exchange(RequestCmd.OBJECT_LIST_REAL_TIME).map {
+            val p = it as? ObjectPack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected object pack")
+            ObjectRecord(info.serverId, p.objHash, p.objName ?: "", p.objType ?: "", p.alive)
+        }
     }
 
-    override fun page(query: Query, cursor: Cursor): XLogPage {
+    override fun page(query: Query, cursor: Cursor): XLogPage = collectorOperation {
         query.validate()
         val request = MapPack().apply {
             put("date", query.date); put("stime", query.from); put("etime", query.to - 1)
@@ -106,34 +109,34 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
         }
         val packs = exchange(RequestCmd.TRANX_LOAD_TIME_GROUP_V2, request)
         val meta = packs.lastOrNull() as? MapPack
-            ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "XLog page metadata missing")
+            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "XLog page metadata missing")
         if (meta.get("hasMore") !is BooleanValue || meta.get("lastXLogTime") !is DecimalValue ||
             meta.get("lastTxid") !is DecimalValue) {
-            throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Invalid XLog page metadata")
+            throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid XLog page metadata")
         }
         val records = packs.dropLast(1).map {
-            val p = it as? XLogPack ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Expected XLog pack")
+            val p = it as? XLogPack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected XLog pack")
             if (p.objHash != query.objHash || p.endTime !in query.from until query.to) {
-                throw CliFailure(ErrorCode.PROTOCOL_ERROR, "XLog outside requested scope")
+                throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "XLog outside requested scope")
             }
             XLogRecord(p.txid.toString(), p.gxid.toString(), p.caller.toString(), p.endTime,
                 p.objHash, p.service, p.elapsed, p.error)
         }
-        if (records.size > query.pageSize) throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Page exceeds requested size")
+        if (records.size > query.pageSize) throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Page exceeds requested size")
         val next = Cursor(meta.getLong("lastXLogTime"), meta.getLong("lastTxid").toString())
         val more = meta.getBoolean("hasMore")
         if (more && (records.isEmpty() || next.bucketTime == 0L || next.txid == "0" || next == cursor)) {
-            throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Non-advancing XLog cursor")
+            throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Non-advancing XLog cursor")
         }
-        return XLogPage(records, next, more)
+        XLogPage(records, next, more)
     }
 
-    override fun profile(date: String, txid: Long, includeText: Boolean): ProfileRecord {
+    override fun profile(date: String, txid: Long, includeText: Boolean): ProfileRecord = collectorOperation {
         val request = MapPack().apply { put("date", date); put("txid", txid); put("max", 1000) }
         val packs = exchange(RequestCmd.TRANX_PROFILE, request)
-        if (packs.isEmpty()) throw CliFailure(ErrorCode.NOT_FOUND, "Profile unavailable")
+        if (packs.isEmpty()) throw OperationFailure(ErrorCode.NOT_FOUND, "Profile unavailable")
         val steps = packs.flatMap {
-            val p = it as? XLogProfilePack ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Expected profile pack")
+            val p = it as? XLogProfilePack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected profile pack")
             (Step.toObjects(p.profile) ?: emptyArray()).map { step ->
                 val sql = if (step is SqlStep) SqlProfile(step.hash, step.elapsed, step.error,
                     (step as? SqlStep3)?.updated) else null
@@ -141,7 +144,7 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
             }
         }
         val profile = ProfileRecord(txid.toString(), steps)
-        return if (includeText) resolveText(date, profile) else profile
+        if (includeText) resolveText(date, profile) else profile
     }
 
     private fun resolveText(date: String, profile: ProfileRecord): ProfileRecord {
@@ -150,9 +153,9 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
         })
         val transaction = if (packs.isEmpty()) null else {
             val p = packs.singleOrNull() as? XLogPack
-                ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Expected one transaction pack")
+                ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one transaction pack")
             if (p.txid.toString() != profile.txid) {
-                throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Transaction identity differs from requested profile")
+                throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Transaction identity differs from requested profile")
             }
             p
         }
@@ -182,9 +185,9 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
                 batch.forEach { requested.add(it.toLong()) }
             })
             packs.forEach {
-                val p = it as? TextPack ?: throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Expected dictionary text pack")
+                val p = it as? TextPack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected dictionary text pack")
                 if (p.xtype != type || p.hash !in batch || p.text == null || result.containsKey(p.hash)) {
-                    throw CliFailure(ErrorCode.PROTOCOL_ERROR, "Invalid dictionary response")
+                    throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid dictionary response")
                 }
                 result[p.hash] = p.text
             }
@@ -192,5 +195,7 @@ class CollectorSource private constructor(private val socket: Socket) : Observat
         return result
     }
 
-    override fun close() { socket.close() }
+    override fun close() = collectorOperation {
+        socket.close()
+    }
 }

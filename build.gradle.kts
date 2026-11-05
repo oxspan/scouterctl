@@ -48,6 +48,7 @@ tasks.processResources {
 }
 tasks.test {
     useJUnitPlatform { includeEngines("kotest") }
+    systemProperty("architecture.main.classes", sourceSets.main.get().output.classesDirs.asPath)
     val externalJar = providers.gradleProperty("cliJar")
     if (!externalJar.isPresent) dependsOn("fatJar")
     val cliJar = externalJar.map { file(it) }
