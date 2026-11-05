@@ -25,7 +25,7 @@ java -jar "$SCOUTERCTL_JAR" doctor \
   --host 127.0.0.1 --port 6100 --user guest --interactive
 ```
 
-Replace the connection values with your own; the command prompts for your password. Continue with [transaction queries and capture](QUICKSTART.md#query-and-export).
+Replace the connection values with your own; the command prompts for your password. Continue with [connection setup and transaction queries](QUICKSTART.md#connect-and-find-a-target).
 
 ## How it works
 
