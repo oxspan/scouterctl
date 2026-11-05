@@ -1,10 +1,8 @@
 name: CI and release
 
 on:
-  pull_request:
-    branches: [master, develop]
   push:
-    branches: [master, develop]
+    branches: [master]
   workflow_dispatch:
     inputs:
       scale_validation:
@@ -34,25 +32,22 @@ jobs:
       sha: ${{ steps.package.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ !env.ACT }}
         with:
           ref: ${{ inputs.release_tag || github.sha }}
           persist-credentials: false
-      - name: Check pull request route
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_BRANCH: ${{ github.base_ref }}
-          HEAD_BRANCH: ${{ github.head_ref }}
-        run: |
-          case "$BASE_BRANCH:$HEAD_BRANCH" in
-            develop:feature/*|develop:hotfix/*|develop:master|develop:dependabot/*) ;;
-            master:develop|master:hotfix/*|master:release-please--branches--master) ;;
-            *) echo "Unsupported PR route: $HEAD_BRANCH -> $BASE_BRANCH" >&2; exit 1 ;;
-          esac
+      - name: Copy local working tree
+        if: ${{ env.ACT == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-disabled: ${{ env.ACT == 'true' }}
       - name: Build, test, and package
         run: ./gradlew --no-daemon test pocRelease
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
