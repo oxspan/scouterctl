@@ -166,6 +166,8 @@ The destination directory must not exist for a new export. If the export is inte
 
 To save profiles as well, add `--include-profiles` to capture. Add `--include-text` only when you intend to store potentially sensitive dictionary text. This creates a v2 bundle; the default page size is 25 and the maximum is 100. Resume with the same flags and query. Missing profiles are recorded and retried on resume; connection failures preserve earlier page checkpoints.
 
+Profile results now include `completeness`: `truncated` means the Collector explicitly reported omitted blocks; `unknown` does not certify completeness. Known truncation makes `profile get` and `inspect` return exit 8 with the available data. See [Profile completeness](https://github.com/oxspan/scouterctl/blob/develop/docs/profile-completeness.md), including compatibility with older capture readers.
+
 Inspect a saved transaction after disconnecting from the Collector:
 
 ```sh

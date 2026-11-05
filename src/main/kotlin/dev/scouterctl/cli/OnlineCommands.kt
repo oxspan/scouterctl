@@ -34,7 +34,7 @@ class OnlineCommands(
     }
     private fun profile(source: ObservationSource, request: OnlineRequest.Profile): Int {
         val profile = source.profile(request.date, request.txid, request.includeText)
-        return output.result(json.encodeToJsonElement(profile.toDto()))
+        return output.result(json.encodeToJsonElement(profile.toDto()), profile.completeness != ProfileCompleteness.TRUNCATED)
     }
 
     private fun capture(source: ObservationSource, endpoint: Endpoint, request: OnlineRequest.Capture): Int {
