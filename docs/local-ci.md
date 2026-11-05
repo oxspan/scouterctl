@@ -25,6 +25,18 @@ The local workflow uses the current working tree instead of checking out GitHub 
 
 ## Hosted execution policy
 
-Ordinary PR events and pushes to develop no longer start this workflow. Hosted execution remains available through `workflow_dispatch`; pushes to master retain the existing release pipeline. This reduces repeated candidate/PR/merge validation while preserving release automation. Local reports and review evidence remain required before integration; a skipped or absent hosted check is not a test pass.
+Local act runs supplement shared CI; they do not replace checks on contributions.
+
+| Event | Automatic checks |
+| --- | --- |
+| PR to develop | Linux build, complete Kotest suite, package verification and PR route check |
+| PR to master | Linux checks plus Windows/macOS checks against the same packaged JAR |
+| Push to develop | No duplicate run; integrate through a checked PR |
+| Push to master | All three platforms, then the existing release workflow |
+| Manual dispatch | All three platforms; existing-tag asset repair keeps its existing Linux-only path |
+
+A newer commit cancels an older run of the same PR. Master release runs are not cancelled by this policy. Scale validation remains opt-in. Documentation-only PRs still receive the baseline Linux check, keeping check names and branch expectations predictable.
+
+Check results for the latest PR revision before merging. Contributors can run act before pushing for faster feedback. Local success alone does not establish that hosted checks passed, and a skipped or absent check is not a pass.
 
 See [act's compatibility limits](https://nektosact.com/not_supported.html) and [artifact-server documentation](https://nektosact.com/usage/index.html#action-artifacts).

@@ -2,7 +2,7 @@
 
 Use Kotlin for new production code and tests. The existing Java reference probe is an independent protocol comparison tool; it is not a template for new application code. Write automated tests with Kotest `FunSpec` and Kotest matchers. Kotest runs on JUnit Platform on the JVM; JUnit Jupiter annotations and assertions are not used for new tests.
 
-Prefer focused local tests during development. Use [Local CI](docs/local-ci.md) to run the Linux workflow with act before a handoff or when workflow behavior changes. Hosted CI runs only on manual dispatch and master pushes; ordinary PR/develop changes do not consume hosted runner time.
+Prefer focused local tests during development. Use [Local CI](docs/local-ci.md) to run the Linux workflow with act before a handoff or when workflow behavior changes. Every PR receives shared Linux checks. PRs to master, master pushes and ordinary manual runs also validate Windows and macOS; develop pushes avoid repeating PR checks.
 
 Use JDK 21 and the checked-in Gradle Wrapper:
 
@@ -42,7 +42,7 @@ Create `feature/*` and `hotfix/*` branches as needed; they are not permanent bra
 - Use a **merge commit**, not squash or rebase, for `develop → master` promotion and `master → develop` synchronization. This preserves shared ancestry and the individual Conventional Commits that release-please reads.
 - After merging a hotfix or a release PR into `master`, synchronize `master → develop` with a merge-commit PR. This carries fixes, version changes, and changelog entries back into development.
 - Dependabot targets `develop`. Release-please targets `master`.
-- Review the PR base against the branch table before integration. Ordinary PR/develop changes are verified locally; hosted checks run on manual dispatch and master pushes. Publishing runs only from `master`.
+- CI checks PR routes and runs Linux validation on PRs to both long-lived branches. PRs to `master` also run Windows/macOS validation. Pushes to `develop` do not repeat PR checks; pushes to `master` retain cross-platform checks and release automation. Publishing runs only from `master`.
 
 A separate `release/*` branch is unnecessary while promotion to `master` is followed by a short release review. Revisit it if a release needs extended stabilization while unrelated work continues on `develop`, or if multiple release lines must be maintained. The release-please PR branch only prepares version metadata; it is not a stabilization branch.
 
@@ -105,7 +105,7 @@ If a promotion produces no candidate, inspect the release job log before retryin
 
 The existing `v0.0.0` is the bootstrap baseline. It is not rebuilt or replaced by this setup. Release PRs are not automatically merged.
 
-The workflow uses only the repository's `GITHUB_TOKEN`. Allow GitHub Actions to create pull requests in the repository's Actions settings. Release PRs use local validation before merge; explicitly dispatch hosted checks when needed before promotion. Release assets are attached in the same workflow because tags/releases created by the default token do not trigger another workflow.
+The workflow uses only the repository's `GITHUB_TOKEN`. Allow GitHub Actions to create pull requests in the repository's Actions settings. Release PRs require the latest revision to pass the cross-platform checks before merge. Bot-created PR checks may require **Approve workflows to run**. Release assets are attached in the same workflow because tags/releases created by the default token do not trigger another workflow.
 
 ## Runner delays
 
