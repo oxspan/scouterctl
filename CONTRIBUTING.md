@@ -9,7 +9,7 @@ Use JDK 21 and the checked-in Gradle Wrapper:
 bash .github/scripts/verify-package.sh
 ```
 
-The Linux verification script requires Bash, Java, jq, unzip, and standard GNU utilities. CI builds the release package on Linux, then downloads that exact ZIP on Windows and macOS. Those jobs verify the checksum, archive contents, version/help, and run the complete Kotest suite against the extracted JAR in a path containing spaces. Each operating system uses its native JDK 21. Release automation waits for all three platforms. Non-ASCII installation paths are outside this POC's validated scope: the Windows JDK launcher failed before entering the CLI when given a Korean path on the hosted runner.
+The Linux verification script requires Bash, Java, jq, unzip, and standard GNU utilities. CI builds the release package on Linux, then downloads that exact ZIP on Windows and macOS. Those jobs verify the checksum, archive contents, version/help, and run the complete Kotest suite against the extracted JAR in a path containing spaces. Each operating system uses its native JDK 21. Release automation waits for all three platforms. The suite also copies the JAR into a Korean installation directory and launches it by its ASCII filename, using UTF-8 argument files for Korean connection names, capture paths and service filters. Direct non-ASCII arguments to the Windows JDK launcher remain code-page dependent; see [Windows Unicode usage](QUICKSTART.md#windows-unicode-paths-and-arguments).
 
 To test an extracted package locally, run `./gradlew test -PcliJar=/absolute/path/to/scouterctl-version-all.jar` (`./gradlew.bat` in PowerShell). The package version must match the checkout. The normal test task builds and uses the local JAR when this property is omitted.
 
@@ -96,6 +96,10 @@ If a promotion produces no candidate, inspect the release job log before retryin
 The existing `v0.0.0` is the bootstrap baseline. It is not rebuilt or replaced by this setup. Release PRs are not automatically merged.
 
 The workflow uses only the repository's `GITHUB_TOKEN`. Allow GitHub Actions to create pull requests in the repository's Actions settings. Bot-created PR checks may require **Approve workflows to run**; approve and check them before merging. Release assets are attached in the same workflow because tags/releases created by the default token do not trigger another workflow.
+
+## Runner delays
+
+A queued job is not a test failure. Follow [Runner delay recovery](docs/ci-runner-recovery.md) when a required platform has not started. Keep all three platform gates: do not substitute a different architecture or publish an unchecked package to clear a queue.
 
 ## Recover an interrupted upload
 

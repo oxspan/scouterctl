@@ -20,7 +20,7 @@ import java.time.format.DateTimeFormatter
 import java.util.concurrent.Callable
 import kotlin.system.exitProcess
 
-@Command(name = "scouterctl", mixinStandardHelpOptions = true, versionProvider = CliVersion::class,
+@Command(name = "scouterctl", mixinStandardHelpOptions = true, showAtFileInUsageHelp = true, versionProvider = CliVersion::class,
     description = ["Read-only Collector 2.21.3 POC. Commands: doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary, inspect compare.",
         "Connect: doctor --host HOST --port PORT --user ACCOUNT, then object list with the same options.",
         "Save/select connections: context add/list/use --name NAME. Check credentials: auth login.",
