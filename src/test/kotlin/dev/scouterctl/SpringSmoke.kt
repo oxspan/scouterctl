@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
 
 /** Spring MVC -> Servlet hook -> real JDBC instrumentation -> Collector -> packaged CLI. */
 fun main(args: Array<String>) {
-    val upstream = Path.of(args.single()).toAbsolutePath().normalize()
+    val upstream = Path.of(args.first()).toAbsolutePath().normalize()
     val work = Files.createTempDirectory("scouterctl-spring-smoke-")
     val offline = SpringOfflineCheck(work)
     val comparison = SpringComparisonCheck(work)
@@ -70,8 +70,10 @@ fun main(args: Array<String>) {
     val collectorJava = System.getenv("SCOUTER_COLLECTOR_JAVA") ?: java
     val cp = listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
         upstream.resolve("scouter.common/target/scouter-common-2.21.3.jar"), upstream.resolve("scouter.server/target/lib/*")).joinToString(":")
-    val collector = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")
-        .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("collector.log").toFile()).start()
+    var collectorStarts = 0
+    fun startCollector(): Process = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")
+        .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("collector-${++collectorStarts}.log").toFile()).start()
+    var collector = startCollector()
     var service: Process? = null
     println("Evidence: $work")
     try {
@@ -161,6 +163,20 @@ fun main(args: Array<String>) {
             }
         }
         Files.writeString(work.resolve("profile-checks.json"), json.encodeToString(verified))
+        if (args.drop(1) == listOf("--recovery")) {
+            verifySpringRecovery(work, port, password, httpPort, window, rows,
+                stopCollector = {
+                    collector.destroy()
+                    if (!collector.waitFor(10, TimeUnit.SECONDS)) collector.destroyForcibly().waitFor(5, TimeUnit.SECONDS)
+                    check(!collector.isAlive)
+                },
+                restartCollector = {
+                    collector = startCollector()
+                    awaitSpring("Collector login after restart") {
+                        CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-spring-smoke" }
+                    }
+                })
+        }
         offline.capture(cli, window)
         comparison.capture(cli, httpPort, objectHash)
         Files.list(work).use { files -> files.filter { it.toString().endsWith(".jsonl") }.forEach { file ->

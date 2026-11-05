@@ -15,6 +15,8 @@ To test an extracted package locally, run `./gradlew test -PcliJar=/absolute/pat
 
 The real Collector/Agent/Spring smoke tests require a separately built Scouter checkout and are not part of this CI workflow. The Kotest suite uses native pseudo-terminals (PTY on Linux/macOS, ConPTY on Windows) to exercise hidden password input, cancellation, and saved connections against a protocol fixture. This verifies console behavior, not a specific desktop terminal application or real Collector instrumentation on every OS. The terminal library is test-only and is not included in the release JAR.
 
+The optional `recoverySmoke` task exercises real Collector stop/restart and capture resume; see [Capture recovery](docs/capture-recovery.md).
+
 ## Architecture boundaries
 
 Follow the dependency rules in [Architecture](docs/architecture.md). Keep core models and application operations independent of CLI parsing, serialization, files and network clients. Implement external operations behind application-owned ports and construct concrete adapters in the composition root.

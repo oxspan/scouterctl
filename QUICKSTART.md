@@ -164,7 +164,7 @@ Run these commands with the password environment variable set. Replace the examp
 
 The destination directory must not exist for a new export. If the export is interrupted or partially completes, add `--resume` to the same capture command. Each query covers one date and one object over `[from,to)`. Set `--timezone` to the Collector's actual time zone.
 
-To save profiles as well, add `--include-profiles` to capture. Add `--include-text` only when you intend to store potentially sensitive dictionary text. This creates a v2 bundle; the default page size is 25 and the maximum is 100. Resume with the same flags and query. Missing profiles are recorded and retried on resume; connection failures preserve earlier page checkpoints.
+To save profiles as well, add `--include-profiles` to capture. Add `--include-text` only when you intend to store potentially sensitive dictionary text. This creates a v2 bundle; the default page size is 25 and the maximum is 100. Resume with the same flags and query. Missing profiles are recorded and retried on resume; connection failures preserve earlier page checkpoints. See [Capture recovery](https://github.com/oxspan/scouterctl/blob/develop/docs/capture-recovery.md) for interruption handling and the limits of recovery.
 
 Inspect a saved transaction after disconnecting from the Collector:
 
