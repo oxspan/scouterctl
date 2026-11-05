@@ -1,6 +1,7 @@
 package dev.scouterctl.cli
 
 import dev.scouterctl.application.*
+import dev.scouterctl.core.ProfileCompleteness
 
 import dev.scouterctl.adapters.serialization.*
 import kotlinx.serialization.json.encodeToJsonElement
@@ -15,7 +16,8 @@ class OfflineCommands(private val repository: (Path) -> EvidenceRepository, priv
     }
     private fun inspect(request: OfflineRequest.Inspect): Int {
         val result = inspectCapture(repository(request.directory), request.txid, request.includeText)
-        return output.result(json.encodeToJsonElement(result.toDto()), result.captureExecutionComplete && result.unavailableProfiles == 0)
+        return output.result(json.encodeToJsonElement(result.toDto()), result.captureExecutionComplete && result.unavailableProfiles == 0 &&
+            result.record.profile?.completeness != ProfileCompleteness.TRUNCATED)
     }
     private fun search(request: OfflineRequest.Search): Int {
         val result = searchCapture(repository(request.directory), request.filter, request.includeText)

@@ -6,6 +6,7 @@ import scouter.lang.pack.*
 import scouter.lang.step.MessageStep
 import scouter.lang.step.SqlStep3
 import scouter.lang.step.Step
+import scouter.lang.step.StepControl
 import scouter.net.NetCafe
 import scouter.net.RequestCmd
 import scouter.net.TcpFlag
@@ -23,7 +24,7 @@ enum class Fault {
     NONE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
-    PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
+    PROFILE_TRUNCATED, PROFILE_OTHER_CONTROL, PROFILE_MANY_STEPS, PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
 }
 
 class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPassword: String? = null) : AutoCloseable {
@@ -146,7 +147,12 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 val missing = request.getLong("txid") == ids[1] &&
                                     (fault == Fault.PROFILE_MISSING || (fault == Fault.PROFILE_MISSING_ONCE && !profileMissed))
                                 if (missing) profileMissed = true else send(output, XLogProfilePack().apply {
-                                    profile = if (fault == Fault.PROFILE_MALFORMED && request.getLong("txid") == ids.last()) byteArrayOf(127)
+                                    profile = if (fault == Fault.PROFILE_TRUNCATED || fault == Fault.PROFILE_OTHER_CONTROL) Step.toBytes(arrayOf(
+                                        SqlStep3().apply { index = 1; hash = 123; elapsed = 7 },
+                                        StepControl().apply { code = if (fault == Fault.PROFILE_TRUNCATED) 0 else 7; message = " ** Profile Truncated ** " }
+                                    )) else if (fault == Fault.PROFILE_MANY_STEPS) Step.toBytes(Array(1001) { number ->
+                                        SqlStep3().apply { index = number; hash = 123; elapsed = 1 }
+                                    }) else if (fault == Fault.PROFILE_MALFORMED && request.getLong("txid") == ids.last()) byteArrayOf(127)
                                     else if (fault == Fault.MANY_SQL) Step.toBytes(Array(101) { number ->
                                         SqlStep3().apply { index = number; hash = number }
                                     }) else Step.toBytes(arrayOf(

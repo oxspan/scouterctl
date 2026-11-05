@@ -8,6 +8,7 @@ import scouter.io.DataOutputX
 import scouter.lang.pack.*
 import scouter.lang.TextTypes
 import scouter.lang.step.Step
+import scouter.lang.step.StepControl
 import scouter.lang.step.SqlStep
 import scouter.lang.step.SqlStep3
 import scouter.lang.value.BooleanValue
@@ -135,15 +136,18 @@ class CollectorSource private constructor(private val socket: Socket, private va
         val request = MapPack().apply { put("date", date); put("txid", txid); put("max", 1000) }
         val packs = exchange(RequestCmd.TRANX_PROFILE, request)
         if (packs.isEmpty()) throw OperationFailure(ErrorCode.NOT_FOUND, "Profile unavailable")
+        var truncated = false
         val steps = packs.flatMap {
             val p = it as? XLogProfilePack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected profile pack")
             (Step.toObjects(p.profile) ?: emptyArray()).map { step ->
+                if (step is StepControl && step.code == 0 && step.message == " ** Profile Truncated ** ") truncated = true
                 val sql = if (step is SqlStep) SqlProfile(step.hash, step.elapsed, step.error,
                     (step as? SqlStep3)?.updated) else null
                 ProfileStep(step.stepTypeName, step.order, sql)
             }
         }
-        val profile = ProfileRecord(txid.toString(), steps)
+        val profile = ProfileRecord(txid.toString(), steps, completeness =
+            if (truncated) ProfileCompleteness.TRUNCATED else ProfileCompleteness.UNKNOWN)
         if (includeText) resolveText(date, profile) else profile
     }
 

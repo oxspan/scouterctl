@@ -2,6 +2,7 @@ package dev.scouterctl.adapters.serialization
 
 import dev.scouterctl.core.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 @Serializable
 data class ServerInfoDto(
@@ -40,10 +41,14 @@ data class ProfileTransactionDto(
 data class ProfileStepDto(val type: String, val order: Int, val sql: SqlProfileDto? = null)
 
 @Serializable
+enum class ProfileCompletenessDto { @SerialName("unknown") UNKNOWN, @SerialName("truncated") TRUNCATED }
+
+@Serializable
 data class ProfileRecordDto(
     val txid: String, val steps: List<ProfileStepDto>,
     val detail: String = "structural-only; free text and binds omitted",
     val transaction: ProfileTransactionDto? = null,
+    val completeness: ProfileCompletenessDto = ProfileCompletenessDto.UNKNOWN,
 )
 
 @Serializable
@@ -80,9 +85,11 @@ fun ProfileStep.toDto(): ProfileStepDto = ProfileStepDto(type, order, sql?.toDto
 
 fun ProfileStepDto.toModel(): ProfileStep = ProfileStep(type, order, sql?.toModel())
 
-fun ProfileRecord.toDto(): ProfileRecordDto = ProfileRecordDto(txid, steps.map { it.toDto() }, detail, transaction?.toDto())
+fun ProfileRecord.toDto(): ProfileRecordDto = ProfileRecordDto(txid, steps.map { it.toDto() }, detail, transaction?.toDto(),
+    when (completeness) { ProfileCompleteness.UNKNOWN -> ProfileCompletenessDto.UNKNOWN; ProfileCompleteness.TRUNCATED -> ProfileCompletenessDto.TRUNCATED })
 
-fun ProfileRecordDto.toModel(): ProfileRecord = ProfileRecord(txid, steps.map { it.toModel() }, detail, transaction?.toModel())
+fun ProfileRecordDto.toModel(): ProfileRecord = ProfileRecord(txid, steps.map { it.toModel() }, detail, transaction?.toModel(),
+    when (completeness) { ProfileCompletenessDto.UNKNOWN -> ProfileCompleteness.UNKNOWN; ProfileCompletenessDto.TRUNCATED -> ProfileCompleteness.TRUNCATED })
 
 fun Cursor.toDto(): CursorDto = CursorDto(bucketTime, txid)
 

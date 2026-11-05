@@ -16,13 +16,13 @@ class SerializationContractTest : FunSpec({
         val source = ServerInfo("1", "2.21.3", "UTC", "test")
         val query = Query("20260101", 1767225600000, 1767225601000, "UTC", 1, 25)
         json.encodeToString(EvidenceManifest(source = source, endpoint = "localhost:6100", query = query, textIncluded = false).toDto()) shouldBe
-            """{"schemaVersion":"scouterctl.capture/v2","source":{"serverId":"1","version":"2.21.3","timezoneDisplayName":"UTC","group":"test","source":"collector-tcp","effectivePermission":"unknown","nativeTls":false},"endpoint":"localhost:6100","query":{"date":"20260101","from":1767225600000,"to":1767225601000,"timezone":"UTC","objHash":1,"pageSize":25},"textIncluded":false,"cursor":{"bucketTime":0,"txid":"0"},"executionComplete":false,"pages":[],"lastFailure":null,"upstreamCoverage":"unknown","sampling":"unknown","timezoneVerification":"operator-declared"}"""
+            """{"schemaVersion":"scouterctl.capture/v3","source":{"serverId":"1","version":"2.21.3","timezoneDisplayName":"UTC","group":"test","source":"collector-tcp","effectivePermission":"unknown","nativeTls":false},"endpoint":"localhost:6100","query":{"date":"20260101","from":1767225600000,"to":1767225601000,"timezone":"UTC","objHash":1,"pageSize":25},"textIncluded":false,"cursor":{"bucketTime":0,"txid":"0"},"executionComplete":false,"pages":[],"lastFailure":null,"upstreamCoverage":"unknown","sampling":"unknown","timezoneVerification":"operator-declared"}"""
     }
     test("v1 defaults and signed transaction identifiers retain their wire bytes") {
         json.encodeToString(XLogRecord("-9223372036854775808", "9223372036854775807", "0", 1, 2, 3, 4, 0).toDto()) shouldBe
             """{"txid":"-9223372036854775808","gxid":"9223372036854775807","caller":"0","endTime":1,"objHash":2,"serviceHash":3,"elapsed":4,"errorHash":0}"""
         json.encodeToString(ProfileRecord("1", listOf(ProfileStep("SQL", 0, SqlProfile(1, 2, 0)))).toDto()) shouldBe
-            """{"txid":"1","steps":[{"type":"SQL","order":0,"sql":{"hash":1,"elapsedMs":2,"errorHash":0,"updated":null,"statement":null,"error":null}}],"detail":"structural-only; free text and binds omitted","transaction":null}"""
+            """{"txid":"1","steps":[{"type":"SQL","order":0,"sql":{"hash":1,"elapsedMs":2,"errorHash":0,"updated":null,"statement":null,"error":null}}],"detail":"structural-only; free text and binds omitted","transaction":null,"completeness":"unknown"}"""
         json.encodeToString(ContextConfig().toDto()) shouldBe """{"schemaVersion":"scouterctl.contexts/v1","current":null,"contexts":{}}"""
     }
     test("decoded dictionary status survives boundaries without changing data class equality or copy") {

@@ -7,7 +7,7 @@ data class EvidenceRecord(val xlog: XLogRecord, val profileStatus: ProfileAvaila
 data class EvidencePage(val name: String, val sha256: String, val records: Int, val unavailableProfiles: Int)
 
 data class EvidenceManifest(
-    val schemaVersion: String = "scouterctl.capture/v2",
+    val schemaVersion: String = "scouterctl.capture/v3",
     val source: ServerInfo, val endpoint: String, val query: Query, val textIncluded: Boolean,
     val cursor: Cursor = Cursor(), val executionComplete: Boolean = false,
     val pages: List<EvidencePage> = emptyList(), val lastFailure: ErrorCode? = null,
