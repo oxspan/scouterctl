@@ -237,3 +237,6 @@ Exit codes: `0` success, `2` invalid input/resume conditions, `3` authentication
 
 - [Changelog](CHANGELOG.md)
 - [Scouter protocol library provenance](vendor/README.md)
+
+- [Apache License 2.0](LICENSE)
+- [Security policy](SECURITY.md)

@@ -106,7 +106,7 @@ val pocDist = tasks.register<Zip>("pocDist") {
     into("scouterctl-${project.version}") {
         from(tasks.named("fatJar"))
         from("QUICKSTART.md") { rename { "README.md" } }
-        from("CHANGELOG.md", "version.txt")
+        from("CHANGELOG.md", "version.txt", "LICENSE", "SECURITY.md")
         from("vendor") {
             include("README.md", "SCOUTER-LICENSE.txt")
             into("vendor")

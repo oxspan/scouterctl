@@ -13,13 +13,15 @@ trap 'rm -rf "$work"' EXIT
 prefix="scouterctl-$version"
 printf '%s\n' "$prefix/README.md" "$prefix/CHANGELOG.md" "$prefix/version.txt" \
   "$prefix/scouterctl-$version-all.jar" "$prefix/vendor/README.md" \
-  "$prefix/vendor/SCOUTER-LICENSE.txt" | sort > "$work/expected"
+  "$prefix/vendor/SCOUTER-LICENSE.txt" "$prefix/LICENSE" "$prefix/SECURITY.md" | sort > "$work/expected"
 unzip -Z1 "$archive" | sed '/\/$/d' | sort > "$work/actual"
 diff -u "$work/expected" "$work/actual"
 unzip -q "$archive" -d "$work/extracted"
 package="$work/extracted/$prefix"
 cmp QUICKSTART.md "$package/README.md"
 cmp version.txt "$package/version.txt"
+cmp LICENSE "$package/LICENSE"
+cmp SECURITY.md "$package/SECURITY.md"
 [[ "$(java -jar "$package/scouterctl-$version-all.jar" --version)" == "scouterctl $version" ]]
 java -jar "$package/scouterctl-$version-all.jar" --help > /dev/null
 printf 'Verified package %s\n' "$version"

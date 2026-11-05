@@ -89,3 +89,7 @@ The executable JAR is written to `build/libs/`. On Windows, use `gradlew.bat`.
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Scouter library provenance and license](vendor/README.md)
+
+## License and security
+
+scouterctl is licensed under [Apache License 2.0](LICENSE). Bundled dependencies retain their own licenses; see [Scouter provenance](vendor/README.md). For vulnerability reports, see the [security policy](SECURITY.md).
