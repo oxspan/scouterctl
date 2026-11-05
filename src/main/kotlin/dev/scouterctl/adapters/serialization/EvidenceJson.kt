@@ -15,7 +15,7 @@ data class EvidencePageDto(val name: String, val sha256: String, val records: In
 
 @Serializable
 data class EvidenceManifestDto(
-    val schemaVersion: String = "scouterctl.capture/v2",
+    val schemaVersion: String = "scouterctl.capture/v3",
     val source: ServerInfoDto, val endpoint: String, val query: QueryDto, val textIncluded: Boolean,
     val cursor: CursorDto = CursorDto(), val executionComplete: Boolean = false,
     val pages: List<EvidencePageDto> = emptyList(), val lastFailure: ErrorCodeDto? = null,

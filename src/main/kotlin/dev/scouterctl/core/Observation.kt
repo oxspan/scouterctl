@@ -34,10 +34,13 @@ data class ProfileTransaction(
 
 data class ProfileStep(val type: String, val order: Int, val sql: SqlProfile? = null)
 
+enum class ProfileCompleteness { UNKNOWN, TRUNCATED }
+
 data class ProfileRecord(
     val txid: String, val steps: List<ProfileStep>,
     val detail: String = "structural-only; free text and binds omitted",
     val transaction: ProfileTransaction? = null,
+    val completeness: ProfileCompleteness = ProfileCompleteness.UNKNOWN,
 )
 
 data class Cursor(val bucketTime: Long = 0, val txid: String = "0")

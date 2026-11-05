@@ -2,6 +2,8 @@ package dev.scouterctl.adapters.serialization
 
 import dev.scouterctl.core.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class PageFileDto(val name: String, val sha256: String, val records: Int)
@@ -49,3 +51,11 @@ fun CaptureManifestDto.toModel(): CaptureManifest = CaptureManifest(
     timezoneVerification,
     files.map { it.toModel() },
 )
+
+internal fun requireCaptureSchema(content: String, vararg supported: String) {
+    val manifest = json.parseToJsonElement(content) as? JsonObject
+    val version = manifest?.get("schemaVersion") as? JsonPrimitive
+    if (version?.isString != true || version.content !in supported) {
+        throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Unsupported capture schema; expected ${supported.joinToString(" or ")}")
+    }
+}
