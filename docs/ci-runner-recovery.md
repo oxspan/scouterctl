@@ -20,6 +20,6 @@ Check the exact head SHA, job status, runner assignment, started steps and annot
 
 A rerun uses the original SHA and ref. If source or package bytes change, validate the new candidate. Do not change runner architecture, disable required checks, or automatically publish using an unrelated successful run. Any exceptional publication requires a separately reviewed candidate, matching source and package hashes, actual platform evidence and an explicit release decision. An older release's one-off recovery is not a standing bypass.
 
-This is an operator procedure, not an automatic retry loop. It needs no extra token, scheduled workflow or repository permission. For a release that already exists but has missing assets, use the separate [upload recovery procedure](../CONTRIBUTING.md#recover-an-interrupted-upload).
+This is an operator procedure, not an automatic retry loop. It needs no extra token, scheduled workflow or repository permission. For a release that already exists but has missing assets, use the separate [upload recovery procedure](releasing.md#recover-an-interrupted-upload).
 
 References: [GitHub reruns](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs), [job timeout](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes).

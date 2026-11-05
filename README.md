@@ -85,6 +85,8 @@ The executable JAR is written to `build/libs/`. On Windows, use `gradlew.bat`.
 ## Documentation
 
 - [Quick start and command usage](QUICKSTART.md)
+- [CLI output and exit codes](docs/cli-contract.md)
+- [Capture compatibility](docs/capture-compatibility.md)
 - [Architecture](docs/architecture.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
