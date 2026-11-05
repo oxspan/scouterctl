@@ -30,7 +30,7 @@ On macOS, use `shasum -a 256 -c SHA256SUMS` instead of `sha256sum -c SHA256SUMS`
 
 On Windows with PowerShell 7:
 
-Use ASCII installation paths and command-line arguments; spaces are supported. The Windows JDK launcher can replace characters outside the system code page before the CLI starts. Use `--service-hash` instead of a non-ASCII `--service-name`. Unicode text inside captures and JSON output is preserved.
+Start inside the extracted directory and use the JAR filename as shown below. This also supports Korean installation directories. For non-ASCII command arguments, use the UTF-8 argument-file example below. Unicode text inside captures and JSON output is preserved.
 
 ```powershell
 $archive = Get-Item ./scouterctl-*-poc.zip
@@ -45,6 +45,30 @@ java -jar $SCOUTERCTL_JAR --help
 ```
 
 For online commands in PowerShell, set the password with `$env:SCOUTERCTL_PASSWORD = Read-Host 'Collector password' -MaskInput`, then run `java -jar $SCOUTERCTL_JAR --host 127.0.0.1 --port 6100 --user guest doctor` with your connection values. Clear the environment value afterward with `Remove-Item Env:SCOUTERCTL_PASSWORD`. Replace the Bash array invocation in later examples with `java -jar $SCOUTERCTL_JAR` and the same connection flags. Passwords are not stored in the CLI configuration.
+
+### Windows Unicode paths and arguments
+
+The Windows JDK 21 launcher can replace characters outside the system code page before scouterctl starts. Changing only the console code page or `file.encoding` does not repair direct arguments. Use `Set-Location -LiteralPath` to enter the installation directory and pass only the ASCII JAR filename, not its full Korean path.
+
+For Korean connection names, accounts, capture paths or service filters, save the arguments in a UTF-8 file **without a BOM**, then pass `@query.args` **after** the JAR filename. This file is read by scouterctl's argument parser, not the Java launcher:
+
+```powershell
+Set-Location -LiteralPath 'C:/도구/scouterctl'
+$SCOUTERCTL_JAR = "scouterctl-$((Get-Content version.txt -Raw).Trim())-all.jar"
+@'
+inspect search
+--directory "C:/관측 자료/캡처"
+--service-name "/결제<GET>"
+--include-text
+'@ | Set-Content -LiteralPath query.args -Encoding utf8NoBOM
+java -Dfile.encoding=UTF-8 -jar $SCOUTERCTL_JAR '@query.args'
+```
+
+Quote values containing spaces, `#` or quotes; inside quoted values, escape `"` as `\"` and `\` as `\\`. Forward slashes avoid Windows path escaping. Paths inside the file are relative to the shell's current directory, not the argument file. Keep the JAR and argument filenames ASCII. Keep passwords in `SCOUTERCTL_PASSWORD` or the interactive prompt, not in argument files.
+
+The same file can contain `context add --name 운영 --user 관측계정`, followed by a separate invocation of `context use --name 운영`. Context names accept 1–64 Unicode code points: letters, decimal digits, combining marks, dots, underscores and hyphens, starting with a letter or digit. Names are stored exactly as entered, without case folding or Unicode normalization; visually identical spellings with different code points are distinct. Older versions that only accept ASCII names cannot read a config containing Unicode names; use a separate `SCOUTERCTL_CONFIG` file if switching back.
+
+This workflow covers Korean installation folders and Unicode values read from argument files. Direct Unicode launcher arguments and installation paths containing emoji remain outside the supported Windows scope. See the [JDK launcher change](https://www.oracle.com/java/technologies/javase/21-0-9-relnotes.html) and [argument-file syntax](https://picocli.info/#AtFiles).
 
 ## Connect and find a target
 
@@ -201,7 +225,7 @@ Names are omitted unless `--include-text` is set, which requires stored text in 
 - `--include-text` is supported by `profile get`, `capture --include-profiles`, and `inspect`. V2 pages contain XLogs, profile availability, profiles, and optional dictionary snapshots. Inspect uses only these stored values.
 - Profile capture is limited to 10,000 pages and 16 MiB per page. A smaller page size may be needed for large profiles; changing the query requires a new capture. Resume may leave unreferenced page files, which are ignored. Checksums detect accidental corruption; the manifest is not signed.
 - Capture completion indicates that the requested execution has finished, not that all traffic is included. Concurrent writes and durability during power loss are not guaranteed.
-- Online commands require Collector 2.21.3; other versions are rejected. Run the packaged JAR with JDK 21. On Windows, use ASCII installation paths and command-line arguments.
+- Online commands require Collector 2.21.3; other versions are rejected. Run the packaged JAR with JDK 21. On Windows, use the documented relative-JAR and UTF-8 argument-file workflow for Korean paths and Unicode values.
 
 Exit codes: `0` success, `2` invalid input/resume conditions, `3` authentication/session error, `5` connection failure/timeout, `6` protocol error, `7` profile/transaction not found, `8` partial completion or capture limit, `9` version mismatch, `10` I/O or integrity error.
 

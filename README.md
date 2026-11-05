@@ -34,7 +34,7 @@ See [Architecture](docs/architecture.md) for the application components and capt
 - Scouter Collector **2.21.3**, a query account, and TCP access for online commands.
 - An existing capture for offline inspection; no Collector connection is needed.
 
-Install the Collector and Agent separately. Collector connections do not provide built-in TLS; use a trusted network or a tunnel. On Windows, use ASCII installation paths and command-line arguments.
+Install the Collector and Agent separately. Collector connections do not provide built-in TLS; use a trusted network or a tunnel. For Windows paths and arguments containing non-ASCII characters, follow the [Unicode usage instructions](QUICKSTART.md#windows-unicode-paths-and-arguments).
 
 ## Get started
 

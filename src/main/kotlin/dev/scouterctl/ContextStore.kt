@@ -34,8 +34,9 @@ data class ContextConfig(
 }
 
 internal fun validateContextName(name: String) {
-    if (!name.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,63}"))) {
-        throw CliFailure(ErrorCode.INVALID_ARGUMENT, "Context name must be 1..64 ASCII letters, digits, dots, underscores or hyphens; start with a letter or digit")
+    if (name.codePointCount(0, name.length) !in 1..64 ||
+        !name.matches(Regex("[\\p{L}\\p{Nd}][\\p{L}\\p{Nd}\\p{M}._-]*"))) {
+        throw CliFailure(ErrorCode.INVALID_ARGUMENT, "Context name must be 1..64 Unicode code points: letters, digits, combining marks, dots, underscores or hyphens; start with a letter or digit")
     }
 }
 
