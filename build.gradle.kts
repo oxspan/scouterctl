@@ -12,7 +12,31 @@ require(version.toString().matches(Regex("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0
 }
 repositories { mavenCentral() }
 kotlin { jvmToolchain(21) }
-application { mainClass.set("dev.scouterctl.MainKt") }
+application {
+    mainClass.set("dev.scouterctl.MainKt")
+    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8")
+}
+tasks.startScripts {
+    doLast {
+        // Stop prerequisite failures before Gradle's batch template falls through to execution.
+        val script = windowsScript.readText()
+        val failureExit = "\"%COMSPEC%\" /c exit 1"
+        check(script.split(failureExit).size == 3) { "Review the Windows launcher failure paths" }
+        windowsScript.writeText(script.replace(failureExit, "exit /b 1"))
+    }
+}
+distributions {
+    main {
+        contents {
+            from("README.md", "QUICKSTART.md", "LICENSE", "SECURITY.md", "version.txt")
+            from("docs") { into("docs") }
+            from("vendor") {
+                include("README.md", "SCOUTER-LICENSE.txt")
+                into("vendor")
+            }
+        }
+    }
+}
 dependencies {
     implementation(files("vendor/scouter-common-2.21.3.jar"))
     implementation("info.picocli:picocli:4.7.7")
@@ -48,6 +72,8 @@ tasks.processResources {
 }
 tasks.test {
     useJUnitPlatform { includeEngines("kotest") }
+    dependsOn(tasks.distZip)
+    systemProperty("cli.distribution", tasks.distZip.get().archiveFile.get().asFile.absolutePath)
     systemProperty("architecture.main.classes", sourceSets.main.get().output.classesDirs.asPath)
     val externalJar = providers.gradleProperty("cliJar")
     if (!externalJar.isPresent) dependsOn("fatJar")
