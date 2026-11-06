@@ -14,6 +14,14 @@ internal fun Cli.interpret(): CommandRequest {
         allowedOptions(setOf("--before", "--after", "--limit", "--include-text", "--no-input"))
         return OfflineRequest.Compare(required(before, "--before"), required(after, "--after"), ComparisonOptions(limit ?: 20, includeText))
     }
+    if (command in setOf("counter list", "counter get")) {
+        allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input", "--object-hash") +
+            if (command == "counter get") setOf("--counter") else emptySet())
+        val counter = if (command == "counter get") required(counterName, "--counter") else null
+        if (counter != null && (counter.isBlank() || counter.length > 256 || counter.any(Char::isISOControl))) invalid("Invalid counter name")
+        return OnlineRequest.Counters(required(objHash, "--object-hash"), counter)
+    }
+    if (counterName != null) invalid("--counter requires counter get")
     if (command in setOf("collector status", "collector config", "agent status", "agent config")) {
         allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input") +
             (if (command.endsWith("config")) setOf("--key") else emptySet()) +

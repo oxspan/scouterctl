@@ -96,6 +96,10 @@ fun main(args: Array<String>) {
                         ?.also { objectHash = it.objHash } != null
                 }
             }
+            if (args.drop(1) == listOf("--counter-only")) {
+                verifyRealtimeCounters(work, endpoint, password, objectHash, httpPort)
+                return
+            }
             if (args.drop(1) == listOf("--inspection-only")) {
                 eventually("Agent JVM response") {
                     CollectorSource.connect(endpoint, password, BuildInfo.version).use {

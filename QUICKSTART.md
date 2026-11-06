@@ -170,6 +170,22 @@ Both commands go through the selected Collector. Status includes the Agent name,
 
 Configuration lists the Agent's runtime settings and defaults. Only selected numeric/boolean operational settings expose values; other current/default values are null with `redacted: true`, including when selected by `--key`. Neither command writes configuration. An unknown target, an offline Agent's configuration, unavailable configuration or a missing setting returns exit 7. Malformed responses return exit 6. The CLI remains on JDK 21 even when the Agent/application runs on Java 8.
 
+## Real-time counters
+
+Use a target hash from `object list`:
+
+```bash
+"${SCOUTERCTL[@]}" counter list --object-hash 123456
+"${SCOUTERCTL[@]}" counter get --object-hash 123456 --counter HeapUsed
+"${SCOUTERCTL[@]}" counter get --object-hash 123456 --counter TPS
+```
+
+Both commands return `data.agent` and a sorted `data.counters` array; `get` selects one exact name. Each entry has `name`, `displayName`, `unit`, `value` and `availability`. Numeric values are decimal strings, preserving integer precision. Units and display names come from the Collector's default/custom definitions for that object type; an unknown definition has null metadata. Values retain the Collector's units without conversion.
+
+`available` includes genuine zero values. `unavailable` has `value: null`: the counter is defined but has no current cached value, or the Collector reports the Agent as offline. `unsupported` also has null value and means a cached value is not a supported numeric type; arbitrary text is excluded. Unrecognized names and missing targets return exit 7. Malformed responses and nonfinite numbers return exit 6.
+
+These are the latest values in the Collector cache. The response supplies no sample timestamp, and the counters need not share a measurement window. The CLI does not certify freshness or replace missing values with zero. Some counters need another producer: for example, `ProcCpu` can remain unavailable without the Host Agent, and GC counters may need another collection cycle after startup. TPS, response time and error rate are Agent aggregates, so they need not match a client-side HTTP batch's count or error fraction. The commands do not write settings or query historical time series.
+
 ## Query and export
 
 Run these commands with the password environment variable set. Replace the example object hash, date, time zone, and transaction ID with values from your environment.
