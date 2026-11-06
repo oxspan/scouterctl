@@ -140,6 +140,22 @@ Existing commands remain noninteractive by default. `auth login` and `--interact
 
 For CI, use explicit endpoint flags or an isolated `SCOUTERCTL_CONFIG`, set the password through your secret mechanism, and pass `--no-input`. Contexts are local preferences, not an access-control boundary. TCP still has no native TLS.
 
+## Collector status and settings
+
+After setting up the `SCOUTERCTL` connection above:
+
+```sh
+"${SCOUTERCTL[@]}" collector status
+"${SCOUTERCTL[@]}" collector config
+"${SCOUTERCTL[@]}" collector config --key net_tcp_listen_port
+```
+
+Status reports `usedHeapBytes`, `committedHeapBytes` and `serverTimeEpochMs`. Committed heap is not the JVM maximum heap. Collector metadata accompanies both results.
+
+Configuration lists runtime settings exposed by the Collector alongside their defaults. Values are strings. The CLI shows values only for selected port, HTTP-enable and retention settings; other entries have `value: null`, `defaultValue: null` and `redacted: true`. Filtering by `--key` does not reveal hidden values. A missing setting exits 7. This is not a raw configuration-file export, and it does not include arbitrary custom properties.
+
+These commands do not write settings or require a local Agent. They authenticate with the selected Collector account. Successful access does not prove that the Collector enforces distinct permissions for every operation; `effectivePermission` remains `unknown`.
+
 ## Query and export
 
 Run these commands with the password environment variable set. Replace the example object hash, date, time zone, and transaction ID with values from your environment.

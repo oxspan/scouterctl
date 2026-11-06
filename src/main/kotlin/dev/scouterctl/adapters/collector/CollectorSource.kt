@@ -2,6 +2,7 @@ package dev.scouterctl.adapters.collector
 
 import dev.scouterctl.core.*
 import dev.scouterctl.application.ObservationSource
+import dev.scouterctl.application.collectorSettingValueIsVisible
 
 import scouter.io.DataInputX
 import scouter.io.DataOutputX
@@ -12,6 +13,9 @@ import scouter.lang.step.StepControl
 import scouter.lang.step.SqlStep
 import scouter.lang.step.SqlStep3
 import scouter.lang.value.BooleanValue
+import scouter.lang.value.ListValue
+import scouter.lang.value.TextValue
+import scouter.lang.value.Value
 import scouter.lang.value.DecimalValue
 import scouter.net.NetCafe
 import scouter.net.RequestCmd
@@ -89,6 +93,47 @@ class CollectorSource private constructor(private val socket: Socket, private va
                 TcpFlag.INVALID_SESSION -> throw OperationFailure(ErrorCode.AUTH_FAILED, "Collector session expired")
                 else -> throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Unexpected response flag")
             }
+        }
+    }
+
+    override fun status(): CollectorStatus = collectorOperation {
+        val pack = exchange(RequestCmd.SERVER_STATUS).singleOrNull() as? MapPack
+            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one Collector status response")
+        fun number(key: String): Long = (pack.get(key) as? DecimalValue)?.value
+            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid Collector status fields")
+        val status = CollectorStatus(number("used"), number("total"), number("time"))
+        if (status.usedHeapBytes < 0 || status.committedHeapBytes < status.usedHeapBytes || status.serverTimeEpochMs < 0) {
+            throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid Collector status values")
+        }
+        status
+    }
+
+    override fun settings(): List<CollectorSetting> = collectorOperation {
+        val pack = exchange(RequestCmd.LIST_CONFIGURE_SERVER).singleOrNull() as? MapPack
+            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one Collector settings response")
+        fun items(key: String): ListValue = pack.get(key) as? ListValue
+            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid Collector settings fields")
+        val keys = items("key")
+        val values = items("value")
+        val defaults = items("default")
+        if (keys.size() > 5000 || keys.size() != values.size() || keys.size() != defaults.size()) {
+            throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Inconsistent Collector settings lists")
+        }
+        val seen = mutableSetOf<String>()
+        fun visibleValue(value: Value): String = when (value) {
+            is DecimalValue -> value.value.toString()
+            is BooleanValue -> value.value.toString()
+            else -> throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid operational setting value")
+        }
+        (0 until keys.size()).map { index ->
+            val key = (keys.get(index) as? TextValue)?.value
+                ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid Collector setting key")
+            if (key.isEmpty() || key.length > 256 || !seen.add(key)) {
+                throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid or duplicate Collector setting key")
+            }
+            val visible = collectorSettingValueIsVisible(key)
+            CollectorSetting(key, if (visible) visibleValue(values.get(index)) else null,
+                if (visible) visibleValue(defaults.get(index)) else null, !visible)
         }
     }
 

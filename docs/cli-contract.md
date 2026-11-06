@@ -12,7 +12,7 @@ This contract describes the current CLI boundary for scripts. It is separate fro
 
 ## Single-result commands
 
-`doctor`, `auth login`, `object list`, `profile get`, `capture`, `context add/list/use`, and the `inspect` family emit one result or one error object.
+`collector status`, `collector config`, `doctor`, `auth login`, `object list`, `profile get`, `capture`, `context add/list/use`, and the `inspect` family emit one result or one error object.
 
 ```json
 {"schemaVersion":"scouterctl.result/v1","ok":true,"data":{},"executionComplete":true}

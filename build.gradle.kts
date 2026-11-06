@@ -154,3 +154,12 @@ tasks.register("legacyFixtureClasspath") {
     dependsOn(legacyFixture.classesTaskName)
     doLast { println(legacyFixture.runtimeClasspath.asPath) }
 }
+
+tasks.register<JavaExec>("collectorInspectionSmoke") {
+    dependsOn(tasks.testClasses, "fatJar")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.SpringSmokeKt")
+    args(providers.gradleProperty("scouterRoot").getOrElse("../scouter"), "--inspection-only")
+    systemProperty("cli.jar", providers.gradleProperty("cliJar").getOrElse(
+        layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
+}
