@@ -25,7 +25,7 @@ For the nine releases from the Spring column: 15 HTTP requests produced 21 Servl
 
 Before 2.8.1, the Collector does not handle the `XLOG_PROFILE2` telemetry emitted by Agent 2.21.3. A mixed-version test found XLogs but empty profiles. That is an Agent-to-Collector ingestion mismatch; changing the CLI cannot recover profiles that were never stored. Use a compatible Agent/Collector combination.
 
-Collector status and runtime-settings inspection are validated separately with `collectorInspectionSmoke`. See [Quick start](../QUICKSTART.md#collector-status-and-settings) for output units and hidden values.
+Collector status and runtime-settings inspection are validated separately with `collectorInspectionSmoke`. Agent status/JVM and runtime-settings reads are checked with matching Java 8 Agents using `agentInspectionSmoke` across the same 18 releases. Linux and native Windows JDK 21 clients are checked against 2.8.1 and 2.21.3; the Collector/Agent processes run on Linux. See [Quick start](../QUICKSTART.md#collector-status-and-settings) for output units and hidden values.
 
 ## Limits
 
@@ -55,10 +55,12 @@ export SCOUTER_AGENT_JAR="$SCOUTER_DIST/agent.java/scouter.agent.jar"
 export SCOUTER_SERVICE_JAVA="$JAVA8/bin/java"
 export SCOUTER_SERVICE_CLASSPATH="$(./gradlew -q legacyFixtureClasspath)"
 ./gradlew agentSmoke -PscouterRoot="$SCOUTER_SOURCE"
+# Run only Agent status/settings checks:
+./gradlew agentInspectionSmoke -PscouterRoot="$SCOUTER_SOURCE"
 ```
 
 `JAVA8`, `SCOUTER_DIST` and `SCOUTER_SOURCE` refer to your Java 8 installation, extracted distribution and built Scouter source checkout. The legacy JDBC dependency is test-only and is excluded from the CLI package. Build/run Gradle with JDK 21.
 
-For Servlet checks on the compatible releases, use `springSmoke` with a built Java 21-capable Agent from the source checkout. `recoverySmoke` adds actual Collector stop/restart to that scenario. `collectorInspectionSmoke` starts only the Collector and checks status, settings, authentication and unchanged configuration/account files; it does not start an Agent or application. The optional `SCOUTER_SERVICE_*` and `SCOUTER_AGENT_JAR` overrides apply to `agentSmoke`, not `springSmoke`.
+For Servlet checks on the compatible releases, use `springSmoke` with a built Java 21-capable Agent from the source checkout. `recoverySmoke` adds actual Collector stop/restart to that scenario. `collectorInspectionSmoke` starts only the Collector and checks status, settings, authentication and unchanged configuration/account files; it does not start an Agent or application. The optional `SCOUTER_SERVICE_*` and `SCOUTER_AGENT_JAR` overrides apply to `agentSmoke` and `agentInspectionSmoke`, not `springSmoke`.
 
 See [Capture recovery](capture-recovery.md), [Local CI](local-ci.md) and [protocol library provenance](../vendor/README.md).

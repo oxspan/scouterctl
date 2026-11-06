@@ -41,7 +41,9 @@ internal class MemorySource(
     override val info = portSource
     var closed = false
     override fun status() = CollectorStatus(1, 2, 3)
-    override fun settings(): List<CollectorSetting> = emptyList()
+    override fun settings(): List<RuntimeSetting> = emptyList()
+    override fun agentStatus(objHash: Int): AgentStatus = throw OperationFailure(ErrorCode.NOT_FOUND, "No Agent in memory fixture")
+    override fun agentSettings(objHash: Int): AgentConfiguration = throw OperationFailure(ErrorCode.NOT_FOUND, "No Agent in memory fixture")
     override fun objects(): List<ObjectRecord> = emptyList()
     override fun page(query: Query, cursor: Cursor) = fetch(cursor)
     override fun profile(date: String, txid: Long, includeText: Boolean) = profile(txid)

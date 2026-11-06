@@ -3,6 +3,7 @@ package dev.scouterctl.adapters.collector
 import dev.scouterctl.core.*
 import dev.scouterctl.application.ObservationSource
 import dev.scouterctl.application.collectorSettingValueIsVisible
+import dev.scouterctl.application.agentSettingValueIsVisible
 
 import scouter.io.DataInputX
 import scouter.io.DataOutputX
@@ -108,16 +109,56 @@ class CollectorSource private constructor(private val socket: Socket, private va
         status
     }
 
-    override fun settings(): List<CollectorSetting> = collectorOperation {
-        val pack = exchange(RequestCmd.LIST_CONFIGURE_SERVER).singleOrNull() as? MapPack
-            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one Collector settings response")
+    override fun settings(): List<RuntimeSetting> = collectorOperation {
+        parseSettings(exchange(RequestCmd.LIST_CONFIGURE_SERVER), ::collectorSettingValueIsVisible)
+    }
+
+    override fun agentStatus(objHash: Int): AgentStatus = collectorOperation {
+        val agent = agent(objHash)
+        if (!agent.alive) return@collectorOperation AgentStatus(agent, AgentJvmAvailability.OFFLINE, null)
+        val response = exchange(RequestCmd.OBJECT_ENV, MapPack().apply { put("objHash", objHash.toLong()) })
+        if (response.isEmpty()) return@collectorOperation AgentStatus(agent, AgentJvmAvailability.UNAVAILABLE, null)
+        val pack = response.singleOrNull() as? MapPack
+            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one Agent JVM response")
+        fun text(key: String): String? {
+            val value = pack.get(key) ?: return null
+            return (value as? TextValue)?.value
+                ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid Agent JVM field")
+        }
+        val javaVersion = text("java.version")
+            ?: return@collectorOperation AgentStatus(agent, AgentJvmAvailability.UNAVAILABLE, null)
+        if (javaVersion.isBlank()) throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid Agent Java version")
+        AgentStatus(agent, AgentJvmAvailability.AVAILABLE, AgentJvm(javaVersion, text("java.runtime.version"),
+            text("java.vm.name"), text("java.vm.version"), text("java.vendor"), text("os.name"), text("os.arch")))
+    }
+
+    override fun agentSettings(objHash: Int): AgentConfiguration = collectorOperation {
+        val agent = agent(objHash)
+        if (!agent.alive) throw OperationFailure(ErrorCode.NOT_FOUND, "Agent is not alive")
+        val response = exchange(RequestCmd.LIST_CONFIGURE_WAS, MapPack().apply { put("objHash", objHash.toLong()) })
+        if (response.isEmpty()) throw OperationFailure(ErrorCode.NOT_FOUND, "Agent settings are unavailable")
+        AgentConfiguration(agent, parseSettings(response, ::agentSettingValueIsVisible))
+    }
+
+    private fun agent(objHash: Int): AgentIdentity {
+        val agents = exchange(RequestCmd.OBJECT_LIST_REAL_TIME).map {
+            it as? ObjectPack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected object pack")
+        }.filter { it.objHash == objHash }
+        if (agents.size > 1) throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Duplicate Agent identity")
+        val agent = agents.singleOrNull() ?: throw OperationFailure(ErrorCode.NOT_FOUND, "Agent was not found")
+        return AgentIdentity(agent.objHash, agent.objName ?: "", agent.objType ?: "", agent.alive, agent.version ?: "unknown")
+    }
+
+    private fun parseSettings(response: List<Pack>, valueIsVisible: (String) -> Boolean): List<RuntimeSetting> {
+        val pack = response.singleOrNull() as? MapPack
+            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one runtime settings response")
         fun items(key: String): ListValue = pack.get(key) as? ListValue
-            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid Collector settings fields")
+            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid runtime settings fields")
         val keys = items("key")
         val values = items("value")
         val defaults = items("default")
         if (keys.size() > 5000 || keys.size() != values.size() || keys.size() != defaults.size()) {
-            throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Inconsistent Collector settings lists")
+            throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Inconsistent runtime settings lists")
         }
         val seen = mutableSetOf<String>()
         fun visibleValue(value: Value): String = when (value) {
@@ -125,14 +166,14 @@ class CollectorSource private constructor(private val socket: Socket, private va
             is BooleanValue -> value.value.toString()
             else -> throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid operational setting value")
         }
-        (0 until keys.size()).map { index ->
+        return (0 until keys.size()).map { index ->
             val key = (keys.get(index) as? TextValue)?.value
-                ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid Collector setting key")
+                ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid runtime setting key")
             if (key.isEmpty() || key.length > 256 || !seen.add(key)) {
-                throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid or duplicate Collector setting key")
+                throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid or duplicate runtime setting key")
             }
-            val visible = collectorSettingValueIsVisible(key)
-            CollectorSetting(key, if (visible) visibleValue(values.get(index)) else null,
+            val visible = valueIsVisible(key)
+            RuntimeSetting(key, if (visible) visibleValue(values.get(index)) else null,
                 if (visible) visibleValue(defaults.get(index)) else null, !visible)
         }
     }

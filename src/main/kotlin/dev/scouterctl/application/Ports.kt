@@ -5,7 +5,9 @@ import dev.scouterctl.core.*
 interface ObservationSource : AutoCloseable {
     val info: ServerInfo
     fun status(): CollectorStatus
-    fun settings(): List<CollectorSetting>
+    fun settings(): List<RuntimeSetting>
+    fun agentStatus(objHash: Int): AgentStatus
+    fun agentSettings(objHash: Int): AgentConfiguration
     fun objects(): List<ObjectRecord>
     fun page(query: Query, cursor: Cursor): XLogPage
     fun profile(date: String, txid: Long, includeText: Boolean = false): ProfileRecord

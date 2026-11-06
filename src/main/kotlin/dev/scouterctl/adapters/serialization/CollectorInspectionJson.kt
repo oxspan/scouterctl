@@ -9,13 +9,10 @@ data class CollectorStatusDto(
 )
 
 @Serializable
-data class CollectorSettingDto(val key: String, val value: String?, val defaultValue: String?, val redacted: Boolean)
-
-@Serializable
-data class CollectorSettingsDto(val collector: ServerInfoDto, val settings: List<CollectorSettingDto>)
+data class CollectorSettingsDto(val collector: ServerInfoDto, val settings: List<RuntimeSettingDto>)
 
 fun CollectorStatus.toDto(source: ServerInfo): CollectorStatusDto =
     CollectorStatusDto(source.toDto(), usedHeapBytes, committedHeapBytes, serverTimeEpochMs)
 
-fun List<CollectorSetting>.toSettingsDto(source: ServerInfo): CollectorSettingsDto =
-    CollectorSettingsDto(source.toDto(), map { CollectorSettingDto(it.key, it.value, it.defaultValue, it.redacted) })
+fun List<RuntimeSetting>.toSettingsDto(source: ServerInfo): CollectorSettingsDto =
+    CollectorSettingsDto(source.toDto(), map { it.toDto() })

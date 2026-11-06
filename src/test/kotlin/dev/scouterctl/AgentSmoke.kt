@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
 
 /** End-to-end HTTP -> real javaagent -> Collector -> packaged CLI, without synthetic telemetry. */
 fun main(args: Array<String>) {
-    val upstream = Path.of(args.single()).toAbsolutePath().normalize()
+    val upstream = Path.of(args.first()).toAbsolutePath().normalize()
     val work = Files.createTempDirectory("scouterctl-agent-smoke-")
     Files.createDirectory(work.resolve("conf"))
     val port = ServerSocket(0).use { it.localPort }
@@ -95,6 +95,15 @@ fun main(args: Array<String>) {
                     source.objects().singleOrNull { it.objName.endsWith("/scouterctl-fixture") && it.alive }
                         ?.also { objectHash = it.objHash } != null
                 }
+            }
+            if (args.drop(1) == listOf("--inspection-only")) {
+                eventually("Agent JVM response") {
+                    CollectorSource.connect(endpoint, password, BuildInfo.version).use {
+                        it.agentStatus(objectHash).jvmAvailability == AgentJvmAvailability.AVAILABLE
+                    }
+                }
+                verifyAgentInspection(work, endpoint, password, objectHash)
+                return
             }
             val from = System.currentTimeMillis()
             val expected = linkedMapOf("/poc/ok" to 18, "/poc/slow" to 6, "/poc/error" to 6, "/poc/sql" to 6)

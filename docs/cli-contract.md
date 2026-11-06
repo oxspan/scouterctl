@@ -12,7 +12,7 @@ This contract describes the current CLI boundary for scripts. It is separate fro
 
 ## Single-result commands
 
-`collector status`, `collector config`, `doctor`, `auth login`, `object list`, `profile get`, `capture`, `context add/list/use`, and the `inspect` family emit one result or one error object.
+`collector status`, `collector config`, `agent status`, `agent config`, `doctor`, `auth login`, `object list`, `profile get`, `capture`, `context add/list/use`, and the `inspect` family emit one result or one error object.
 
 ```json
 {"schemaVersion":"scouterctl.result/v1","ok":true,"data":{},"executionComplete":true}
@@ -39,7 +39,7 @@ The example message is illustrative. `error.code` is the machine-readable identi
 | 3 | `AUTH_FAILED` | Authentication or session failure |
 | 5 | `CONNECTION_FAILED` | Connection, socket or timeout failure |
 | 6 | `PROTOCOL_ERROR` | Unsupported or undecodable response |
-| 7 | `NOT_FOUND` | Requested profile/transaction unavailable |
+| 7 | `NOT_FOUND` | Requested target, setting or profile/transaction unavailable |
 | 8 | `PARTIAL_RESULT`, or a partial result object | Page/resource limit or incomplete operation |
 | 9 | `VERSION_MISMATCH` | Unsupported Collector version |
 | 10 | `IO_ERROR` | Artifact/transport I/O or integrity failure |

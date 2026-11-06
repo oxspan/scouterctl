@@ -95,7 +95,7 @@ This explicit-flag flow needs no saved settings. Missing password input returns 
 | Exit `2`, `INVALID_ARGUMENT` | Supply `--user` and `SCOUTERCTL_PASSWORD`. Use a hostname/IP for `--host`, a port in 1..65535, and `--timeout-ms` in 1..60000. |
 | Exit `3`, `AUTH_FAILED` | Check the account and password with the Collector administrator. Re-enter the password using hidden input. |
 | Exit `5`, `CONNECTION_FAILED` | Check hostname resolution, the TCP port, Collector availability, and the network/tunnel. For a slow reachable Collector, adjust `--timeout-ms` (default 5000). |
-| Exit `9`, `VERSION_MISMATCH` | This POC supports Collector 2.21.3. Confirm the endpoint and version; there is no compatibility override. |
+| Exit `9`, `VERSION_MISMATCH` | Check the [supported Collector releases](https://github.com/oxspan/scouterctl/blob/develop/docs/supported-versions.md). There is no compatibility override. |
 | Exit `0`, empty object list | Login worked, but no targets were reported. Check the Agent's Collector address and startup logs. |
 
 Messages suggest a next check, not a definitive network diagnosis. A timeout can occur after a connection was established. After correcting input or configuration, rerun `doctor`, then `object list`.
@@ -155,6 +155,20 @@ Status reports `usedHeapBytes`, `committedHeapBytes` and `serverTimeEpochMs`. Co
 Configuration lists runtime settings exposed by the Collector alongside their defaults. Values are strings. The CLI shows values only for selected port, HTTP-enable and retention settings; other entries have `value: null`, `defaultValue: null` and `redacted: true`. Filtering by `--key` does not reveal hidden values. A missing setting exits 7. This is not a raw configuration-file export, and it does not include arbitrary custom properties.
 
 These commands do not write settings or require a local Agent. They authenticate with the selected Collector account. Successful access does not prove that the Collector enforces distinct permissions for every operation; `effectivePermission` remains `unknown`.
+
+## Agent status and settings
+
+Choose a Java Agent's `objHash` from `object list`:
+
+```bash
+"${SCOUTERCTL[@]}" agent status --object-hash 123456
+"${SCOUTERCTL[@]}" agent config --object-hash 123456
+"${SCOUTERCTL[@]}" agent config --object-hash 123456 --key net_collector_tcp_port
+```
+
+Both commands go through the selected Collector. Status includes the Agent name, type, version and Collector-reported `alive` flag. When available, `jvm` contains Java/VM versions, vendor, OS name and architecture; arbitrary system properties and personal paths are excluded. `jvmAvailability` is `available`, `offline` when the Collector reports the Agent as down, or `unavailable` when no JVM data is returned. An unavailable JVM is not proof of a healthy application. A transport timeout returns exit 5 instead of a status result.
+
+Configuration lists the Agent's runtime settings and defaults. Only selected numeric/boolean operational settings expose values; other current/default values are null with `redacted: true`, including when selected by `--key`. Neither command writes configuration. An unknown target, an offline Agent's configuration, unavailable configuration or a missing setting returns exit 7. Malformed responses return exit 6. The CLI remains on JDK 21 even when the Agent/application runs on Java 8.
 
 ## Query and export
 
@@ -245,9 +259,9 @@ For scripting, see the [CLI output contract](https://github.com/oxspan/scouterct
 - `--include-text` is supported by `profile get`, `capture --include-profiles`, and `inspect`. V3 pages contain XLogs, profile availability, profiles, completeness and optional dictionary snapshots; existing v2 pages remain readable. Inspect uses only these stored values.
 - Profile capture is limited to 10,000 pages and 16 MiB per page. A smaller page size may be needed for large profiles; changing the query requires a new capture. Resume may leave unreferenced page files, which are ignored. Checksums detect accidental corruption; the manifest is not signed.
 - Capture completion indicates that the requested execution has finished, not that all traffic is included. Concurrent writes and durability during power loss are not guaranteed.
-- Online commands require Collector 2.21.3; other versions are rejected. Run the packaged JAR with JDK 21. On Windows, use the documented relative-JAR and UTF-8 argument-file workflow for Korean paths and Unicode values.
+- Online commands require a [supported Collector release](https://github.com/oxspan/scouterctl/blob/develop/docs/supported-versions.md); unverified versions are rejected. Run the packaged JAR with JDK 21. On Windows, use the documented relative-JAR and UTF-8 argument-file workflow for Korean paths and Unicode values.
 
-Exit codes: `0` success, `2` invalid input/resume conditions, `3` authentication/session error, `5` connection failure/timeout, `6` protocol error, `7` profile/transaction not found, `8` partial completion or capture limit, `9` version mismatch, `10` I/O or integrity error.
+Exit codes: `0` success, `2` invalid input/resume conditions, `3` authentication/session error, `5` connection failure/timeout, `6` protocol error, `7` target, setting or profile/transaction unavailable, `8` partial completion or capture limit, `9` version mismatch, `10` I/O or integrity error.
 
 ## Documentation
 
