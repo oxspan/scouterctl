@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit
 /** End-to-end HTTP -> real javaagent -> Collector -> packaged CLI, without synthetic telemetry. */
 fun main(args: Array<String>) {
     val upstream = Path.of(args.first()).toAbsolutePath().normalize()
+    val hostCounters = args.drop(1) == listOf("--host-counters")
     val work = Files.createTempDirectory("scouterctl-agent-smoke-")
     Files.createDirectory(work.resolve("conf"))
     val port = ServerSocket(0).use { it.localPort }
@@ -63,6 +64,10 @@ fun main(args: Array<String>) {
         trace_sampling_enabled=false
         profile_step_max_count=1000
     """.trimIndent())
+    if (hostCounters) {
+        Files.createDirectory(work.resolve("registry"))
+        Files.writeString(work.resolve("agent.conf"), "\ncounter_object_registry_path=${work.resolve("registry")}\n", java.nio.file.StandardOpenOption.APPEND)
+    }
     val java = Path.of(System.getProperty("java.home"), "bin/java").toString()
     val collectorJava = System.getenv("SCOUTER_COLLECTOR_JAVA") ?: java
     val cp = System.getenv("SCOUTER_COLLECTOR_CLASSPATH") ?: listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
@@ -70,10 +75,27 @@ fun main(args: Array<String>) {
     val collector = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")
         .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("collector.log").toFile()).start()
     var service: Process? = null
+    var host: Process? = null
     println("Evidence: $work")
     try {
         val endpoint = Endpoint("127.0.0.1", port, "poc", 1500)
         eventually("Collector login") { CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-agent-smoke" } }
+        if (hostCounters) {
+            val home = Files.createDirectory(work.resolve("host"))
+            Files.writeString(home.resolve("host.conf"), """
+                net_collector_ip=127.0.0.1
+                net_collector_tcp_port=$port
+                net_collector_udp_port=$udp
+                obj_name=scouterctl-host-fixture
+                counter_object_registry_path=${work.resolve("registry")}
+                log_dir=${home.resolve("logs")}
+            """.trimIndent())
+            val hostJar = System.getenv("SCOUTER_HOST_JAR") ?: error("Set SCOUTER_HOST_JAR to the matching official Host Agent JAR")
+            val hostJava = System.getenv("SCOUTER_HOST_JAVA") ?: collectorJava
+            host = ProcessBuilder(hostJava, "-Xmx128m", "-Duser.timezone=UTC", "-Dscouter.config=${home.resolve("host.conf")}",
+                "-cp", hostJar, "scouter.boot.Boot", home.resolve("lib").toString())
+                .directory(home.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("host.log").toFile()).start()
+        }
         val agent = System.getenv("SCOUTER_AGENT_JAR")?.let(Path::of)
             ?: upstream.resolve("scouter.agent.java/target/scouter.agent.jar")
         check(Files.isRegularFile(agent)) { "Build Java 21 agent first: $agent" }
@@ -95,6 +117,10 @@ fun main(args: Array<String>) {
                     source.objects().singleOrNull { it.objName.endsWith("/scouterctl-fixture") && it.alive }
                         ?.also { objectHash = it.objHash } != null
                 }
+            }
+            if (hostCounters) {
+                verifyHostCounters(work, endpoint, password, objectHash, httpPort)
+                return
             }
             if (args.drop(1) == listOf("--counter-only")) {
                 verifyRealtimeCounters(work, endpoint, password, objectHash, httpPort)
@@ -182,7 +208,7 @@ fun main(args: Array<String>) {
             println("PASS: 36 real HTTP requests, 36 unique XLogs, 6 errors, slow timings, method/JDBC profiles, 8-page capture/resume, auth failure, redaction")
         }
     } finally {
-        for (process in listOfNotNull(service, collector)) {
+        for (process in listOfNotNull(service, host, collector)) {
             process.destroy()
             if (!process.waitFor(10, TimeUnit.SECONDS)) { process.destroyForcibly(); process.waitFor(5, TimeUnit.SECONDS) }
             check(!process.isAlive) { "Fixture process did not stop" }
@@ -191,6 +217,7 @@ fun main(args: Array<String>) {
         Files.writeString(work.resolve("teardown.json"), buildJsonObject {
             put("collectorPid", collector.pid()); put("collectorStopped", !collector.isAlive)
             put("servicePid", service?.pid()); put("serviceStopped", service?.isAlive != true)
+            put("hostPid", host?.pid()); put("hostStopped", host?.isAlive != true)
         }.toString())
         println("Fixture processes stopped")
     }

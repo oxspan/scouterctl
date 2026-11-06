@@ -29,6 +29,8 @@ Collector status and runtime-settings inspection are validated separately with `
 
 Real-time counter reads use `counterSmoke` with matching Agents on Java 8. The same 18 releases are checked for counter definitions/units, list/get, heap samples, missing counters/targets, authentication and unchanged configuration. The 2.8.1 and 2.21.3 checks also send real slow/SQL/error HTTP traffic and observe positive TPS, response time and error-rate aggregates. Native Windows and Linux clients are checked on those two releases. The JVM/OS scope remains the same as above.
 
+Host/process CPU and host I/O have separate producer requirements and version differences. See [Host and process counters](host-counters.md) for the tested combinations and the 2.21.3 Host Agent missing-I/O limitation.
+
 ## Limits
 
 - Versions absent from the table, including snapshots and unverified patch releases, are rejected with `VERSION_MISMATCH` and exit 9.
