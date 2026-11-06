@@ -1,7 +1,8 @@
 # Install the command
 
-The command distribution contains `bin/scouterctl` (Linux/macOS),
-`bin/scouterctl.bat` (Windows), dependencies, and license notices. It uses an
+The standard command distribution contains `bin/scouterctl` (Linux/macOS) and
+a legacy Windows batch script. The Windows x64 distribution provides
+`bin/scouterctl.exe`. Both contain dependencies and license notices and use an
 installed JDK 21; it does not include Java, a Collector, or an Agent.
 
 This distribution is currently built from source. Published POC releases still
@@ -43,36 +44,72 @@ It replaces itself with Java on Unix, so terminal interrupts reach the CLI.
 
 ## Windows
 
-Extract the ZIP to a directory whose full path contains only ASCII characters,
-such as `C:\Tools`. In PowerShell:
+Use `scouterctl-<version>-windows-x64.zip` for the native Windows command.
+It requires Windows 10 version 1903 or newer on x64 and an x64 HotSpot JDK
+21 or newer. The native command preserves Korean installation paths and
+direct Unicode arguments without changing your system locale or code page.
 
 ```powershell
-Expand-Archive -LiteralPath ./scouterctl-0.3.0.zip -DestinationPath C:/Tools
+Expand-Archive -LiteralPath ./scouterctl-0.3.0-windows-x64.zip -DestinationPath "$HOME/도구"
 $env:JAVA_HOME = 'C:/Program Files/Eclipse Adoptium/jdk-21'
-$env:PATH = "C:/Tools/scouterctl-0.3.0/bin;$env:PATH"
+$env:PATH = "$HOME/도구/scouterctl-0.3.0/bin;$env:PATH"
 scouterctl --version
-scouterctl --help
+scouterctl context add --name 운영_서울 --user guest
 ```
 
 Use your actual JDK directory. For future terminals, add the installation's
 `bin` directory to your **user** PATH in Windows settings. The package does
-not change PATH, the registry, or your PowerShell execution policy.
+not change PATH, the registry, your console code page or execution policy.
+`JAVA_HOME` takes priority over `java.exe` on PATH. PowerShell and Command
+Prompt can both resolve `scouterctl.exe` from PATH.
 
-The Windows JDK 21 launcher can replace characters outside the system code
-page in installation paths and direct command arguments. The command package
-does not solve that JDK limitation. For Korean arguments, use the UTF-8
-argument-file approach in [Quick start](../QUICKSTART.md#windows-unicode-paths-and-arguments),
-invoked as `scouterctl '@query.args'`. Keep the argument filename ASCII and
-use an ASCII installation path. Paths inside that file are relative to your
-current working directory. Passwords belong in the interactive prompt or
-`SCOUTERCTL_PASSWORD`, not in argument files.
+Relative configuration and capture paths remain relative to your current
+working directory. Unicode values can be passed directly, including emoji
+in account names and capture paths. As with other native Windows programs,
+use your shell's quoting rules; PowerShell 7 is recommended for values with
+literal quote characters. Java `ProcessBuilder` callers should use
+`-Djdk.lang.Process.allowAmbiguousCommands=false` in the calling JVM for
+correct Windows escaping of literal quotes and backslashes.
+
+JDK 21 still has a separate class-loading limitation for supplementary
+characters such as emoji in **installation paths**. Keep those characters
+out of the installation directory; Korean letters and spaces are supported.
+The older `.bat` and direct `java -jar` launch methods retain the JDK
+argument limitations described in [Quick start](../QUICKSTART.md#windows-unicode-paths-and-arguments).
+
+The executable hosts Java in the same process using the public JNI
+Invocation API. It does not ship a JDK or copy credentials into argument
+files. `JAVA_OPTS` and `SCOUTERCTL_OPTS` accept JVM options; the JVM also reads
+`JAVA_TOOL_OPTIONS`. The java.exe-specific `JDK_JAVA_OPTIONS` is rejected
+with guidance to use `JAVA_TOOL_OPTIONS` instead.
+
+### Build the Windows package
+
+The optional native build uses [Zig 0.15.2](https://ziglang.org/download/) and
+Windows JDK 21 headers. You can cross-compile from Linux or build on Windows:
+
+```sh
+./gradlew windowsDistZip -PzigHome=/path/to/zig-0.15.2 \
+  -PwindowsJdkHome=/path/to/windows-jdk-21
+```
+
+On Windows use `gradlew.bat`; `windowsJdkHome` defaults to the JDK running
+Gradle. The ordinary Kotlin build does not require Zig. The ZIP includes
+notices for the native toolchain's linked runtime components.
+
+Run the native launcher tests **on Windows**, against the resulting ZIP:
+
+```powershell
+./gradlew.bat test --tests dev.scouterctl.WindowsLauncherTest `
+  -PwindowsDistribution=C:/packages/scouterctl-0.3.0-windows-x64.zip
+```
 
 ## Java startup errors
 
 If Java is absent or `JAVA_HOME` names a missing installation, the launcher
-writes an error to stderr and exits with code `1`. An older Java installation
-can report `UnsupportedClassVersionError` before the CLI starts, also with
-code `1`. These startup errors are not CLI JSON responses. Select JDK 21 and
+writes an error to stderr and exits with code `1`. The native Windows
+command also rejects Java versions older than 21. The legacy Java launch
+methods can report `UnsupportedClassVersionError`, also with code `1`. These startup errors are not CLI JSON responses. Select JDK 21 and
 retry the same command.
 
 ## Connect and extract data
