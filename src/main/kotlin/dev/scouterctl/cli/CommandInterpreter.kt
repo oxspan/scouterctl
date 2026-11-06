@@ -14,13 +14,19 @@ internal fun Cli.interpret(): CommandRequest {
         allowedOptions(setOf("--before", "--after", "--limit", "--include-text", "--no-input"))
         return OfflineRequest.Compare(required(before, "--before"), required(after, "--after"), ComparisonOptions(limit ?: 20, includeText))
     }
-    if (command in setOf("collector status", "collector config")) {
+    if (command in setOf("collector status", "collector config", "agent status", "agent config")) {
         allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input") +
-            if (command == "collector config") setOf("--key") else emptySet())
+            (if (command.endsWith("config")) setOf("--key") else emptySet()) +
+            if (command.startsWith("agent ")) setOf("--object-hash") else emptySet())
         settingKey?.let { if (!it.matches(Regex("[A-Za-z_][A-Za-z0-9_.-]{0,255}"))) invalid("Use a setting name for --key") }
-        return if (command == "collector status") OnlineRequest.CollectorStatus else OnlineRequest.CollectorConfig(settingKey)
+        return when (command) {
+            "collector status" -> OnlineRequest.CollectorStatus
+            "collector config" -> OnlineRequest.CollectorConfig(settingKey)
+            "agent status" -> OnlineRequest.AgentStatus(required(objHash, "--object-hash"))
+            else -> OnlineRequest.AgentConfig(required(objHash, "--object-hash"), settingKey)
+        }
     }
-    if (settingKey != null) invalid("--key requires collector config")
+    if (settingKey != null) invalid("--key requires collector config or agent config")
     if (before != null || after != null) invalid("--before and --after require inspect compare")
     if (command == "inspect summary") {
         allowedOptions(setOf("--directory", "--limit", "--sort", "--include-text", "--no-input"))

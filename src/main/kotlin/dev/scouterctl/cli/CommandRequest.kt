@@ -20,6 +20,8 @@ sealed interface OnlineRequest : CommandRequest {
     data class Doctor(val login: Boolean) : OnlineRequest
     data object CollectorStatus : OnlineRequest
     data class CollectorConfig(val key: String?) : OnlineRequest
+    data class AgentStatus(val objHash: Int) : OnlineRequest
+    data class AgentConfig(val objHash: Int, val key: String?) : OnlineRequest
     data object Objects : OnlineRequest
     data class Profile(val date: String, val txid: Long, val includeText: Boolean) : OnlineRequest
     data class Search(val query: Query, val maxPages: Int) : OnlineRequest

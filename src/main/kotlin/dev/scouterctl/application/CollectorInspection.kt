@@ -10,7 +10,7 @@ private val visibleCollectorSettings = setOf(
 
 fun collectorSettingValueIsVisible(key: String): Boolean = key in visibleCollectorSettings
 
-fun collectorSettings(source: ObservationSource, key: String?): List<CollectorSetting> {
+fun collectorSettings(source: ObservationSource, key: String?): List<RuntimeSetting> {
     val settings = source.settings().sortedBy { it.key }
     if (key == null) return settings
     return listOf(settings.singleOrNull { it.key == key }

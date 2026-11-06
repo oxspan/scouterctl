@@ -24,6 +24,8 @@ class OnlineCommands(
                 is OnlineRequest.Doctor -> output.result(json.encodeToJsonElement(observation.info.toDto()))
                 OnlineRequest.CollectorStatus -> output.result(json.encodeToJsonElement(observation.status().toDto(observation.info)))
                 is OnlineRequest.CollectorConfig -> output.result(json.encodeToJsonElement(collectorSettings(observation, request.key).toSettingsDto(observation.info)))
+                is OnlineRequest.AgentStatus -> output.result(json.encodeToJsonElement(observation.agentStatus(request.objHash).toDto(observation.info)))
+                is OnlineRequest.AgentConfig -> output.result(json.encodeToJsonElement(agentSettings(observation, request.objHash, request.key).toDto(observation.info)))
                 OnlineRequest.Objects -> output.result(json.encodeToJsonElement(observation.objects().map { it.toDto() }))
                 is OnlineRequest.Profile -> profile(observation, request)
                 is OnlineRequest.Search -> {

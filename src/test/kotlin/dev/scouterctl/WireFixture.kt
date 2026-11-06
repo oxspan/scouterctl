@@ -21,6 +21,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 enum class Fault {
+    AGENT_OFFLINE, AGENT_NO_RESPONSE, AGENT_JVM_MALFORMED, AGENT_DUPLICATE,
     NONE, STATUS_MALFORMED, CONFIG_MALFORMED, CONFIG_DUPLICATE, CONFIG_INVALID_VISIBLE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
@@ -92,6 +93,8 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                             RequestCmd.LOGIN -> "login"
                             RequestCmd.SERVER_STATUS -> "collector_status"
                             RequestCmd.LIST_CONFIGURE_SERVER -> "collector_config"
+                            RequestCmd.LIST_CONFIGURE_WAS -> "agent_config"
+                            RequestCmd.OBJECT_ENV -> "agent_jvm"
                             RequestCmd.OBJECT_LIST_REAL_TIME -> "objects"
                             RequestCmd.TRANX_LOAD_TIME_GROUP_V2 -> "xlog_page"
                             RequestCmd.TRANX_PROFILE -> "profile"
@@ -119,9 +122,26 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 put("used", 1024L); put("total", 4096L); put("time", baseTime)
                                 if (fault == Fault.STATUS_MALFORMED) put("used", "private-status-value")
                             })
-                            RequestCmd.LIST_CONFIGURE_SERVER -> send(output, MapPack().apply {
+                            RequestCmd.OBJECT_ENV -> {
+                                check(input.readMapPack().getInt("objHash") == 42)
+                                check(fault != Fault.AGENT_OFFLINE)
+                                if (fault != Fault.AGENT_NO_RESPONSE) send(output, MapPack().apply {
+                                    put("java.version", "1.8.0_502"); put("java.vm.name", "OpenJDK 64-Bit Server VM")
+                                    put("os.name", "Linux"); put("os.arch", "amd64")
+                                    put("user.home", "/private/home"); put("work.dir", "/private/work")
+                                    put("secret.token", "private-token")
+                                    if (fault == Fault.AGENT_JVM_MALFORMED) put("java.version", 8L)
+                                })
+                            }
+                            RequestCmd.LIST_CONFIGURE_SERVER, RequestCmd.LIST_CONFIGURE_WAS -> {
+                                val agent = command == RequestCmd.LIST_CONFIGURE_WAS
+                                if (agent) {
+                                    check(input.readMapPack().getInt("objHash") == 42)
+                                    check(fault != Fault.AGENT_OFFLINE)
+                                }
+                                if (!agent || fault != Fault.AGENT_NO_RESPONSE) send(output, MapPack().apply {
                                 newList("key").apply {
-                                    add("smtp_password"); add("net_tcp_listen_port"); add("db_dir")
+                                    add("smtp_password"); add(if (agent) "net_collector_tcp_port" else "net_tcp_listen_port"); add("db_dir")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("db_dir")
                                 }
                                 newList("value").apply {
@@ -134,10 +154,16 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                     if (fault != Fault.CONFIG_MALFORMED) add("/private/default")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("duplicate-private-default")
                                 }
-                            })
-                            RequestCmd.OBJECT_LIST_REAL_TIME -> if (fault != Fault.EMPTY_OBJECTS) send(output, ObjectPack().apply {
-                                objHash = 42; objName = "/fixture"; objType = "java"; address = "private-address"
-                            })
+                                })
+                            }
+                            RequestCmd.OBJECT_LIST_REAL_TIME -> if (fault != Fault.EMPTY_OBJECTS) {
+                                repeat(if (fault == Fault.AGENT_DUPLICATE) 2 else 1) {
+                                    send(output, ObjectPack().apply {
+                                        objHash = 42; objName = "/fixture"; objType = "java"; address = "private-address"
+                                        version = "2.8.1"; alive = fault != Fault.AGENT_OFFLINE
+                                    })
+                                }
+                            }
                             RequestCmd.TRANX_LOAD_TIME_GROUP_V2 -> {
                                 val request = input.readMapPack()
                                 val txid = request.getLong("txid")
