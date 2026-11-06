@@ -12,7 +12,7 @@ flowchart LR
     Bundle --> Inspect[Offline inspect, search, summary, compare]
 ```
 
-Online commands authenticate to the Collector and issue read requests. `capture` writes local files; offline commands read captures without authentication or a Collector connection. The client supports Collector 2.21.3 and rejects other online versions. The Collector TCP transport has no built-in TLS; use a trusted network or a tunnel.
+Online commands authenticate to the Collector and issue read requests. `capture` writes local files; offline commands read captures without authentication or a Collector connection. The client accepts the [tested Collector releases](supported-versions.md) and rejects unverified online versions. The Collector TCP transport has no built-in TLS; use a trusted network or a tunnel.
 
 ## Dependency boundaries
 

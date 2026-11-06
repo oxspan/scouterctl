@@ -140,6 +140,14 @@ class CollectorSource private constructor(private val socket: Socket, private va
         AgentConfiguration(agent, parseSettings(response, ::agentSettingValueIsVisible))
     }
 
+    override fun realtimeCounters(objHash: Int): RealtimeCounters = collectorOperation {
+        val agent = agent(objHash)
+        val metadata = exchange(RequestCmd.GET_XML_COUNTER)
+        val values = if (agent.alive) exchange(RequestCmd.COUNTER_REAL_TIME_OBJECT_ALL,
+            MapPack().apply { put("objHash", objHash.toLong()) }) else emptyList()
+        decodeCounters(agent, metadata, values)
+    }
+
     private fun agent(objHash: Int): AgentIdentity {
         val agents = exchange(RequestCmd.OBJECT_LIST_REAL_TIME).map {
             it as? ObjectPack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected object pack")

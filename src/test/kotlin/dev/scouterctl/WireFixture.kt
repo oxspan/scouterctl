@@ -21,6 +21,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 enum class Fault {
+    COUNTER_MALFORMED, COUNTER_DUPLICATE, COUNTER_NAN, COUNTER_XML_DTD, COUNTER_EMPTY, COUNTER_CUSTOM,
     AGENT_OFFLINE, AGENT_NO_RESPONSE, AGENT_JVM_MALFORMED, AGENT_DUPLICATE,
     NONE, STATUS_MALFORMED, CONFIG_MALFORMED, CONFIG_DUPLICATE, CONFIG_INVALID_VISIBLE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
@@ -122,6 +123,32 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 put("used", 1024L); put("total", 4096L); put("time", baseTime)
                                 if (fault == Fault.STATUS_MALFORMED) put("used", "private-status-value")
                             })
+                            RequestCmd.GET_XML_COUNTER -> send(output, MapPack().apply {
+                                val xml = if (fault == Fault.COUNTER_XML_DTD)
+                                    """<!DOCTYPE Counters [<!ENTITY secret SYSTEM "file:///private/counter-secret">]><Counters>&secret;</Counters>"""
+                                else """<Counters><Familys><Family name="javaee"><Counter name="ProcCpu" disp="CPU" unit="%"/>
+                                    <Counter name="GcCount" unit="cnt"/><Counter name="HeapUsed" unit="MB"/></Family></Familys>
+                                    <Types><ObjectType name="java" family="javaee"/></Types></Counters>"""
+                                put("default", scouter.lang.value.BlobValue(xml.toByteArray()))
+                                if (fault == Fault.COUNTER_CUSTOM) put("custom", scouter.lang.value.BlobValue(
+                                    """<Counters><Types><ObjectType name="java" family="javaee"><Counter name="HeapUsed" disp="Custom heap" unit="bytes"/></ObjectType></Types></Counters>""".toByteArray()))
+                            })
+                            RequestCmd.COUNTER_REAL_TIME_OBJECT_ALL -> {
+                                check(input.readMapPack().getInt("objHash") == 42)
+                                check(fault != Fault.AGENT_OFFLINE)
+                                send(output, MapPack().apply {
+                                    val keys = newList("counter"); val values = newList("value")
+                                    if (fault != Fault.COUNTER_EMPTY) {
+                                        keys.add("HeapUsed"); values.add(9007199254740993L)
+                                        keys.add("ProcCpu"); values.add(scouter.lang.value.FloatValue(0f))
+                                        keys.add("pluginCounter"); values.add(scouter.lang.value.DoubleValue(2.5))
+                                        keys.add("pluginText"); values.add("private-counter-value")
+                                        if (fault == Fault.COUNTER_DUPLICATE) { keys.add("HeapUsed"); values.add(7L) }
+                                        if (fault == Fault.COUNTER_MALFORMED) keys.add("extra")
+                                        if (fault == Fault.COUNTER_NAN) values.set(1, scouter.lang.value.DoubleValue(Double.NaN))
+                                    }
+                                })
+                            }
                             RequestCmd.OBJECT_ENV -> {
                                 check(input.readMapPack().getInt("objHash") == 42)
                                 check(fault != Fault.AGENT_OFFLINE)

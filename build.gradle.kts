@@ -172,3 +172,13 @@ tasks.register<JavaExec>("agentInspectionSmoke") {
     systemProperty("cli.jar", providers.gradleProperty("cliJar").getOrElse(
         layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
 }
+
+
+tasks.register<JavaExec>("counterSmoke") {
+    dependsOn(tasks.testClasses, "fatJar")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.AgentSmokeKt")
+    args(providers.gradleProperty("scouterRoot").getOrElse("../scouter"), "--counter-only")
+    systemProperty("cli.jar", providers.gradleProperty("cliJar").getOrElse(
+        layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
+}

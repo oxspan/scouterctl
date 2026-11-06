@@ -10,7 +10,7 @@ import java.nio.file.Path
 import java.util.concurrent.Callable
 
 @Command(name = "scouterctl", mixinStandardHelpOptions = true, showAtFileInUsageHelp = true,
-    description = ["Scouter Collector CLI. Commands: collector status, collector config, agent status, agent config, doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary, inspect compare.",
+    description = ["Scouter Collector CLI. Commands: counter list, counter get, collector status, collector config, agent status, agent config, doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary, inspect compare.",
         "Connect: doctor --host HOST --port PORT --user ACCOUNT, then object list with the same options.",
         "Save/select connections: context add/list/use --name NAME. Check credentials: auth login.",
         "Password: SCOUTERCTL_PASSWORD, or --interactive for hidden terminal input. Passwords are never saved.",
@@ -20,6 +20,7 @@ class Cli(private val dispatcher: CommandDispatcher, private val output: JsonOut
     @Mixin val connection = ConnectionOptions()
     @Spec lateinit var spec: CommandSpec
     @Option(names = ["--name"], description = ["Name for context add/use"]) var name: String? = null
+    @Option(names = ["--counter"], description = ["counter get: exact counter name"]) var counterName: String? = null
     @Option(names = ["--key"], description = ["collector config / agent config: exact setting name"]) var settingKey: String? = null
     @Option(names = ["--date"]) var date: String? = null
     @Option(names = ["--from"]) var from: String? = null
