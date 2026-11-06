@@ -28,7 +28,7 @@ tasks.startScripts {
 distributions {
     main {
         contents {
-            from("README.md", "QUICKSTART.md", "LICENSE", "SECURITY.md", "version.txt")
+            from("README.md", "QUICKSTART.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "SECURITY.md", "version.txt")
             from("docs") { into("docs") }
             from("vendor") {
                 include("README.md", "SCOUTER-LICENSE.txt")
