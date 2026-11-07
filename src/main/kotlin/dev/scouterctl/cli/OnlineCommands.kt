@@ -12,6 +12,7 @@ class OnlineCommands(
     private val source: (Endpoint, String) -> ObservationSource,
     private val captures: (Path) -> CaptureRepository,
     private val evidence: (Path) -> EvidenceRepository,
+    private val counterCaptures: (Path) -> CounterCaptureRepository,
     private val password: PasswordInput,
     private val output: JsonOutput,
 ) {
@@ -26,6 +27,15 @@ class OnlineCommands(
                 is OnlineRequest.CollectorConfig -> output.result(json.encodeToJsonElement(collectorSettings(observation, request.key).toSettingsDto(observation.info)))
                 is OnlineRequest.AgentStatus -> output.result(json.encodeToJsonElement(observation.agentStatus(request.objHash).toDto(observation.info)))
                 is OnlineRequest.AgentConfig -> output.result(json.encodeToJsonElement(agentSettings(observation, request.objHash, request.key).toDto(observation.info)))
+                is OnlineRequest.CounterExport -> counterCaptures(request.directory).use { store ->
+                    val manifest = exportCounters(observation, request.query,
+                        CounterExportOptions(request.resume, request.maxChunks, "${endpoint.host}:${endpoint.port}"), store)
+                    output.result(json.encodeToJsonElement(manifest.toDto()), manifest.executionComplete)
+                }
+                is OnlineRequest.CounterHistory -> {
+                    streamCounterHistory(observation, request.query, output::counterHistoryEvent)
+                    0
+                }
                 is OnlineRequest.Counters -> output.result(json.encodeToJsonElement(realtimeCounters(observation, request.objHash, request.name).toDto(observation.info)))
                 OnlineRequest.Objects -> output.result(json.encodeToJsonElement(observation.objects().map { it.toDto() }))
                 is OnlineRequest.Profile -> profile(observation, request)

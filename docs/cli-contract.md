@@ -4,7 +4,7 @@ This contract describes the current CLI boundary for scripts. It is separate fro
 
 ## Process and channels
 
-- Normal command output is UTF-8 JSON on stdout, terminated by a newline. `xlog search` emits JSONL: parse each nonempty line as one JSON object.
+- Normal command output is UTF-8 JSON on stdout, terminated by a newline. `xlog search` and `counter history` emit JSONL: parse each nonempty line as one JSON object.
 - Command and argument errors also go to stdout as JSON. Do not assume stderr is the error API. Keep stdout and stderr separate when parsing.
 - Explicit interactive password input uses a terminal and a human-readable prompt on stderr. Automation should provide `SCOUTERCTL_PASSWORD` and use `--no-input`; it must not depend on prompt text.
 - `--help` and `--version` are plain-text stdout with exit 0, outside the JSON contract. Help layout and diagnostic messages may change. Parse error codes rather than message text.
@@ -12,7 +12,7 @@ This contract describes the current CLI boundary for scripts. It is separate fro
 
 ## Single-result commands
 
-`collector status`, `collector config`, `agent status`, `agent config`, `counter list`, `counter get`, `doctor`, `auth login`, `object list`, `profile get`, `capture`, `context add/list/use`, and the `inspect` family emit one result or one error object.
+`collector status`, `collector config`, `agent status`, `agent config`, `counter list`, `counter get`, `counter export`, `doctor`, `auth login`, `object list`, `profile get`, `capture`, `context add/list/use`, and the `inspect` family emit one result or one error object.
 
 ```json
 {"schemaVersion":"scouterctl.result/v1","ok":true,"data":{},"executionComplete":true}
@@ -61,6 +61,10 @@ The abbreviated objects illustrate event shape, not executable JSON fixtures. Th
 A successful stream has exactly one final `complete` event and exit 0. Failure after streaming starts ends with the `scouterctl.error/v1` error object and a nonzero exit, without `complete`. Failure before streaming starts may emit only the error object. A page budget produces `PARTIAL_RESULT` and exit 8; earlier records must not be mistaken for the full query. A killed process or failed output transport may leave no terminal event.
 
 A consumer should accept the stream schema, process records, then require both the final `complete` event and exit 0 before marking the query complete. Use `capture` and its checkpoints when resumable extraction is needed.
+
+`counter history` uses its own `scouterctl.counter-stream/v1` schema with the same start/record/complete lifecycle. Its start includes the dated target and counter metadata, and records contain stored timestamps and numeric strings. See [counter history](counter-history.md) for missing values, units and query limits. XLog stream fields and schemas are unchanged.
+
+`counter export` returns a single manifest result and writes JSONL chunk files. Its `scouterctl.counter-capture/v1` format is separate from XLog captures. See [resumable counter export](counter-export.md) for budgets, checkpoints and completion semantics.
 
 ## Values and evolution
 
