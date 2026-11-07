@@ -1,5 +1,25 @@
 # 변경 기록
 
+## [1.0.0](https://github.com/oxspan/scouterctl/compare/v0.3.0...v1.0.0) (2026-11-07)
+
+
+### Features
+
+* ✨ Add command packages with native Windows Unicode support ([ac743da](https://github.com/oxspan/scouterctl/commit/ac743daf4292ae9df08a072178a67f1c0e7e99d6))
+* ✨ Add real-time counter queries ([#42](https://github.com/oxspan/scouterctl/issues/42)) ([6e83199](https://github.com/oxspan/scouterctl/commit/6e8319932cbfbd4f0f837209263e54d4ec6f06ae))
+* ✨ Add stored counter history and resumable exports ([9f3bc93](https://github.com/oxspan/scouterctl/commit/9f3bc93b8a601ec032c3803a9558178c5fcdff6f))
+* ✨ Inspect Agent JVM and runtime settings ([#41](https://github.com/oxspan/scouterctl/issues/41)) ([6d5cea2](https://github.com/oxspan/scouterctl/commit/6d5cea215e5c53f1a2ed19c7730ba8f3e80078a5))
+* ✨ Inspect Collector status and runtime settings ([#40](https://github.com/oxspan/scouterctl/issues/40)) ([9cd0cf5](https://github.com/oxspan/scouterctl/commit/9cd0cf5699170dd54a15c66df86d8414dc5cb7b8))
+* ✨ Prepare Linux and Windows command releases ([ed964ae](https://github.com/oxspan/scouterctl/commit/ed964ae4fe058bd518e8eecce8334071cec36716))
+* ✨ Report profile truncation in versioned captures ([67bb5e2](https://github.com/oxspan/scouterctl/commit/67bb5e2ff84ffc264196d7b940155a09bc0b1153))
+* ✨ Report profile truncation in versioned captures ([#37](https://github.com/oxspan/scouterctl/issues/37)) ([67bb5e2](https://github.com/oxspan/scouterctl/commit/67bb5e2ff84ffc264196d7b940155a09bc0b1153))
+* ✨ Support verified Collector releases on Java 8 ([#39](https://github.com/oxspan/scouterctl/issues/39)) ([b8fbda7](https://github.com/oxspan/scouterctl/commit/b8fbda796a0ee2d6e109406674980066f181d16e))
+
+
+### Bug Fixes
+
+* 🐛 Support Korean Windows usage with UTF-8 argument files ([3f11b77](https://github.com/oxspan/scouterctl/commit/3f11b77c34a38eebe76aeedc100b56fdf0333503))
+
 ## [0.3.0](https://github.com/oxspan/scouterctl/compare/v0.2.1...v0.3.0) (2026-11-04)
 
 
