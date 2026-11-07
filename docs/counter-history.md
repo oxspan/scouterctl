@@ -3,16 +3,17 @@
 Read one object's stored counter samples as JSONL. Use the Collector's storage date and declare its IANA timezone explicitly.
 
 ```sh
+mkdir captures
 scouterctl counter history \
   --object-hash 123 --counter HeapUsed \
   --date 20261107 \
   --from 2026-11-07T09:00:00+09:00 \
   --to 2026-11-07T10:00:00+09:00 \
   --timezone Asia/Seoul \
-  --no-input > heap.jsonl
+  --no-input > captures/heap.jsonl
 ```
 
-Supply connection options or a saved context and `SCOUTERCTL_PASSWORD` as described in [installation](installation.md). Use `counter list --object-hash 123` to discover currently defined names. A historical object need not be online; its identity comes from the requested day's object records.
+Create `captures` first if it does not exist. Supply connection options or a saved context and `SCOUTERCTL_PASSWORD` as described in [connections](connections.md). Use `counter list --object-hash 123` to discover currently defined names. A historical object need not be online; its identity comes from the requested day's object records.
 
 The interval is **[from, to)** in epoch milliseconds. Both endpoints must fit within one Collector-local storage day (the exclusive end may be the next midnight). The timezone is operator-declared; the Collector login's display name does not establish an IANA timezone.
 
@@ -35,4 +36,5 @@ This is a bounded, single-object, single-counter, single-day query. The whole re
 
 A missing daily object returns `NOT_FOUND`. An empty interval or an unrecorded counter produces a complete stream with zero records. That does not prove that the counter existed, traffic was absent, retention was complete, or collection was lossless. Current metadata can differ from metadata at collection time.
 
-The opt-in Kotlin `counterHistorySmoke` checks all 18 [listed Collector releases](supported-versions.md) on Linux Java 8 with matching Agents and a Linux JDK 21 CLI. Native Windows x64 clients have separate live checks on 2.8.1 and 2.21.3; the other releases have not been certified on Windows or macOS.
+
+See [supported versions](supported-versions.md) for the checked Collector/JVM combinations and [Testing](testing.md) to reproduce them.

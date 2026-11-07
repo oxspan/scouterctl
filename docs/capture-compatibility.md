@@ -16,7 +16,7 @@ The v3 layout, checksums, limits, text policy and checkpoint rules retain the v2
 
 ## Existing captures
 
-Keep original v1/v2 directories. Reading a v2 bundle does not rewrite or upgrade it. Missing profile completeness is read as `unknown`; earlier captures did not retain enough control-step detail to reconstruct truncation reliably. The unreleased profile-completeness candidate also wrote this field in v2; the current reader accepts those bundles, but does not resume them.
+Keep original v1/v2 directories. Reading a v2 bundle does not rewrite or upgrade it. Missing profile completeness is read as `unknown`; earlier captures did not retain enough control-step detail to reconstruct truncation reliably.
 
 To continue an incomplete v2 capture, use the CLI version that created it, or start a new v3 capture in a different directory with the intended query and `--include-profiles`. The current CLI refuses v2 resume before writing any page or manifest, even if the capture is already complete. It does not offer automatic migration, downgrade, or in-place conversion. New capture contents still depend on what the Collector retains when they are requested.
 
@@ -28,4 +28,4 @@ To continue an incomplete v2 capture, use the CLI version that created it, or st
 - Validate the original page bytes against their recorded checksums. Reading must not regenerate JSON or update hashes. Checksums detect changes; they do not authenticate who created a capture.
 - Announce unsupported formats and migration paths in release notes before removing a documented read capability. This initial compatibility policy covers the formats above; it is not an unlimited future support promise.
 
-This contract covers capture files. CLI result envelopes and command compatibility are separate contracts. See [Profile completeness](profile-completeness.md) for truncation and exit behavior.
+These rules cover capture files. [Command output and exit codes](cli-contract.md) have separate versioning rules. See [Profile completeness](profile-completeness.md) for truncation and exit behavior.
