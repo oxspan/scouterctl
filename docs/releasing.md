@@ -20,7 +20,7 @@ PACKAGE_VERSION=1.0.0 ALLOW_CANDIDATE=true bash .github/scripts/verify-release-f
 
 `candidateVersion` changes build output only. It generates a matching `version.txt` inside the ZIPs while leaving tracked release metadata intact. A candidate is not a published release. The uploader always requires tracked metadata and tag/commit agreement and never accepts this local override as publication authority.
 
-`build/release/` contains exactly the Linux x64 ZIP, Windows x64 ZIP and their `SHA256SUMS`. Both ZIPs contain the same JVM libraries and metadata; Windows adds its native launcher/notices. Java is not bundled. See the [draft 1.0 release notes](releases/1.0.0.md).
+`build/release/` contains exactly the Linux x64 ZIP, Windows x64 ZIP and their `SHA256SUMS`. Both ZIPs contain the same JVM libraries and metadata; Windows adds its native launcher/notices. Java is not bundled. See the [1.0 release notes](releases/1.0.0.md).
 
 For actual install/update/rollback/remove checks using two versioned command packages:
 
