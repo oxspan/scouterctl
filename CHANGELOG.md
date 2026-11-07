@@ -11,7 +11,6 @@
 * ✨ Inspect Agent JVM and runtime settings ([#41](https://github.com/oxspan/scouterctl/issues/41)) ([6d5cea2](https://github.com/oxspan/scouterctl/commit/6d5cea215e5c53f1a2ed19c7730ba8f3e80078a5))
 * ✨ Inspect Collector status and runtime settings ([#40](https://github.com/oxspan/scouterctl/issues/40)) ([9cd0cf5](https://github.com/oxspan/scouterctl/commit/9cd0cf5699170dd54a15c66df86d8414dc5cb7b8))
 * ✨ Prepare Linux and Windows command releases ([ed964ae](https://github.com/oxspan/scouterctl/commit/ed964ae4fe058bd518e8eecce8334071cec36716))
-* ✨ Report profile truncation in versioned captures ([67bb5e2](https://github.com/oxspan/scouterctl/commit/67bb5e2ff84ffc264196d7b940155a09bc0b1153))
 * ✨ Report profile truncation in versioned captures ([#37](https://github.com/oxspan/scouterctl/issues/37)) ([67bb5e2](https://github.com/oxspan/scouterctl/commit/67bb5e2ff84ffc264196d7b940155a09bc0b1153))
 * ✨ Support verified Collector releases on Java 8 ([#39](https://github.com/oxspan/scouterctl/issues/39)) ([b8fbda7](https://github.com/oxspan/scouterctl/commit/b8fbda796a0ee2d6e109406674980066f181d16e))
 
