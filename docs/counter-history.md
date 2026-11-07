@@ -35,4 +35,4 @@ This is a bounded, single-object, single-counter, single-day query. The whole re
 
 A missing daily object returns `NOT_FOUND`. An empty interval or an unrecorded counter produces a complete stream with zero records. That does not prove that the counter existed, traffic was absent, retention was complete, or collection was lossless. Current metadata can differ from metadata at collection time.
 
-Live checks cover Collector 2.8.1 and 2.21.3 on Java 8, queried by CLI Java 21 on Linux and Windows x64. See [supported versions](supported-versions.md) for the broader project's verification boundaries.
+The opt-in Kotlin `counterHistorySmoke` checks all 18 [listed Collector releases](supported-versions.md) on Linux Java 8 with matching Agents and a Linux JDK 21 CLI. Native Windows x64 clients have separate live checks on 2.8.1 and 2.21.3; the other releases have not been certified on Windows or macOS.

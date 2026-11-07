@@ -29,9 +29,9 @@ Collector status and runtime-settings inspection are validated separately with `
 
 Real-time counter reads use `counterSmoke` with matching Agents on Java 8. The same 18 releases are checked for counter definitions/units, list/get, heap samples, missing counters/targets, authentication and unchanged configuration. The 2.8.1 and 2.21.3 checks also send real slow/SQL/error HTTP traffic and observe positive TPS, response time and error-rate aggregates. Native Windows and Linux clients are checked on those two releases. The JVM/OS scope remains the same as above.
 
-Past counter samples (`counter history`) have separate live checks on **2.8.1 and 2.21.3**, using Linux and native Windows x64 clients on JDK 21 against Linux Collector/Agent processes on Java 8. Stored timestamps and numeric values matched an independent wire reference after the test service stopped; empty intervals, unrecorded counters and authentication failures were also checked. These history checks have not been run across the other releases in the table. See [counter history](counter-history.md).
+Past counter history and resumable export use the opt-in Kotlin `counterHistorySmoke`. All **18 releases** above are checked on Linux Java 8 with matching Agents and a Linux JDK 21 CLI: stored timestamps/numeric strings against a direct wire reference, MB units, half-open boundaries, empty windows, unrecorded counters, missing objects, authentication failure, a two-day chunk boundary, budgeted export/resume, unchanged committed bytes and repeated completion. Each fixture generates real HTTP/JDBC traffic and stops its service before comparing samples.
 
-Resumable counter export (`counter export`) is checked separately on the same two anchor releases. Live checks cover five local-day chunks, actual Collector stop/restart, Linux-to-Windows resume, unchanged checkpointed files, repeated completion, query mismatch and corruption rejection. Seven stored samples per release matched the independent wire reference. See [resumable counter export](counter-export.md); these checks do not certify history/export on all 18 releases.
+Full Collector stop/restart, query mismatch and corruption rejection are additional checks on **2.8.1 and 2.21.3**. Native Windows JDK 21 clients are checked separately on those two releases, including Linux-to-Windows resume across multiple windows. Windows/macOS coverage is not implied for the other 16 releases. See [counter history](counter-history.md) and [resumable counter export](counter-export.md).
 
 ## Limits
 
@@ -65,10 +65,18 @@ export SCOUTER_SERVICE_CLASSPATH="$(./gradlew -q legacyFixtureClasspath)"
 ./gradlew agentInspectionSmoke -PscouterRoot="$SCOUTER_SOURCE"
 # Counter reads, optionally with real HTTP load:
 SCOUTER_COUNTER_LOAD=true ./gradlew counterSmoke -PscouterRoot="$SCOUTER_SOURCE"
+# Stored counter history, units, boundaries and checkpointed multi-day export:
+./gradlew counterHistorySmoke
+# Add actual Collector stop/restart and damaged-file checks on representative releases:
+SCOUTER_COUNTER_RECOVERY=true ./gradlew counterHistorySmoke
 ```
 
 `JAVA8`, `SCOUTER_DIST` and `SCOUTER_SOURCE` refer to your Java 8 installation, extracted distribution and built Scouter source checkout. The legacy JDBC dependency is test-only and is excluded from the CLI package. Build/run Gradle with JDK 21.
 
-For Servlet checks on the compatible releases, use `springSmoke` with a built Java 21-capable Agent from the source checkout. `recoverySmoke` adds actual Collector stop/restart to that scenario. `collectorInspectionSmoke` starts only the Collector and checks status, settings, authentication and unchanged configuration/account files; it does not start an Agent or application. The optional `SCOUTER_SERVICE_*` and `SCOUTER_AGENT_JAR` overrides apply to `agentSmoke`, `agentInspectionSmoke` and `counterSmoke`, not `springSmoke`.
+For Servlet checks on the compatible releases, use `springSmoke` with a built Java 21-capable Agent from the source checkout. `recoverySmoke` adds actual Collector stop/restart to that scenario. `collectorInspectionSmoke` starts only the Collector and checks status, settings, authentication and unchanged configuration/account files; it does not start an Agent or application. The optional `SCOUTER_SERVICE_*` and `SCOUTER_AGENT_JAR` overrides apply to `agentSmoke`, `agentInspectionSmoke`, `counterSmoke` and `counterHistorySmoke`, not `springSmoke`.
 
 See [Capture recovery](capture-recovery.md), [Local CI](local-ci.md) and [protocol library provenance](../vendor/README.md).
+
+`counterHistorySmoke` uses the configured `SCOUTER_COLLECTOR_*`, `SCOUTER_AGENT_JAR` and `SCOUTER_SERVICE_*` values; with all overrides set, it does not require a Scouter source checkout. It prints an isolated evidence directory containing the raw CLI output, reference TSV, export files, summary and teardown state. Fixture processes stop and the temporary account file is removed in `finally`. The test never targets an existing running Collector or its data.
+
+Run the external Collector smoke separately from the protocol unit suite: both allocate temporary local ports, and launching both concurrently can cause a fixture bind collision. The optional recovery mode waits for the Collector's periodic index flush, then requires the restarted independent reference to match; immediate readability is not a disk-durability guarantee. No Collector fixture is downloaded or launched by ordinary `test` or hosted CI.

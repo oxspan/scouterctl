@@ -210,6 +210,15 @@ tasks.register<JavaExec>("counterSmoke") {
         layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
 }
 
+tasks.register<JavaExec>("counterHistorySmoke") {
+    dependsOn(tasks.testClasses, "fatJar")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.AgentSmokeKt")
+    args(providers.gradleProperty("scouterRoot").getOrElse("../scouter"), "--counter-history-only")
+    systemProperty("cli.jar", providers.gradleProperty("cliJar").getOrElse(
+        layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
+}
+
 // Opt-in Windows x64 packaging; ordinary Kotlin builds do not need a native toolchain.
 val zigHome = providers.gradleProperty("zigHome")
 val windowsJdkHome = providers.gradleProperty("windowsJdkHome").orElse(
