@@ -12,7 +12,7 @@ This contract describes the current CLI boundary for scripts. It is separate fro
 
 ## Single-result commands
 
-`collector status`, `collector config`, `agent status`, `agent config`, `counter list`, `counter get`, `doctor`, `auth login`, `object list`, `profile get`, `capture`, `context add/list/use`, and the `inspect` family emit one result or one error object.
+`collector status`, `collector config`, `agent status`, `agent config`, `counter list`, `counter get`, `counter export`, `doctor`, `auth login`, `object list`, `profile get`, `capture`, `context add/list/use`, and the `inspect` family emit one result or one error object.
 
 ```json
 {"schemaVersion":"scouterctl.result/v1","ok":true,"data":{},"executionComplete":true}
@@ -63,6 +63,8 @@ A successful stream has exactly one final `complete` event and exit 0. Failure a
 A consumer should accept the stream schema, process records, then require both the final `complete` event and exit 0 before marking the query complete. Use `capture` and its checkpoints when resumable extraction is needed.
 
 `counter history` uses its own `scouterctl.counter-stream/v1` schema with the same start/record/complete lifecycle. Its start includes the dated target and counter metadata, and records contain stored timestamps and numeric strings. See [counter history](counter-history.md) for missing values, units and query limits. XLog stream fields and schemas are unchanged.
+
+`counter export` returns a single manifest result and writes JSONL chunk files. Its `scouterctl.counter-capture/v1` format is separate from XLog captures. See [resumable counter export](counter-export.md) for budgets, checkpoints and completion semantics.
 
 ## Values and evolution
 

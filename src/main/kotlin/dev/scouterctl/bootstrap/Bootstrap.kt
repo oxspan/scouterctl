@@ -17,7 +17,7 @@ fun runCli(args: Array<String>) {
         ContextCommands(contexts, output),
         OfflineCommands(::EvidenceStore, output),
         OnlineCommands(contexts, { endpoint, password -> CollectorSource.connect(endpoint, password, BuildInfo.version) },
-            ::CaptureStore, ::EvidenceStore, TerminalPasswordInput(), output),
+            ::CaptureStore, ::EvidenceStore, ::CounterCaptureStore, TerminalPasswordInput(), output),
     )
     val command = CommandLine(Cli(dispatcher, output))
     command.commandSpec.version("scouterctl ${BuildInfo.version}")

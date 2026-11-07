@@ -21,6 +21,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 enum class Fault {
+    COUNTER_EXPORT,
     HISTORY_EMPTY, HISTORY_MALFORMED, HISTORY_TIME_TYPE, HISTORY_OUTSIDE, HISTORY_NAN, HISTORY_TARGET_DUPLICATE,
     COUNTER_MALFORMED, COUNTER_DUPLICATE, COUNTER_NAN, COUNTER_XML_DTD, COUNTER_EMPTY, COUNTER_CUSTOM,
     AGENT_OFFLINE, AGENT_NO_RESPONSE, AGENT_JVM_MALFORMED, AGENT_DUPLICATE,
@@ -135,10 +136,11 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                     """<Counters><Types><ObjectType name="java" family="javaee"><Counter name="HeapUsed" disp="Custom heap" unit="bytes"/></ObjectType></Types></Counters>""".toByteArray()))
                             })
                             RequestCmd.OBJECT_LIST_LOAD_DATE -> {
-                                check(input.readMapPack().getText("date") == "20260101")
+                                val storageDate = input.readMapPack().getText("date")
+                                if (fault != Fault.COUNTER_EXPORT) check(storageDate == "20260101")
                                 send(output, MapPack().apply {
                                     val hashes = newList("objHash"); val names = newList("objName"); val types = newList("objType")
-                                    repeat(if (fault == Fault.HISTORY_TARGET_DUPLICATE) 2 else 1) {
+                                    repeat(if (fault == Fault.COUNTER_EXPORT && storageDate != "20260102") 0 else if (fault == Fault.HISTORY_TARGET_DUPLICATE) 2 else 1) {
                                         hashes.add(42L); names.add("/historical-fixture"); types.add("java")
                                     }
                                 })
@@ -146,11 +148,16 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                             RequestCmd.COUNTER_PAST_TIME -> {
                                 val request = input.readMapPack()
                                 check(request.getInt("objHash") == 42)
-                                check(request.getLong("stime") == 1767225600000L)
-                                check(request.getLong("etime") == 1767225659999L)
+                                if (fault != Fault.COUNTER_EXPORT) {
+                                    check(request.getLong("stime") == 1767225600000L)
+                                    check(request.getLong("etime") == 1767225659999L)
+                                }
                                 send(output, MapPack().apply {
                                     val times = newList("time"); val values = newList("value")
-                                    if (fault != Fault.HISTORY_EMPTY && request.getText("counter") != "missing") {
+                                    if (fault == Fault.COUNTER_EXPORT) {
+                                        times.add(request.getLong("stime")); values.add(9007199254740993L)
+                                        times.add(request.getLong("etime")); values.add(0L)
+                                    } else if (fault != Fault.HISTORY_EMPTY && request.getText("counter") != "missing") {
                                         times.add(1767225600000L); values.add(9007199254740993L)
                                         times.add(1767225610000L); values.add(0L)
                                         times.add(1767225630000L); values.add("private-history-text")

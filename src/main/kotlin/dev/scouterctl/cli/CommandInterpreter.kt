@@ -14,6 +14,18 @@ internal fun Cli.interpret(): CommandRequest {
         allowedOptions(setOf("--before", "--after", "--limit", "--include-text", "--no-input"))
         return OfflineRequest.Compare(required(before, "--before"), required(after, "--after"), ComparisonOptions(limit ?: 20, includeText))
     }
+    if (command == "counter export") {
+        allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input",
+            "--object-hash", "--counter", "--from", "--to", "--timezone", "--directory", "--resume", "--chunk-minutes", "--max-chunks"))
+        val budget = maxChunks ?: 24
+        if (budget !in 1..10000) invalid("Use max-chunks 1..10000")
+        val query = CounterExportQuery(Instant.parse(required(from, "--from")).toEpochMilli(),
+            Instant.parse(required(to, "--to")).toEpochMilli(), required(timezone, "--timezone"),
+            required(objHash, "--object-hash"), required(counterName, "--counter"), chunkMinutes ?: 60)
+        query.windows()
+        return OnlineRequest.CounterExport(query, required(directory, "--directory"), resume, budget)
+    }
+    if (chunkMinutes != null || maxChunks != null) invalid("--chunk-minutes and --max-chunks require counter export")
     if (command == "counter history") {
         allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input",
             "--object-hash", "--counter", "--date", "--from", "--to", "--timezone"))
@@ -28,7 +40,7 @@ internal fun Cli.interpret(): CommandRequest {
         if (counter != null && (counter.isBlank() || counter.length > 256 || counter.any(Char::isISOControl))) invalid("Invalid counter name")
         return OnlineRequest.Counters(required(objHash, "--object-hash"), counter)
     }
-    if (counterName != null) invalid("--counter requires counter get or counter history")
+    if (counterName != null) invalid("--counter requires counter get, counter history or counter export")
     if (command in setOf("collector status", "collector config", "agent status", "agent config")) {
         allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input") +
             (if (command.endsWith("config")) setOf("--key") else emptySet()) +

@@ -37,3 +37,11 @@ interface ContextRepository {
     fun read(): ContextConfig
     fun update(change: (ContextConfig) -> ContextConfig): ContextConfig
 }
+
+interface CounterCaptureRepository : AutoCloseable {
+    fun create()
+    fun load(): CounterCaptureManifest
+    fun save(manifest: CounterCaptureManifest)
+    fun writeChunk(index: Int, points: List<CounterPoint>): CounterChunkFile
+    fun validate(manifest: CounterCaptureManifest)
+}

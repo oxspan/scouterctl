@@ -57,4 +57,4 @@ class CommandDispatchTest : FunSpec({
 private fun dispatchForTest(contexts: () -> ContextRepository, evidence: (Path) -> EvidenceRepository,
     source: (Endpoint, String) -> ObservationSource, password: PasswordInput, output: JsonOutput): CommandDispatcher =
     CommandDispatcher(ContextCommands(contexts, output), OfflineCommands(evidence, output),
-        OnlineCommands(contexts, source, { error("Unexpected v1 capture") }, evidence, password, output))
+        OnlineCommands(contexts, source, { error("Unexpected v1 capture") }, evidence, { error("Unexpected counter export") }, password, output))

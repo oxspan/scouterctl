@@ -31,7 +31,7 @@ The final event has `type: "complete"`, `executionComplete: true`, `records`, `u
 
 ## Limits
 
-This is a bounded, single-object, single-counter, single-day query. The whole reply is decoded and buffered before JSONL output. Replies with more than 100,000 samples are rejected after decoding; this does not bound decoding memory or Collector-side work. Existing blob limits are not a total-reply size limit. Oversized or malformed replies fail without a successful completion event. There is no pagination, retry, checkpoint or resume for this command.
+This is a bounded, single-object, single-counter, single-day query. The whole reply is decoded and buffered before JSONL output. Replies with more than 100,000 samples are rejected after decoding; this does not bound decoding memory or Collector-side work. Existing blob limits are not a total-reply size limit. Oversized or malformed replies fail without a successful completion event. There is no pagination, retry, checkpoint or resume for this command. Use [counter export](counter-export.md) for multi-day files and checkpointed resume.
 
 A missing daily object returns `NOT_FOUND`. An empty interval or an unrecorded counter produces a complete stream with zero records. That does not prove that the counter existed, traffic was absent, retention was complete, or collection was lossless. Current metadata can differ from metadata at collection time.
 

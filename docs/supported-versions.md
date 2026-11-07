@@ -31,6 +31,8 @@ Real-time counter reads use `counterSmoke` with matching Agents on Java 8. The s
 
 Past counter samples (`counter history`) have separate live checks on **2.8.1 and 2.21.3**, using Linux and native Windows x64 clients on JDK 21 against Linux Collector/Agent processes on Java 8. Stored timestamps and numeric values matched an independent wire reference after the test service stopped; empty intervals, unrecorded counters and authentication failures were also checked. These history checks have not been run across the other releases in the table. See [counter history](counter-history.md).
 
+Resumable counter export (`counter export`) is checked separately on the same two anchor releases. Live checks cover five local-day chunks, actual Collector stop/restart, Linux-to-Windows resume, unchanged checkpointed files, repeated completion, query mismatch and corruption rejection. Seven stored samples per release matched the independent wire reference. See [resumable counter export](counter-export.md); these checks do not certify history/export on all 18 releases.
+
 ## Limits
 
 - Versions absent from the table, including snapshots and unverified patch releases, are rejected with `VERSION_MISMATCH` and exit 9.
