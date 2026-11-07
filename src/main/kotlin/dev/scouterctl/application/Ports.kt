@@ -8,6 +8,7 @@ interface ObservationSource : AutoCloseable {
     fun settings(): List<RuntimeSetting>
     fun agentStatus(objHash: Int): AgentStatus
     fun agentSettings(objHash: Int): AgentConfiguration
+    fun counterHistory(query: CounterHistoryQuery): CounterHistory
     fun realtimeCounters(objHash: Int): RealtimeCounters
     fun objects(): List<ObjectRecord>
     fun page(query: Query, cursor: Cursor): XLogPage

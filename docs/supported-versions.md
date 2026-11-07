@@ -29,6 +29,8 @@ Collector status and runtime-settings inspection are validated separately with `
 
 Real-time counter reads use `counterSmoke` with matching Agents on Java 8. The same 18 releases are checked for counter definitions/units, list/get, heap samples, missing counters/targets, authentication and unchanged configuration. The 2.8.1 and 2.21.3 checks also send real slow/SQL/error HTTP traffic and observe positive TPS, response time and error-rate aggregates. Native Windows and Linux clients are checked on those two releases. The JVM/OS scope remains the same as above.
 
+Past counter samples (`counter history`) have separate live checks on **2.8.1 and 2.21.3**, using Linux and native Windows x64 clients on JDK 21 against Linux Collector/Agent processes on Java 8. Stored timestamps and numeric values matched an independent wire reference after the test service stopped; empty intervals, unrecorded counters and authentication failures were also checked. These history checks have not been run across the other releases in the table. See [counter history](counter-history.md).
+
 ## Limits
 
 - Versions absent from the table, including snapshots and unverified patch releases, are rejected with `VERSION_MISMATCH` and exit 9.

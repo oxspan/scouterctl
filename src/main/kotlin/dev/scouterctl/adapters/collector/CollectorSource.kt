@@ -140,6 +140,17 @@ class CollectorSource private constructor(private val socket: Socket, private va
         AgentConfiguration(agent, parseSettings(response, ::agentSettingValueIsVisible))
     }
 
+    override fun counterHistory(query: CounterHistoryQuery): CounterHistory = collectorOperation {
+        val targets = exchange(RequestCmd.OBJECT_LIST_LOAD_DATE, MapPack().apply { put("date", query.date) })
+        val target = decodeCounterTarget(query.objHash, targets)
+        val metadata = exchange(RequestCmd.GET_XML_COUNTER)
+        val response = exchange(RequestCmd.COUNTER_PAST_TIME, MapPack().apply {
+            put("objHash", query.objHash.toLong()); put("counter", query.counter)
+            put("stime", query.from); put("etime", query.to - 1)
+        })
+        decodeCounterHistory(query, target, metadata, response)
+    }
+
     override fun realtimeCounters(objHash: Int): RealtimeCounters = collectorOperation {
         val agent = agent(objHash)
         val metadata = exchange(RequestCmd.GET_XML_COUNTER)

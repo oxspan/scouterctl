@@ -22,6 +22,7 @@ sealed interface OnlineRequest : CommandRequest {
     data class CollectorConfig(val key: String?) : OnlineRequest
     data class AgentStatus(val objHash: Int) : OnlineRequest
     data class AgentConfig(val objHash: Int, val key: String?) : OnlineRequest
+    data class CounterHistory(val query: CounterHistoryQuery) : OnlineRequest
     data class Counters(val objHash: Int, val name: String?) : OnlineRequest
     data object Objects : OnlineRequest
     data class Profile(val date: String, val txid: Long, val includeText: Boolean) : OnlineRequest
