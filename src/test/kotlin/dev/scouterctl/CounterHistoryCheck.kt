@@ -59,6 +59,9 @@ internal fun verifyCounterHistory(work: Path, endpoint: Endpoint, password: Stri
     val boundary = reference.first().time
     val exact = run("boundary", listOf("counter", "history") + target + window(boundary, boundary + 1))
     check(sampleRows(exact) == reference.filter { it.time == boundary })
+    val upper = reference.first { it.time > boundary }.time
+    val prefix = run("exclusive-to", listOf("counter", "history") + target + window(boundary, upper))
+    check(sampleRows(prefix) == reference.filter { it.time >= boundary && it.time < upper })
     val empty = run("empty", listOf("counter", "history") + target + window(boundary + 1, boundary + 2))
     check(reference.none { it.time in boundary + 1 until boundary + 2 } && sampleRows(empty).isEmpty())
     val missing = run("missing-counter", history.map { if (it == "HeapUsed") "scouterctl_missing_counter" else it })
