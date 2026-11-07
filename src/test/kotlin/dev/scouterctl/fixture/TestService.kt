@@ -3,7 +3,7 @@ package dev.scouterctl.fixture
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.nio.file.Files
-import java.nio.file.Path
+import java.nio.file.Paths
 import java.sql.DriverManager
 import java.util.concurrent.Executors
 
@@ -25,7 +25,8 @@ fun main(args: Array<String>) {
         exchange.close()
     }
     server.start()
-    Files.writeString(Path.of(args.single()), server.address.port.toString())
+    Files.write(Paths.get(args.single()), server.address.port.toString().toByteArray())
+    Files.write(Paths.get(args.single() + ".java-version"), System.getProperty("java.version").toByteArray())
 }
 
 class TestService {

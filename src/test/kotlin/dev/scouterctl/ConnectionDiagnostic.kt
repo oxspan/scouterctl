@@ -1,5 +1,8 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.json.*
 
 // Project only known fields and reasons; raw output, arguments and exception messages can contain secrets.

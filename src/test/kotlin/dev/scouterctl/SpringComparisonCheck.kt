@@ -1,5 +1,10 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.application.*
+import dev.scouterctl.adapters.files.*
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.json.*
 import scouter.util.HashUtil
 import java.net.URI
@@ -37,7 +42,7 @@ internal class SpringComparisonCheck(private val work: Path) {
                         "--to", Instant.now().plusMillis(1).toString(), "--timezone", "UTC", "--object-hash", objectHash.toString())
                     val rows = cli.run("comparison-$phase-xlogs", listOf("xlog", "search") + window)
                         .filter { it["type"]?.jsonPrimitive?.content == "record" }
-                        .map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
+                        .map { json.decodeFromJsonElement<XLogRecordDto>(it["data"]!!).toModel() }
                     if (rows.size == 4 + failures) {
                         check(rows.count { it.serviceHash == serviceHash } == 4)
                         check(rows.count { it.errorHash != 0 } == failures)
@@ -59,7 +64,7 @@ internal class SpringComparisonCheck(private val work: Path) {
         val args = listOf("inspect", "compare", "--before", before.toString(), "--after", after.toString())
         val resolved = runOfflineCli(work, args + "--include-text")
         check(resolved.exit == 0 && resolved.stderr.isEmpty())
-        val comparison = json.decodeFromJsonElement<CaptureComparison>(resolved.data())
+        val comparison = json.decodeFromJsonElement<CaptureComparisonDto>(resolved.data()).toModel()
         check(comparison.before.capturedRecords == 5 && comparison.after.capturedRecords == 7)
         check(comparison.before.capturedErrors == 1 && comparison.after.capturedErrors == 3)
         check(comparison.totalServices == 2 && comparison.complete)
@@ -81,7 +86,7 @@ internal class SpringComparisonCheck(private val work: Path) {
         check(structural.exit == 0 && !structural.output.contains("/poc/comparison"))
         val identity = runOfflineCli(work, listOf("inspect", "compare", "--before", before.toString(), "--after", before.toString()))
         check(identity.exit == 0)
-        check(json.decodeFromJsonElement<CaptureComparison>(identity.data()).services.all {
+        check(json.decodeFromJsonElement<CaptureComparisonDto>(identity.data()).toModel().services.all {
             it.delta == ServiceDelta(0, 0, 0.0, 0L, 0.0, 0L)
         })
         check(listOf(before, after).all { fingerprints(it) == original[it] })

@@ -1,5 +1,10 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.bootstrap.BuildInfo
+import dev.scouterctl.adapters.collector.CollectorSource
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import scouter.util.CipherUtil
@@ -21,7 +26,8 @@ import java.util.concurrent.TimeUnit
 
 /** End-to-end HTTP -> real javaagent -> Collector -> packaged CLI, without synthetic telemetry. */
 fun main(args: Array<String>) {
-    val upstream = Path.of(args.single()).toAbsolutePath().normalize()
+    val upstream = Path.of(args.first()).toAbsolutePath().normalize()
+    val hostCounters = args.drop(1) == listOf("--host-counters")
     val work = Files.createTempDirectory("scouterctl-agent-smoke-")
     Files.createDirectory(work.resolve("conf"))
     val port = ServerSocket(0).use { it.localPort }
@@ -58,21 +64,46 @@ fun main(args: Array<String>) {
         trace_sampling_enabled=false
         profile_step_max_count=1000
     """.trimIndent())
+    if (hostCounters) {
+        Files.createDirectory(work.resolve("registry"))
+        Files.writeString(work.resolve("agent.conf"), "\ncounter_object_registry_path=${work.resolve("registry")}\n", java.nio.file.StandardOpenOption.APPEND)
+    }
     val java = Path.of(System.getProperty("java.home"), "bin/java").toString()
     val collectorJava = System.getenv("SCOUTER_COLLECTOR_JAVA") ?: java
-    val cp = listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
+    val cp = System.getenv("SCOUTER_COLLECTOR_CLASSPATH") ?: listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
         upstream.resolve("scouter.common/target/scouter-common-2.21.3.jar"), upstream.resolve("scouter.server/target/lib/*")).joinToString(":")
-    val collector = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")
-        .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("collector.log").toFile()).start()
+    fun launchCollector() = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")
+        .directory(work.toFile()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(work.resolve("collector.log").toFile())).start()
+    var collector = launchCollector()
     var service: Process? = null
+    var host: Process? = null
     println("Evidence: $work")
     try {
         val endpoint = Endpoint("127.0.0.1", port, "poc", 1500)
-        eventually("Collector login") { CollectorSource.connect(endpoint, password).use { it.info.serverId == "scouterctl-agent-smoke" } }
-        val agent = upstream.resolve("scouter.agent.java/target/scouter.agent.jar")
+        eventually("Collector login") { CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-agent-smoke" } }
+        if (hostCounters) {
+            val home = Files.createDirectory(work.resolve("host"))
+            Files.writeString(home.resolve("host.conf"), """
+                net_collector_ip=127.0.0.1
+                net_collector_tcp_port=$port
+                net_collector_udp_port=$udp
+                obj_name=scouterctl-host-fixture
+                counter_object_registry_path=${work.resolve("registry")}
+                log_dir=${home.resolve("logs")}
+            """.trimIndent())
+            val hostJar = System.getenv("SCOUTER_HOST_JAR") ?: error("Set SCOUTER_HOST_JAR to the matching official Host Agent JAR")
+            val hostJava = System.getenv("SCOUTER_HOST_JAVA") ?: collectorJava
+            host = ProcessBuilder(hostJava, "-Xmx128m", "-Duser.timezone=UTC", "-Dscouter.config=${home.resolve("host.conf")}",
+                "-cp", hostJar, "scouter.boot.Boot", home.resolve("lib").toString())
+                .directory(home.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("host.log").toFile()).start()
+        }
+        val agent = System.getenv("SCOUTER_AGENT_JAR")?.let(Path::of)
+            ?: upstream.resolve("scouter.agent.java/target/scouter.agent.jar")
         check(Files.isRegularFile(agent)) { "Build Java 21 agent first: $agent" }
-        service = ProcessBuilder(java, "-Xmx128m", "-Duser.timezone=UTC", "-javaagent:$agent",
-            "-Dscouter.config=${work.resolve("agent.conf")}", "-cp", System.getProperty("java.class.path"),
+        val serviceJava = System.getenv("SCOUTER_SERVICE_JAVA") ?: java
+        val serviceClasspath = System.getenv("SCOUTER_SERVICE_CLASSPATH") ?: System.getProperty("java.class.path")
+        service = ProcessBuilder(serviceJava, "-Xmx128m", "-Duser.timezone=UTC", "-javaagent:$agent",
+            "-Dscouter.config=${work.resolve("agent.conf")}", "-cp", serviceClasspath,
             "dev.scouterctl.fixture.TestServiceKt", work.resolve("http-port").toString())
             .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("service.log").toFile()).start()
         eventually("HTTP service startup") { Files.exists(work.resolve("http-port")) }
@@ -83,10 +114,43 @@ fun main(args: Array<String>) {
             check(http.send(request("/health"), HttpResponse.BodyHandlers.ofString()).statusCode() == 200)
             var objectHash = 0
             eventually("instrumented object discovery") {
-                CollectorSource.connect(endpoint, password).use { source ->
+                CollectorSource.connect(endpoint, password, BuildInfo.version).use { source ->
                     source.objects().singleOrNull { it.objName.endsWith("/scouterctl-fixture") && it.alive }
                         ?.also { objectHash = it.objHash } != null
                 }
+            }
+            if (hostCounters) {
+                verifyHostCounters(work, endpoint, password, objectHash, httpPort)
+                return
+            }
+            if (args.drop(1) == listOf("--counter-history-only")) {
+                fun stop(process: Process) {
+                    process.destroy()
+                    if (!process.waitFor(10, TimeUnit.SECONDS)) process.destroyForcibly().waitFor(5, TimeUnit.SECONDS)
+                    check(!process.isAlive) { "Fixture process did not stop" }
+                }
+                verifyCounterHistory(work, endpoint, password, objectHash, httpPort,
+                    stopService = { stop(checkNotNull(service)) }, stopCollector = { stop(collector) },
+                    startCollector = {
+                        collector = launchCollector()
+                        eventually("Collector restart") {
+                            CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-agent-smoke" }
+                        }
+                    })
+                return
+            }
+            if (args.drop(1) == listOf("--counter-only")) {
+                verifyRealtimeCounters(work, endpoint, password, objectHash, httpPort)
+                return
+            }
+            if (args.drop(1) == listOf("--inspection-only")) {
+                eventually("Agent JVM response") {
+                    CollectorSource.connect(endpoint, password, BuildInfo.version).use {
+                        it.agentStatus(objectHash).jvmAvailability == AgentJvmAvailability.AVAILABLE
+                    }
+                }
+                verifyAgentInspection(work, endpoint, password, objectHash)
+                return
             }
             val from = System.currentTimeMillis()
             val expected = linkedMapOf("/poc/ok" to 18, "/poc/slow" to 6, "/poc/error" to 6, "/poc/sql" to 6)
@@ -102,9 +166,9 @@ fun main(args: Array<String>) {
             val date = Instant.ofEpochMilli(from).atZone(ZoneOffset.UTC).toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
             eventually("all 36 agent-generated XLogs persisted") {
                 to = System.currentTimeMillis() + 1
-                CollectorSource.connect(endpoint, password).use {
+                CollectorSource.connect(endpoint, password, BuildInfo.version).use {
                     val observed = it.page(Query(date, from, to, "UTC", objectHash, 100), Cursor()).records
-                    Files.writeString(work.resolve("ingestion-observed.json"), json.encodeToString(observed))
+                    Files.writeString(work.resolve("ingestion-observed.json"), json.encodeToString(observed.map { it.toDto() }))
                     observed.size == 36
                 }
             }
@@ -115,7 +179,7 @@ fun main(args: Array<String>) {
                 "--timezone", "UTC", "--object-hash", objectHash.toString(), "--page-size", "5")
             val events = cli.run("xlogs", listOf("xlog", "search") + window)
             val rows = events.filter { it["type"]?.jsonPrimitive?.content == "record" }
-                .map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
+                .map { json.decodeFromJsonElement<XLogRecordDto>(it["data"]!!).toModel() }
             check(rows.size == 36 && rows.map { it.txid }.toSet().size == 36)
             expected.forEach { (route, count) -> check(rows.count { it.serviceHash == HashUtil.hash(route) } == count) { "Wrong count for $route" } }
             check(rows.filter { it.serviceHash == HashUtil.hash("/poc/slow") }.all { it.elapsed >= 180 })
@@ -127,7 +191,7 @@ fun main(args: Array<String>) {
             }
             val boundaryRows = cli.run("xlogs-boundary", listOf("xlog", "search") + boundaryWindow)
                 .filter { it["type"]?.jsonPrimitive?.content == "record" }
-                .map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
+                .map { json.decodeFromJsonElement<XLogRecordDto>(it["data"]!!).toModel() }
             check(boundaryRows == rows.filter { it.endTime == boundary })
             val emptyWindow = window.toMutableList().apply { set(indexOf("--object-hash") + 1, "0") }
             val empty = cli.run("xlogs-empty", listOf("xlog", "search") + emptyWindow)
@@ -135,16 +199,16 @@ fun main(args: Array<String>) {
             for (route in expected.keys) {
                 val row = rows.first { it.serviceHash == HashUtil.hash(route) }
                 val event = cli.run("profile-${route.substringAfterLast('/')}", listOf("profile", "get", "--date", date, "--txid", row.txid)).single()
-                val profile = json.decodeFromJsonElement<ProfileRecord>(event["data"]!!)
+                val profile = json.decodeFromJsonElement<ProfileRecordDto>(event["data"]!!).toModel()
                 check(profile.steps.any { it.type.startsWith("METHOD") }) { "Missing method instrumentation: $route" }
                 if (route == "/poc/sql") check(profile.steps.any { it.type.startsWith("SQL") }) { "Missing JDBC instrumentation" }
             }
             val captureArgs = listOf("capture", "--directory", work.resolve("capture").toString()) + window
             cli.run("capture-first", captureArgs + listOf("--max-pages", "2"), 8)
             cli.run("capture-resume", captureArgs + listOf("--resume", "--max-pages", "40"))
-            val manifest = json.decodeFromString<CaptureManifest>(Files.readString(work.resolve("capture/manifest.json")))
+            val manifest = json.decodeFromString<CaptureManifestDto>(Files.readString(work.resolve("capture/manifest.json"))).toModel()
             val captured = manifest.files.flatMap { Files.readAllLines(work.resolve("capture").resolve(it.name)) }
-                .map { json.decodeFromString<XLogRecord>(it) }
+                .map { json.decodeFromString<XLogRecordDto>(it).toModel() }
             check(manifest.executionComplete && captured == rows)
             AgentCli(work, port, "invalid-fixture-password").run("wrong-password", listOf("doctor"), 3)
             val files = Files.list(work).use { paths -> paths.filter { it.toString().endsWith(".jsonl") }.toList() }
@@ -156,12 +220,12 @@ fun main(args: Array<String>) {
                 put("methodAndJdbcProfiles", true); put("credentialsAndBindExcluded", true)
                 put("receivedAfterHttpCompletion", rows.count { it.endTime >= httpCompletedAt })
                 put("halfOpenBoundaryRecords", boundaryRows.size); put("emptyQueryComplete", true)
-                put("agentJvm", System.getProperty("java.version")); put("collectorVersion", manifest.source.version)
+                put("agentJvm", Files.readString(work.resolve("http-port.java-version"))); put("collectorVersion", manifest.source.version)
             }.toString())
             println("PASS: 36 real HTTP requests, 36 unique XLogs, 6 errors, slow timings, method/JDBC profiles, 8-page capture/resume, auth failure, redaction")
         }
     } finally {
-        for (process in listOfNotNull(service, collector)) {
+        for (process in listOfNotNull(service, host, collector)) {
             process.destroy()
             if (!process.waitFor(10, TimeUnit.SECONDS)) { process.destroyForcibly(); process.waitFor(5, TimeUnit.SECONDS) }
             check(!process.isAlive) { "Fixture process did not stop" }
@@ -170,6 +234,7 @@ fun main(args: Array<String>) {
         Files.writeString(work.resolve("teardown.json"), buildJsonObject {
             put("collectorPid", collector.pid()); put("collectorStopped", !collector.isAlive)
             put("servicePid", service?.pid()); put("serviceStopped", service?.isAlive != true)
+            put("hostPid", host?.pid()); put("hostStopped", host?.isAlive != true)
         }.toString())
         println("Fixture processes stopped")
     }

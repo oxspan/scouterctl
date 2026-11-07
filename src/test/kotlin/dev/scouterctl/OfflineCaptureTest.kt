@@ -1,5 +1,9 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.files.*
+import dev.scouterctl.adapters.serialization.*
+
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
@@ -25,7 +29,7 @@ class OfflineCaptureTest : FunSpec({
                 val result = runOfflineCli(work, args)
                 result.exit shouldBe 0
                 result.stderr shouldBe ""
-                val inspection = json.decodeFromJsonElement<Inspection>(result.data())
+                val inspection = json.decodeFromJsonElement<InspectionDto>(result.data()).toModel()
                 inspection.record.xlog.txid shouldBe txid.toString()
                 inspection.record.profileStatus shouldBe ProfileAvailability.AVAILABLE
                 inspection.record.profile!!.steps.mapNotNull { it.sql } shouldBe listOf(
@@ -34,7 +38,7 @@ class OfflineCaptureTest : FunSpec({
                 if (text) {
                     val resolved = runOfflineCli(work, args + "--include-text")
                     resolved.exit shouldBe 0
-                    val profile = json.decodeFromJsonElement<Inspection>(resolved.data()).record.profile!!
+                    val profile = json.decodeFromJsonElement<InspectionDto>(resolved.data()).toModel().record.profile!!
                     profile.transaction!!.service shouldBe DictionaryText(10, "/fixture<GET>")
                     profile.steps[1].sql!!.statement shouldBe DictionaryText(123, "select marker from fixture where id = ?")
                     profile.steps[2].sql!!.error shouldBe DictionaryText(-789, "fixture duplicate key error")
@@ -93,7 +97,7 @@ class OfflineCaptureTest : FunSpec({
                 cli.run(server, args).exit shouldBe 8
                 val missing = runOfflineCli(work, listOf("inspect", "--directory", directory.toString(), "--txid", WireFixture.ids[1].toString()))
                 missing.exit shouldBe 8
-                val inspection = json.decodeFromJsonElement<Inspection>(missing.data())
+                val inspection = json.decodeFromJsonElement<InspectionDto>(missing.data()).toModel()
                 inspection.captureExecutionComplete shouldBe true
                 inspection.unavailableProfiles shouldBe 1
                 inspection.record.profileStatus shouldBe ProfileAvailability.UNAVAILABLE

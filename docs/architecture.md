@@ -12,30 +12,60 @@ flowchart LR
     Bundle --> Inspect[Offline inspect, search, summary, compare]
 ```
 
-Online commands authenticate to the Collector and issue read requests. `capture` writes local files; offline commands read captures without authentication or a Collector connection. The client supports Collector 2.21.3 and rejects other online versions. The Collector TCP transport has no built-in TLS; use a trusted network or a tunnel.
+Online commands authenticate to the Collector and issue read requests. `capture` writes local files; offline commands read captures without authentication or a Collector connection. The client accepts the [tested Collector releases](supported-versions.md) and rejects unverified online versions. The Collector TCP transport has no built-in TLS; use a trusted network or a tunnel.
 
-## Application components
+## Dependency boundaries
 
-The project has one Gradle application module. The following files group its current responsibilities:
+The project remains one Gradle module with the `dev.scouterctl.MainKt` entrypoint. Dependencies point inward; [Bootstrap.kt](../src/main/kotlin/dev/scouterctl/bootstrap/Bootstrap.kt) constructs the concrete objects.
 
-| Component | Responsibility |
-| --- | --- |
-| [Main.kt](../src/main/kotlin/dev/scouterctl/Main.kt) | picocli argument parsing, command dispatch, JSON/JSONL output and exit codes |
-| [ConnectionOptions.kt](../src/main/kotlin/dev/scouterctl/ConnectionOptions.kt), [ContextStore.kt](../src/main/kotlin/dev/scouterctl/ContextStore.kt) | Endpoint selection, explicit hidden password input, local named connections |
-| [CollectorSource.kt](../src/main/kotlin/dev/scouterctl/CollectorSource.kt) | `ObservationSource` implementation using Collector TCP and the pinned Scouter binary codec |
-| [Capture.kt](../src/main/kotlin/dev/scouterctl/Capture.kt), [EvidenceCapture.kt](../src/main/kotlin/dev/scouterctl/EvidenceCapture.kt) | Paged transaction export, profile capture, checkpoints and resume |
-| [EvidenceStore.kt](../src/main/kotlin/dev/scouterctl/EvidenceStore.kt), [EvidenceModel.kt](../src/main/kotlin/dev/scouterctl/EvidenceModel.kt) | V2 manifests/pages, checksums and record integrity validation |
-| [Inspect.kt](../src/main/kotlin/dev/scouterctl/Inspect.kt), [EvidenceSearch.kt](../src/main/kotlin/dev/scouterctl/EvidenceSearch.kt) | Offline profile lookup and filtered transaction search |
-| [ServiceSummary.kt](../src/main/kotlin/dev/scouterctl/ServiceSummary.kt), [CaptureComparison.kt](../src/main/kotlin/dev/scouterctl/CaptureComparison.kt) | Service-level captured metrics and comparison of two captures |
+| Package | Responsibility | Project dependencies |
+| --- | --- | --- |
+| [core](../src/main/kotlin/dev/scouterctl/core) | Plain observations, evidence, connection invariants and named failures | None |
+| [application](../src/main/kotlin/dev/scouterctl/application) | Capture/resume, streaming, context selection and offline analysis | core |
+| [adapters.collector](../src/main/kotlin/dev/scouterctl/adapters/collector) | Typed read requests, socket lifecycle and pinned Scouter codec | application, core |
+| [adapters.files](../src/main/kotlin/dev/scouterctl/adapters/files) | Directory-bound repositories, integrity checks, atomic writes and context lock | application, core, serialization |
+| [adapters.serialization](../src/main/kotlin/dev/scouterctl/adapters/serialization) | Explicit wire DTOs and feature-grouped mappings | core |
+| [cli](../src/main/kotlin/dev/scouterctl/cli) | picocli options, typed invocation interpretation, family handlers and UTF-8 presentation | application, core, serialization |
+| [bootstrap](../src/main/kotlin/dev/scouterctl/bootstrap) | Environment config paths, version resource and concrete construction | All outer components |
 
-picocli handles command-line parsing; kotlinx.serialization handles JSON. The vendored `scouter-common` library supplies the wire formats. See its [provenance and license](../vendor/README.md). Tests use Kotest; native terminal support is a test dependency and is not part of the distributed application.
+Core and application use Kotlin/JDK value, time and collection utilities. They do not use filesystem/network APIs, process access, reflection-based lookup, Scouter classes, picocli or serialization. CLI handlers receive port factories; local and offline dispatch never resolves online credentials or connections. `Main.kt` delegates entry only. The flat command words and picocli option facade preserve command parsing and help layout.
+
+[Ports.kt](../src/main/kotlin/dev/scouterctl/application/Ports.kt) declares `ObservationSource`, `CaptureRepository` (v1), `EvidenceRepository` (v2/v3), `CounterCaptureRepository` and `ContextRepository`. Repositories are bound to directories externally, so use cases receive records and manifests rather than paths or JSON. `ContextRepository.update` executes its read/modify/write callback while the file adapter holds the lock. An online handler owns the source's `use` lifetime, including when a streaming output callback fails.
+
+Capture writes each page before publishing its manifest checkpoint. Resume validates the stored source/query/text policy and all referenced pages before updating anything. Offline traversal continues through every page even after a search limit is filled. Search keeps a bounded priority queue; summary and comparison retain the existing service limits and full integrity checks. Atomic moves, profile-capture no-follow file access and per-page size limits remain in the file adapters.
+
+## Wire formats and failures
+
+Inner models have no serialization annotations. The serialization adapter owns `Json { encodeDefaults = true }`, explicit `Dto` classes and bidirectional mappings. Stored records and CLI output share those DTOs. Field order, nulls, enum wire labels and string transaction IDs remain compatible with existing captures. No format migration occurs.
+
+`DictionaryText.status` is a stored field: a decoded legacy value must survive mapping even if it disagrees with `text`. Its internal setter preserves that body-property behavior without changing data-class equality or `copy` semantics. Getter-only `complete` properties are not emitted. Literal serialization contracts cover this distinction.
+
+`OperationFailure` carries a named core error without a CLI exit number. Adapters translate expected I/O failures: EOF remains `IO_ERROR`, while socket errors and timeouts remain `CONNECTION_FAILED`. `UnexpectedFailure` distinguishes translated argument/decoding exceptions from expected operation failures. The capture use case records only the failure categories that previously wrote a checkpoint; unexpected decoding does not overwrite the last committed manifest. CLI presentation owns exit mapping and the final unexpected-exception fallback.
+
+picocli handles parsing; kotlinx.serialization handles boundary JSON. The vendored `scouter-common` library supplies the wire formats; see its [provenance and license](../vendor/README.md). There is no DI framework or new production dependency. Native terminal support is test-only.
+
+## Verification
+
+Run with JDK 21:
+
+```sh
+./gradlew --no-daemon test pocRelease
+./gradlew --no-daemon test --tests '*ArchitectureTest'
+./gradlew --no-daemon springSmoke -PscouterRoot=/path/to/scouter
+```
+
+The ordinary suite retains subprocess, PTY, file integrity and protocol fixtures, plus in-memory port/dispatch tests. [ArchitectureTest](../src/test/kotlin/dev/scouterctl/ArchitectureTest.kt) uses the running JDK's [jdeps](https://docs.oracle.com/en/java/javase/21/docs/specs/man/jdeps.html) with `-verbose:class -filter:none`. It scans the exact Gradle production class directories, includes generated classes, rejects unknown project packages and fails on empty output. Compiled negative fixtures exercise fully qualified file API calls, adapter properties, serialization annotations, process access and reflection. Import spelling cannot bypass the dependency check.
+
+The separate Spring smoke requires built Collector/agent artifacts and verifies real instrumented traffic, shutdown and subsequent offline analysis. A local test pass does not establish native Windows/macOS execution; release CI requires Linux and Windows; macOS is outside the initial supported platform scope.
 
 ## Local data
 
 Named connections store host, port and account plus the selected context. They do not store passwords, password hashes or sessions. An online invocation obtains its password from `SCOUTERCTL_PASSWORD` or explicit terminal input and disconnects after the operation.
 
-A profile capture uses `scouterctl.capture/v2`: a manifest records the source, query, cursor, completion and page checksums; JSONL pages contain XLogs, profile availability and profiles. Dictionary text is optional and may contain sensitive application data. Offline analysis accepts v2; it does not silently migrate transaction-only v1 captures.
+A profile capture uses `scouterctl.capture/v3`: a manifest records the source, query, cursor, completion and page checksums; JSONL pages contain XLogs, profile availability and profiles. Dictionary text is optional and may contain sensitive application data. Offline analysis accepts existing v2 and new v3; it does not silently migrate transaction-only v1 captures. The current writer resumes v3 only. See [Capture compatibility](capture-compatibility.md) for the format policy.
 
 Checksums detect changed page contents, not authenticity. The manifest is unsigned. Capture completion describes the extraction, not total traffic coverage: sampling and upstream coverage remain explicit metadata. Service statistics and comparisons use captured XLogs rather than incoming HTTP request counts. Known service-name conflicts are reported, but numeric service hashes cannot distinguish every collision.
 
 See [Quick start](../QUICKSTART.md) for commands, limits and exit codes, and [Contributing](../CONTRIBUTING.md) for build and release procedures.
+
+Counter history has separate pure query/window models and `scouterctl.counter-stream/v1` JSONL events. Multi-day `counter export` stores `scouterctl.counter-capture/v1` manifests and point files through its own repository port. The application writes each chunk before checkpointing; the file adapter owns atomic replacement, validation and the writer lock. These formats do not alter XLog captures. See [counter export](counter-export.md).

@@ -1,5 +1,8 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.json.*
 import scouter.util.HashUtil
 import java.nio.file.Files
@@ -10,7 +13,7 @@ internal class SpringSummaryCheck(private val work: Path, private val directory:
         val online = Files.readAllLines(work.resolve("xlogs.jsonl"))
             .map { json.parseToJsonElement(it).jsonObject }
             .filter { it["type"]?.jsonPrimitive?.content == "record" }
-            .map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
+            .map { json.decodeFromJsonElement<XLogRecordDto>(it["data"]!!).toModel() }
         val counts = mapOf("/poc/ok<GET>" to 3, "/poc/sql<GET>" to 3, "/poc/app-error<GET>" to 3,
             "/poc/sql-error<GET>" to 3, "/poc/slow-sql<GET>" to 3, "/error" to 6)
         val summary = summarize("errors", listOf("--include-text"))
@@ -36,7 +39,7 @@ internal class SpringSummaryCheck(private val work: Path, private val directory:
                 val result = runOfflineCli(work, listOf("inspect", "--directory", directory.toString(),
                     "--txid", representative.txid, "--include-text"))
                 check(result.exit == 0 && result.stderr.isEmpty())
-                val inspection = json.decodeFromJsonElement<Inspection>(result.data())
+                val inspection = json.decodeFromJsonElement<InspectionDto>(result.data()).toModel()
                 check(inspection.record.xlog.serviceHash == hash && inspection.record.profile != null)
                 details++
             }
@@ -64,6 +67,6 @@ internal class SpringSummaryCheck(private val work: Path, private val directory:
         val result = runOfflineCli(work, listOf("inspect", "summary", "--directory", directory.toString(), "--sort", sort) + flags)
         check(result.exit == 0 && result.stderr.isEmpty())
         Files.writeString(work.resolve("service-summary-$sort-${flags.size}.json"), result.output)
-        return json.decodeFromJsonElement(result.data())
+        return json.decodeFromJsonElement<ServiceSummaryDto>(result.data()).toModel()
     }
 }

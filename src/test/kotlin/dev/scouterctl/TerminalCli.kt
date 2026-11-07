@@ -1,5 +1,7 @@
 package dev.scouterctl
 
+import dev.scouterctl.adapters.serialization.*
+
 import com.pty4j.PtyProcessBuilder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -8,17 +10,17 @@ import java.nio.file.Path
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-internal class TerminalCli(work: Path, args: List<String>, password: String? = null) : AutoCloseable {
+internal class TerminalCli(work: Path, args: List<String>, password: String? = null, command: List<String>? = null) : AutoCloseable {
     private val environment = System.getenv().toMutableMap().apply {
         remove("SCOUTERCTL_PASSWORD")
         put("SCOUTERCTL_CONFIG", work.resolve("config.json").toString())
         put("TERM", "xterm")
         if (password != null) put("SCOUTERCTL_PASSWORD", password)
     }
-    private val process = PtyProcessBuilder((listOf(
+    private val process = PtyProcessBuilder(((command ?: listOf(
         Path.of(System.getProperty("java.home"), "bin", "java").toString(),
         "-jar", System.getProperty("cli.jar"),
-    ) + args).toTypedArray())
+    )) + args).toTypedArray())
         .setEnvironment(environment).setDirectory(work.toString())
         .setInitialColumns(2000).setInitialRows(50)
         .setUseWinConPty(true).setConPtyInheritCursor(false)

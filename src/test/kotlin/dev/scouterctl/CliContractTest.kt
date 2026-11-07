@@ -1,5 +1,8 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.serialization.*
+
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.booleans.shouldBeFalse
@@ -25,7 +28,7 @@ class CliContractTest : FunSpec({
             listOf(doctor, objects, profile).forEach { it.exit shouldBe 0 }
             doctor.data()["group"]?.jsonPrimitive?.content shouldBe "guest"
             objects.events.single()["data"]!!.jsonArray.single().jsonObject["objName"]!!.jsonPrimitive.content shouldBe "/fixture"
-            val decoded = json.decodeFromJsonElement<ProfileRecord>(profile.data())
+            val decoded = json.decodeFromJsonElement<ProfileRecordDto>(profile.data()).toModel()
             decoded.steps shouldContainExactly listOf(ProfileStep("MESSAGE", 1),
                 ProfileStep("SQL3", 2, SqlProfile(123, 7, 0, 1)),
                 ProfileStep("SQL3", 3, SqlProfile(456, 11, -789, -3)))
@@ -69,9 +72,9 @@ class CliContractTest : FunSpec({
             changed.events.single()["error"]!!.jsonObject["message"]!!.jsonPrimitive.content shouldBe
                 "Resume source or query differs from manifest"
             cli.run(server, args + "--resume").exit shouldBe 0
-            val manifest = json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json")))
+            val manifest = json.decodeFromString<CaptureManifestDto>(Files.readString(directory.resolve("manifest.json"))).toModel()
             val rows = manifest.files.flatMap { Files.readAllLines(directory.resolve(it.name)) }
-                .map { json.decodeFromString<XLogRecord>(it).txid }
+                .map { json.decodeFromString<XLogRecordDto>(it).toModel().txid }
             rows shouldContainExactly WireFixture.ids.map(Long::toString)
             manifest.executionComplete.shouldBeTrue()
             manifest.sampling shouldBe "unknown"
@@ -101,11 +104,11 @@ class CliContractTest : FunSpec({
         WireFixture(Fault.DISCONNECT).use { server ->
             val args = listOf("capture", "--directory", directory.toString()) + window
             cli.run(server, args).exit shouldBe 10
-            val manifest = json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json")))
+            val manifest = json.decodeFromString<CaptureManifestDto>(Files.readString(directory.resolve("manifest.json"))).toModel()
             manifest.executionComplete.shouldBeFalse()
             manifest.files.sumOf { it.records } shouldBe 2
             cli.run(server, args + "--resume").exit shouldBe 0
-            val resumed = json.decodeFromString<CaptureManifest>(Files.readString(directory.resolve("manifest.json")))
+            val resumed = json.decodeFromString<CaptureManifestDto>(Files.readString(directory.resolve("manifest.json"))).toModel()
             resumed.files.sumOf { it.records } shouldBe 3
             resumed.executionComplete.shouldBeTrue()
         }
@@ -132,8 +135,9 @@ internal class ContractCli(private val temp: Path) {
         val started = System.nanoTime()
         val stderr = Files.createTempFile(temp, "stderr", ".txt")
         val stdout = Files.createTempFile(temp, "stdout", ".jsonl")
+        val launchArgs = if (System.getProperty("os.name").startsWith("Windows")) listOf(utf8Arguments(temp, args)) else args
         val process = ProcessBuilder(listOf(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-            "-jar", System.getProperty("cli.jar")) + args)
+            "-jar", System.getProperty("cli.jar")) + launchArgs)
             .directory(temp.toFile())
             .redirectOutput(stdout.toFile()).redirectError(stderr.toFile()).apply {
                 environment().remove("SCOUTERCTL_PASSWORD")

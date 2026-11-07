@@ -1,5 +1,8 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.net.ServerSocket

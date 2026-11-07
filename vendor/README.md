@@ -13,6 +13,8 @@ scouterctl uses `scouter-common` to read Scouter's binary protocol.
 
 This is a pinned artifact built from the source revision above. It is not guaranteed to be identical to an official release binary. Its SHA-256 checksum is verified during the build. The executable fat JAR includes this library's classes.
 
+The codec version does not require an identically versioned Collector; see [supported Collector versions](../docs/supported-versions.md).
+
 When replacing the library, update its provenance and checksum together, and verify Collector compatibility.
 
 The Gradle Wrapper uses Gradle 9.6.1 and is configured to verify the distribution's SHA-256 checksum.

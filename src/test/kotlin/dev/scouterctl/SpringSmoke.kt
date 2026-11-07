@@ -1,5 +1,11 @@
 package dev.scouterctl
 
+import dev.scouterctl.core.*
+import dev.scouterctl.bootstrap.BuildInfo
+import dev.scouterctl.adapters.collector.CollectorSource
+import dev.scouterctl.application.*
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import org.apache.catalina.util.ServerInfo
@@ -23,7 +29,7 @@ import java.util.concurrent.TimeUnit
 
 /** Spring MVC -> Servlet hook -> real JDBC instrumentation -> Collector -> packaged CLI. */
 fun main(args: Array<String>) {
-    val upstream = Path.of(args.single()).toAbsolutePath().normalize()
+    val upstream = Path.of(args.first()).toAbsolutePath().normalize()
     val work = Files.createTempDirectory("scouterctl-spring-smoke-")
     val offline = SpringOfflineCheck(work)
     val comparison = SpringComparisonCheck(work)
@@ -62,15 +68,21 @@ fun main(args: Array<String>) {
     """.trimIndent())
     val java = Path.of(System.getProperty("java.home"), "bin/java").toString()
     val collectorJava = System.getenv("SCOUTER_COLLECTOR_JAVA") ?: java
-    val cp = listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
+    val cp = System.getenv("SCOUTER_COLLECTOR_CLASSPATH") ?: listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
         upstream.resolve("scouter.common/target/scouter-common-2.21.3.jar"), upstream.resolve("scouter.server/target/lib/*")).joinToString(":")
-    val collector = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")
-        .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("collector.log").toFile()).start()
+    var collectorStarts = 0
+    fun startCollector(): Process = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")
+        .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("collector-${++collectorStarts}.log").toFile()).start()
+    var collector = startCollector()
     var service: Process? = null
     println("Evidence: $work")
     try {
         val endpoint = Endpoint("127.0.0.1", port, "poc", 1500)
-        awaitSpring("Collector login") { CollectorSource.connect(endpoint, password).use { it.info.serverId == "scouterctl-spring-smoke" } }
+        awaitSpring("Collector login") { CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-spring-smoke" } }
+        if ("--inspection-only" in args) {
+            verifyCollectorInspection(work, endpoint, password)
+            return
+        }
         verifyInitialConnection(work, endpoint, password)
         val agent = upstream.resolve("scouter.agent.java/target/scouter.agent.jar")
         check(Files.isRegularFile(agent)) { "Build Java 21 agent first: $agent" }
@@ -82,7 +94,7 @@ fun main(args: Array<String>) {
         val httpPort = Files.readString(work.resolve("http-port")).trim().toInt()
         var objectHash = 0
         awaitSpring("Spring agent discovery") {
-            CollectorSource.connect(endpoint, password).use { source ->
+            CollectorSource.connect(endpoint, password, BuildInfo.version).use { source ->
                 source.objects().singleOrNull { it.objName.endsWith("/scouterctl-spring") && it.alive }
                     ?.also { objectHash = it.objHash } != null
             }
@@ -105,9 +117,9 @@ fun main(args: Array<String>) {
         val date = Instant.ofEpochMilli(from).atZone(ZoneOffset.UTC).toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
         awaitSpring("21 Servlet-generated XLogs including error dispatches persisted") {
             to = System.currentTimeMillis() + 1
-            CollectorSource.connect(endpoint, password).use {
+            CollectorSource.connect(endpoint, password, BuildInfo.version).use {
                 val observed = it.page(Query(date, from, to, "UTC", objectHash, 100), Cursor()).records
-                Files.writeString(work.resolve("ingestion-observed.json"), json.encodeToString(observed))
+                Files.writeString(work.resolve("ingestion-observed.json"), json.encodeToString(observed.map { it.toDto() }))
                 observed.size == 21
             }
         }
@@ -117,7 +129,7 @@ fun main(args: Array<String>) {
         val window = listOf("--date", date, "--from", Instant.ofEpochMilli(from).toString(), "--to", Instant.ofEpochMilli(to).toString(),
             "--timezone", "UTC", "--object-hash", objectHash.toString(), "--page-size", "5")
         val rows = cli.run("xlogs", listOf("xlog", "search") + window)
-            .filter { it["type"]?.jsonPrimitive?.content == "record" }.map { json.decodeFromJsonElement<XLogRecord>(it["data"]!!) }
+            .filter { it["type"]?.jsonPrimitive?.content == "record" }.map { json.decodeFromJsonElement<XLogRecordDto>(it["data"]!!).toModel() }
         check(rows.size == 21 && rows.map { it.txid }.toSet().size == 21)
         val verified = mutableListOf<JsonObject>()
         val textCheck = SpringProfileTextCheck(cli, date)
@@ -131,7 +143,7 @@ fun main(args: Array<String>) {
                 check((row.errorHash != 0) == expectedError) { "$route error flag: ${row.errorHash}" }
                 val event = cli.run("profile-${route.substringAfterLast('/')}-${index + 1}",
                     listOf("profile", "get", "--date", date, "--txid", row.txid)).single()
-                val profile = json.decodeFromJsonElement<ProfileRecord>(event["data"]!!)
+                val profile = json.decodeFromJsonElement<ProfileRecordDto>(event["data"]!!).toModel()
                 check(profile.txid == row.txid && profile.steps.isNotEmpty())
                 val sql = profile.steps.mapNotNull { it.sql }
                 if (route == "/poc/ok" || route == "/error") check(sql.isEmpty()) else {
@@ -155,6 +167,20 @@ fun main(args: Array<String>) {
             }
         }
         Files.writeString(work.resolve("profile-checks.json"), json.encodeToString(verified))
+        if (args.drop(1) == listOf("--recovery")) {
+            verifySpringRecovery(work, port, password, httpPort, window, rows,
+                stopCollector = {
+                    collector.destroy()
+                    if (!collector.waitFor(10, TimeUnit.SECONDS)) collector.destroyForcibly().waitFor(5, TimeUnit.SECONDS)
+                    check(!collector.isAlive)
+                },
+                restartCollector = {
+                    collector = startCollector()
+                    awaitSpring("Collector login after restart") {
+                        CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-spring-smoke" }
+                    }
+                })
+        }
         offline.capture(cli, window)
         comparison.capture(cli, httpPort, objectHash)
         Files.list(work).use { files -> files.filter { it.toString().endsWith(".jsonl") }.forEach { file ->

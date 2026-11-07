@@ -1,5 +1,7 @@
 package dev.scouterctl
 
+import dev.scouterctl.adapters.serialization.*
+
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import java.nio.file.Files
@@ -14,6 +16,7 @@ class AgentCli(private val work: Path, private val port: Int, private val passwo
         val child = ProcessBuilder(listOf(java, "-jar", System.getProperty("cli.jar")) + arguments +
             listOf("--port", port.toString(), "--user", "poc")).apply {
             environment()["SCOUTERCTL_PASSWORD"] = password
+            environment()["SCOUTERCTL_CONFIG"] = work.resolve("smoke-contexts.json").toString()
         }.redirectOutput(out.toFile()).redirectError(err.toFile()).start()
         try {
             check(child.waitFor(20, TimeUnit.SECONDS)) { "$label timeout" }
