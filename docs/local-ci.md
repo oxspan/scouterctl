@@ -33,7 +33,7 @@ Local act runs supplement shared CI; they do not replace checks on contributions
 | PR to master | Linux checks plus Windows checks against the same packaged JAR |
 | Push to develop | No duplicate run; integrate through a checked PR |
 | Push to master | Linux and Windows, then the existing release workflow |
-| Manual dispatch | All three platforms; existing-tag asset repair keeps its existing Linux-only path |
+| Manual dispatch | Linux and Windows; historical 0.x asset repair uses its tagged package format |
 
 A newer commit cancels an older run of the same PR. Master release runs are not cancelled by this policy. Scale validation remains opt-in. Documentation-only PRs still receive the baseline Linux check, keeping check names and branch expectations predictable.
 
