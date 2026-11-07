@@ -30,7 +30,7 @@ The project remains one Gradle module with the `dev.scouterctl.MainKt` entrypoin
 
 Core and application use Kotlin/JDK value, time and collection utilities. They do not use filesystem/network APIs, process access, reflection-based lookup, Scouter classes, picocli or serialization. CLI handlers receive port factories; local and offline dispatch never resolves online credentials or connections. `Main.kt` delegates entry only. The flat command words and picocli option facade preserve command parsing and help layout.
 
-[Ports.kt](../src/main/kotlin/dev/scouterctl/application/Ports.kt) declares `ObservationSource`, `CaptureRepository` (v1), `EvidenceRepository` (v2/v3) and `ContextRepository`. Repositories are bound to directories externally, so use cases receive records and manifests rather than paths or JSON. `ContextRepository.update` executes its read/modify/write callback while the file adapter holds the lock. An online handler owns the source's `use` lifetime, including when a streaming output callback fails.
+[Ports.kt](../src/main/kotlin/dev/scouterctl/application/Ports.kt) declares `ObservationSource`, `CaptureRepository` (v1), `EvidenceRepository` (v2/v3), `CounterCaptureRepository` and `ContextRepository`. Repositories are bound to directories externally, so use cases receive records and manifests rather than paths or JSON. `ContextRepository.update` executes its read/modify/write callback while the file adapter holds the lock. An online handler owns the source's `use` lifetime, including when a streaming output callback fails.
 
 Capture writes each page before publishing its manifest checkpoint. Resume validates the stored source/query/text policy and all referenced pages before updating anything. Offline traversal continues through every page even after a search limit is filled. Search keeps a bounded priority queue; summary and comparison retain the existing service limits and full integrity checks. Atomic moves, profile-capture no-follow file access and per-page size limits remain in the file adapters.
 
@@ -56,7 +56,7 @@ Run with JDK 21:
 
 The ordinary suite retains subprocess, PTY, file integrity and protocol fixtures, plus in-memory port/dispatch tests. [ArchitectureTest](../src/test/kotlin/dev/scouterctl/ArchitectureTest.kt) uses the running JDK's [jdeps](https://docs.oracle.com/en/java/javase/21/docs/specs/man/jdeps.html) with `-verbose:class -filter:none`. It scans the exact Gradle production class directories, includes generated classes, rejects unknown project packages and fails on empty output. Compiled negative fixtures exercise fully qualified file API calls, adapter properties, serialization annotations, process access and reflection. Import spelling cannot bypass the dependency check.
 
-The separate Spring smoke requires built Collector/agent artifacts and verifies real instrumented traffic, shutdown and subsequent offline analysis. A local test pass does not establish native Windows/macOS execution; release CI checks those platforms separately.
+The separate Spring smoke requires built Collector/agent artifacts and verifies real instrumented traffic, shutdown and subsequent offline analysis. A local test pass does not establish native Windows/macOS execution; release CI requires Linux and Windows; macOS is outside the initial supported platform scope.
 
 ## Local data
 
@@ -67,3 +67,5 @@ A profile capture uses `scouterctl.capture/v3`: a manifest records the source, q
 Checksums detect changed page contents, not authenticity. The manifest is unsigned. Capture completion describes the extraction, not total traffic coverage: sampling and upstream coverage remain explicit metadata. Service statistics and comparisons use captured XLogs rather than incoming HTTP request counts. Known service-name conflicts are reported, but numeric service hashes cannot distinguish every collision.
 
 See [Quick start](../QUICKSTART.md) for commands, limits and exit codes, and [Contributing](../CONTRIBUTING.md) for build and release procedures.
+
+Counter history has separate pure query/window models and `scouterctl.counter-stream/v1` JSONL events. Multi-day `counter export` stores `scouterctl.counter-capture/v1` manifests and point files through its own repository port. The application writes each chunk before checkpointing; the file adapter owns atomic replacement, validation and the writer lock. These formats do not alter XLog captures. See [counter export](counter-export.md).

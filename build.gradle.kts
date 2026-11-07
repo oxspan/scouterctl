@@ -6,9 +6,18 @@ plugins {
     application
 }
 group = "dev.scouterctl"
-version = providers.fileContents(layout.projectDirectory.file("version.txt")).asText.get().trim()
+version = providers.gradleProperty("candidateVersion").orElse(
+    providers.fileContents(layout.projectDirectory.file("version.txt")).asText.map(String::trim)).get()
 require(version.toString().matches(Regex("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)"))) {
     "version.txt must contain a release version (major.minor.patch)"
+}
+val packageVersionFile = layout.buildDirectory.file("generated/package-version/version.txt")
+val packageVersion = tasks.register("packageVersion") {
+    inputs.property("version", project.version.toString())
+    outputs.file(packageVersionFile)
+    doLast {
+        packageVersionFile.get().asFile.apply { parentFile.mkdirs(); writeText("${project.version}\n") }
+    }
 }
 repositories { mavenCentral() }
 kotlin { jvmToolchain(21) }
@@ -28,7 +37,8 @@ tasks.startScripts {
 distributions {
     main {
         contents {
-            from("README.md", "QUICKSTART.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "SECURITY.md", "version.txt")
+            from("README.md", "QUICKSTART.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "SECURITY.md")
+            from(packageVersion)
             from("docs") { into("docs") }
             from("vendor") {
                 include("README.md", "SCOUTER-LICENSE.txt")
@@ -133,7 +143,8 @@ val pocDist = tasks.register<Zip>("pocDist") {
     into("scouterctl-${project.version}") {
         from(tasks.named("fatJar"))
         from("QUICKSTART.md") { rename { "README.md" } }
-        from("CHANGELOG.md", "version.txt", "LICENSE", "SECURITY.md")
+        from("CHANGELOG.md", "LICENSE", "SECURITY.md")
+        from(packageVersion)
         from("vendor") {
             include("README.md", "SCOUTER-LICENSE.txt")
             into("vendor")
@@ -248,11 +259,15 @@ val compileWindowsLauncher = tasks.register<Exec>("compileWindowsLauncher") {
             "launcher.cpp", "launcher.rc", "-lshell32", "-o", output)
     }
 }
+val releaseInputDirectory = providers.gradleProperty("releaseInputDirectory").map { file(it) }
+val commandDistribution = releaseInputDirectory.map { it.resolve("scouterctl-${project.version}.zip") }
+    .orElse(tasks.distZip.flatMap { it.archiveFile }.map { it.asFile })
 val windowsDistZip = tasks.register<Zip>("windowsDistZip") {
-    dependsOn(compileWindowsLauncher, tasks.distZip)
+    dependsOn(compileWindowsLauncher)
+    if (!releaseInputDirectory.isPresent) dependsOn(tasks.distZip)
     archiveFileName.set("scouterctl-${project.version}-windows-x64.zip")
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
-    from(tasks.distZip.map { zipTree(it.archiveFile) }) { exclude("*/bin/*") }
+    from(commandDistribution.map { zipTree(it) }) { exclude("*/bin/*") }
     into("scouterctl-${project.version}/bin") { from(windowsLauncherFile) }
     into("scouterctl-${project.version}/vendor/windows-launcher") {
         from("native/windows/README.md")
@@ -271,4 +286,74 @@ tasks.test {
         systemProperty("jdk.lang.Process.allowAmbiguousCommands", "false")
         systemProperty("cli.windows.distribution", file(windowsDistribution.get()).absolutePath)
     } else exclude("**/WindowsLauncherTest*")
+}
+
+val linuxDistZip = tasks.register<Zip>("linuxDistZip") {
+    dependsOn(tasks.distZip)
+    archiveFileName.set("scouterctl-${project.version}-linux-x64.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    from(tasks.distZip.map { zipTree(it.archiveFile) }) {
+        exclude("*/bin/scouterctl.bat")
+        eachFile { if (path.endsWith("/bin/scouterctl")) permissions { unix("rwxr-xr-x") } }
+    }
+}
+val releaseInputs = tasks.register<Sync>("releaseInputs") {
+    dependsOn(linuxDistZip, tasks.named("fatJar"), tasks.distZip)
+    into(layout.buildDirectory.dir("release-inputs"))
+    from(linuxDistZip, tasks.named("fatJar"), tasks.distZip)
+    doLast {
+        val directory = layout.buildDirectory.dir("release-inputs").get().asFile
+        val names = listOf("scouterctl-${project.version}.zip", "scouterctl-${project.version}-linux-x64.zip", "scouterctl-${project.version}-all.jar").sorted()
+        directory.resolve("SHA256SUMS").writeText(names.joinToString("") { name ->
+            val hash = MessageDigest.getInstance("SHA-256").digest(directory.resolve(name).readBytes()).joinToString("") { "%02x".format(it) }
+            "$hash  $name\n"
+        })
+    }
+}
+val releasePackages = tasks.register<Sync>("releasePackages") {
+    dependsOn(windowsDistZip)
+    into(layout.buildDirectory.dir("release"))
+    if (releaseInputDirectory.isPresent) {
+        from(releaseInputDirectory.map { it.resolve("scouterctl-${project.version}-linux-x64.zip") })
+    } else {
+        dependsOn(linuxDistZip)
+        from(linuxDistZip)
+    }
+    from(windowsDistZip)
+    doLast {
+        val directory = layout.buildDirectory.dir("release").get().asFile
+        val names = listOf("scouterctl-${project.version}-linux-x64.zip", "scouterctl-${project.version}-windows-x64.zip")
+        directory.resolve("SHA256SUMS").writeText(names.joinToString("") { name ->
+            val hash = MessageDigest.getInstance("SHA-256").digest(directory.resolve(name).readBytes()).joinToString("") { "%02x".format(it) }
+            "$hash  $name\n"
+        })
+    }
+}
+listOf("verifyReleaseInputs" to "inputs", "verifyCommandRelease" to "bundle").forEach { (taskName, mode) ->
+    tasks.register<JavaExec>(taskName) {
+        dependsOn(tasks.testClasses)
+        if (mode == "inputs" && !releaseInputDirectory.isPresent) dependsOn(releaseInputs)
+        if (mode == "bundle") dependsOn(releasePackages)
+        classpath = sourceSets.test.get().runtimeClasspath
+        mainClass.set("dev.scouterctl.CommandPackageCheckKt")
+        systemProperty("release.libraries", (listOf(tasks.jar.get().archiveFile.get().asFile.name) + configurations.runtimeClasspath.get().files.map { it.name }).joinToString("|"))
+        systemProperty("jdk.lang.Process.allowAmbiguousCommands", "false")
+        args(mode, project.version.toString(), if (mode == "inputs")
+            releaseInputDirectory.orElse(layout.buildDirectory.dir("release-inputs").map { it.asFile }).get().absolutePath
+            else layout.buildDirectory.dir("release").get().asFile.absolutePath)
+    }
+}
+
+tasks.register<JavaExec>("installLifecycleSmoke") {
+    dependsOn(tasks.testClasses)
+    val current = providers.gradleProperty("currentPackage")
+    val previous = providers.gradleProperty("previousPackage")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.CommandPackageCheckKt")
+    systemProperty("release.libraries", (listOf(tasks.jar.get().archiveFile.get().asFile.name) + configurations.runtimeClasspath.get().files.map { it.name }).joinToString("|"))
+    systemProperty("jdk.lang.Process.allowAmbiguousCommands", "false")
+    doFirst {
+        require(current.isPresent && previous.isPresent) { "Set currentPackage and previousPackage to two actual command ZIPs" }
+        args("lifecycle", project.version.toString(), file(current.get()).absolutePath, file(previous.get()).absolutePath)
+    }
 }
