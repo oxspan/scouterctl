@@ -8,7 +8,7 @@ If the private reporting option is unavailable, open an issue asking the maintai
 
 ## Supported versions
 
-scouterctl is currently a POC. Security fixes target the latest published version; older versions do not have a separate maintenance commitment. Include the exact version and commit, if known, so the issue can be reproduced.
+Security fixes target the latest published version; older versions do not have a separate maintenance commitment. Include the exact version and commit, if known, so the issue can be reproduced.
 
 ## Operating boundaries
 

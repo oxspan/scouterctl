@@ -50,7 +50,7 @@ gh pr create --base develop --template .github/PULL_REQUEST_TEMPLATE/korean.md
 
 Use one language per PR. See the [English](.github/PULL_REQUEST_TEMPLATE/english.md) and [Korean](.github/PULL_REQUEST_TEMPLATE/korean.md) templates.
 
-PRs to `develop` receive Linux tests and package checks. PRs to `master` also verify the same package and run tests on Windows and macOS. Check the latest revision's results before merging; local validation does not establish hosted CI success. See [Local CI](docs/local-ci.md) for the complete execution policy.
+PRs to `develop` receive Linux tests and package checks. PRs to `master` also verify the same package and run tests on Windows. Check the latest revision's results before merging; local validation does not establish hosted CI success. See [Local CI](docs/local-ci.md) for the complete execution policy.
 
 ## Commit and merge conventions
 
