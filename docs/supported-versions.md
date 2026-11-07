@@ -29,6 +29,8 @@ Collector status and runtime-settings inspection are validated separately with `
 
 Real-time counter reads use `counterSmoke` with matching Agents on Java 8. The same 18 releases are checked for counter definitions/units, list/get, heap samples, missing counters/targets, authentication and unchanged configuration. The 2.8.1 and 2.21.3 checks also send real slow/SQL/error HTTP traffic and observe positive TPS, response time and error-rate aggregates. Native Windows and Linux clients are checked on those two releases. The JVM/OS scope remains the same as above.
 
+Host/process CPU and host I/O have separate producer requirements and version differences. See [Host and process counters](host-counters.md) for the tested combinations and the 2.21.3 Host Agent missing-I/O limitation.
+
 Past counter history and resumable export use the opt-in Kotlin `counterHistorySmoke`. All **18 releases** above are checked on Linux Java 8 with matching Agents and a Linux JDK 21 CLI: stored timestamps/numeric strings against a direct wire reference, MB units, half-open boundaries, empty windows, unrecorded counters, missing objects, authentication failure, a two-day chunk boundary, budgeted export/resume, unchanged committed bytes and repeated completion. Each fixture generates real HTTP/JDBC traffic and stops its service before comparing samples.
 
 Full Collector stop/restart, query mismatch and corruption rejection are additional checks on **2.8.1 and 2.21.3**. Native Windows JDK 21 clients are checked separately on those two releases, including Linux-to-Windows resume across multiple windows. Windows/macOS coverage is not implied for the other 16 releases. See [counter history](counter-history.md) and [resumable counter export](counter-export.md).

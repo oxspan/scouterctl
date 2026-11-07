@@ -221,6 +221,18 @@ tasks.register<JavaExec>("counterSmoke") {
         layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
 }
 
+
+tasks.register<JavaExec>("hostCounterSmoke") {
+    dependsOn(tasks.testClasses)
+    val externalJar = providers.gradleProperty("cliJar")
+    if (!externalJar.isPresent) dependsOn("fatJar")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.AgentSmokeKt")
+    args(providers.gradleProperty("scouterRoot").getOrElse("../scouter"), "--host-counters")
+    systemProperty("cli.jar", providers.gradleProperty("cliJar").getOrElse(
+        layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
+}
+
 tasks.register<JavaExec>("counterHistorySmoke") {
     dependsOn(tasks.testClasses, "fatJar")
     classpath = sourceSets.test.get().runtimeClasspath
