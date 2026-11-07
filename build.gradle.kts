@@ -12,7 +12,31 @@ require(version.toString().matches(Regex("(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0
 }
 repositories { mavenCentral() }
 kotlin { jvmToolchain(21) }
-application { mainClass.set("dev.scouterctl.MainKt") }
+application {
+    mainClass.set("dev.scouterctl.MainKt")
+    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8")
+}
+tasks.startScripts {
+    doLast {
+        // Stop prerequisite failures before Gradle's batch template falls through to execution.
+        val script = windowsScript.readText()
+        val failureExit = "\"%COMSPEC%\" /c exit 1"
+        check(script.split(failureExit).size == 3) { "Review the Windows launcher failure paths" }
+        windowsScript.writeText(script.replace(failureExit, "exit /b 1"))
+    }
+}
+distributions {
+    main {
+        contents {
+            from("README.md", "QUICKSTART.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "SECURITY.md", "version.txt")
+            from("docs") { into("docs") }
+            from("vendor") {
+                include("README.md", "SCOUTER-LICENSE.txt")
+                into("vendor")
+            }
+        }
+    }
+}
 dependencies {
     implementation(files("vendor/scouter-common-2.21.3.jar"))
     implementation("info.picocli:picocli:4.7.7")
@@ -48,6 +72,9 @@ tasks.processResources {
 }
 tasks.test {
     useJUnitPlatform { includeEngines("kotest") }
+    dependsOn(tasks.distZip)
+    inputs.file(tasks.distZip.flatMap { it.archiveFile })
+    systemProperty("cli.distribution", tasks.distZip.get().archiveFile.get().asFile.absolutePath)
     systemProperty("architecture.main.classes", sourceSets.main.get().output.classesDirs.asPath)
     val externalJar = providers.gradleProperty("cliJar")
     if (!externalJar.isPresent) dependsOn("fatJar")
@@ -181,4 +208,58 @@ tasks.register<JavaExec>("counterSmoke") {
     args(providers.gradleProperty("scouterRoot").getOrElse("../scouter"), "--counter-only")
     systemProperty("cli.jar", providers.gradleProperty("cliJar").getOrElse(
         layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
+}
+
+// Opt-in Windows x64 packaging; ordinary Kotlin builds do not need a native toolchain.
+val zigHome = providers.gradleProperty("zigHome")
+val windowsJdkHome = providers.gradleProperty("windowsJdkHome").orElse(
+    if (System.getProperty("os.name").startsWith("Windows")) providers.systemProperty("java.home")
+    else providers.environmentVariable("WINDOWS_JAVA_HOME")
+)
+val windowsLauncherFile = layout.buildDirectory.file("windows-launcher/scouterctl.exe")
+val compileWindowsLauncher = tasks.register<Exec>("compileWindowsLauncher") {
+    inputs.dir("native/windows")
+    inputs.property("compilerVersion", "0.15.2")
+    inputs.property("target", "x86_64-windows-gnu")
+    inputs.files(windowsJdkHome.map { listOf(file("$it/include/jni.h"), file("$it/include/win32/jni_md.h")) })
+    outputs.file(windowsLauncherFile)
+    workingDir("native/windows")
+    doFirst {
+        require(zigHome.isPresent) { "Set -PzigHome to an extracted Zig 0.15.2 toolchain" }
+        require(windowsJdkHome.isPresent) { "Set -PwindowsJdkHome to a Windows JDK 21 installation" }
+        val zig = file("${zigHome.get()}/zig" + if (System.getProperty("os.name").startsWith("Windows")) ".exe" else "")
+        val actual = providers.exec { commandLine(zig, "version") }.standardOutput.asText.get().trim()
+        check(actual == "0.15.2") { "Windows launcher build requires Zig 0.15.2" }
+        val include = file("${windowsJdkHome.get()}/include")
+        check(include.resolve("win32/jni_md.h").isFile) { "Windows JDK headers are required" }
+        val output = windowsLauncherFile.get().asFile
+        output.parentFile.mkdirs()
+        commandLine(zig, "c++", "-target", "x86_64-windows-gnu", "-std=c++17", "-O2", "-static", "-municode",
+            "-Wall", "-Wextra", "-Werror", "-I$include", "-I${include.resolve("win32")}",
+            "launcher.cpp", "launcher.rc", "-lshell32", "-o", output)
+    }
+}
+val windowsDistZip = tasks.register<Zip>("windowsDistZip") {
+    dependsOn(compileWindowsLauncher, tasks.distZip)
+    archiveFileName.set("scouterctl-${project.version}-windows-x64.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    from(tasks.distZip.map { zipTree(it.archiveFile) }) { exclude("*/bin/*") }
+    into("scouterctl-${project.version}/bin") { from(windowsLauncherFile) }
+    into("scouterctl-${project.version}/vendor/windows-launcher") {
+        from("native/windows/README.md")
+        from(zigHome.map { file("$it/LICENSE") }) { rename { "Zig-LICENSE.txt" } }
+        listOf("libcxx", "libcxxabi", "libunwind").forEach { library ->
+            from(zigHome.map { file("$it/lib/$library/LICENSE.TXT") }) { rename { "$library-LICENSE.txt" } }
+        }
+        from(zigHome.map { file("$it/lib/libc/mingw/COPYING") }) { rename { "MinGW-COPYING.txt" } }
+    }
+}
+tasks.test {
+    val windowsDistribution = providers.gradleProperty("windowsDistribution")
+    if (windowsDistribution.isPresent && System.getProperty("os.name").startsWith("Windows")) {
+        inputs.file(windowsDistribution.map { file(it) })
+        // Java's legacy Windows child-process quoting can discard backslashes before quotes.
+        systemProperty("jdk.lang.Process.allowAmbiguousCommands", "false")
+        systemProperty("cli.windows.distribution", file(windowsDistribution.get()).absolutePath)
+    } else exclude("**/WindowsLauncherTest*")
 }

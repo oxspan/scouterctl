@@ -48,6 +48,10 @@ For online commands in PowerShell, set the password with `$env:SCOUTERCTL_PASSWO
 
 ### Windows Unicode paths and arguments
 
+The [native Windows command package](docs/installation.md#windows) supports
+Korean installation paths and direct Unicode arguments as `scouterctl`.
+The following workaround applies to the legacy JAR and batch launch methods.
+
 The Windows JDK 21 launcher can replace characters outside the system code page before scouterctl starts. Changing only the console code page or `file.encoding` does not repair direct arguments. Use `Set-Location -LiteralPath` to enter the installation directory and pass only the ASCII JAR filename, not its full Korean path.
 
 For Korean connection names, accounts, capture paths or service filters, save the arguments in a UTF-8 file **without a BOM**, then pass `@query.args` **after** the JAR filename. This file is read by scouterctl's argument parser, not the Java launcher:

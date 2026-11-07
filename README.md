@@ -39,7 +39,7 @@ flowchart LR
 
 ## Documentation
 
-- [Usage and examples](QUICKSTART.md)
+- [Usage and examples](QUICKSTART.md) · [Command installation](docs/installation.md)
 - [Architecture](docs/architecture.md)
 - [JSON output and exit codes](docs/cli-contract.md) · [Capture compatibility](docs/capture-compatibility.md)
 - [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
