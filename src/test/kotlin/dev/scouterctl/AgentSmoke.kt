@@ -72,8 +72,9 @@ fun main(args: Array<String>) {
     val collectorJava = System.getenv("SCOUTER_COLLECTOR_JAVA") ?: java
     val cp = System.getenv("SCOUTER_COLLECTOR_CLASSPATH") ?: listOf(upstream.resolve("scouter.server/target/scouter-server-2.21.3.jar"),
         upstream.resolve("scouter.common/target/scouter-common-2.21.3.jar"), upstream.resolve("scouter.server/target/lib/*")).joinToString(":")
-    val collector = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")
-        .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("collector.log").toFile()).start()
+    fun launchCollector() = ProcessBuilder(collectorJava, "-Xmx256m", "-Duser.timezone=UTC", "-cp", cp, "scouter.server.Main")
+        .directory(work.toFile()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(work.resolve("collector.log").toFile())).start()
+    var collector = launchCollector()
     var service: Process? = null
     var host: Process? = null
     println("Evidence: $work")
@@ -120,6 +121,22 @@ fun main(args: Array<String>) {
             }
             if (hostCounters) {
                 verifyHostCounters(work, endpoint, password, objectHash, httpPort)
+                return
+            }
+            if (args.drop(1) == listOf("--counter-history-only")) {
+                fun stop(process: Process) {
+                    process.destroy()
+                    if (!process.waitFor(10, TimeUnit.SECONDS)) process.destroyForcibly().waitFor(5, TimeUnit.SECONDS)
+                    check(!process.isAlive) { "Fixture process did not stop" }
+                }
+                verifyCounterHistory(work, endpoint, password, objectHash, httpPort,
+                    stopService = { stop(checkNotNull(service)) }, stopCollector = { stop(collector) },
+                    startCollector = {
+                        collector = launchCollector()
+                        eventually("Collector restart") {
+                            CollectorSource.connect(endpoint, password, BuildInfo.version).use { it.info.serverId == "scouterctl-agent-smoke" }
+                        }
+                    })
                 return
             }
             if (args.drop(1) == listOf("--counter-only")) {

@@ -8,6 +8,7 @@ interface ObservationSource : AutoCloseable {
     fun settings(): List<RuntimeSetting>
     fun agentStatus(objHash: Int): AgentStatus
     fun agentSettings(objHash: Int): AgentConfiguration
+    fun counterHistory(query: CounterHistoryQuery): CounterHistory
     fun realtimeCounters(objHash: Int): RealtimeCounters
     fun objects(): List<ObjectRecord>
     fun page(query: Query, cursor: Cursor): XLogPage
@@ -35,4 +36,12 @@ interface EvidenceRepository {
 interface ContextRepository {
     fun read(): ContextConfig
     fun update(change: (ContextConfig) -> ContextConfig): ContextConfig
+}
+
+interface CounterCaptureRepository : AutoCloseable {
+    fun create()
+    fun load(): CounterCaptureManifest
+    fun save(manifest: CounterCaptureManifest)
+    fun writeChunk(index: Int, points: List<CounterPoint>): CounterChunkFile
+    fun validate(manifest: CounterCaptureManifest)
 }

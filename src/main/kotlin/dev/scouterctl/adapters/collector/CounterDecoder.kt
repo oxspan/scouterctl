@@ -12,6 +12,26 @@ import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
 
 internal fun decodeCounters(agent: AgentIdentity, metadata: List<Pack>, response: List<Pack>): RealtimeCounters {
+    val engine = decodeCounterEngine(metadata)
+    val values = if (agent.alive) decodeCounterValues(response) else emptyMap()
+    val names = engine.getCounterSet(agent.objType) + values.keys
+    if (names.size > 5000) invalidCounters()
+    return RealtimeCounters(agent, names.map { name ->
+        if (name.isBlank() || name.length > 256 || name.any(Char::isISOControl)) invalidCounters()
+        val raw = values[name]
+        val number = decodeCounterNumber(raw)
+        val known = engine.isCounterOf(name, agent.objType)
+        CounterReading(name, if (known) engine.getCounterDisplayName(agent.objType, name) else null,
+            if (known) engine.getCounterUnit(agent.objType, name) else null, number,
+            when {
+                raw == null -> CounterAvailability.UNAVAILABLE
+                number != null -> CounterAvailability.AVAILABLE
+                else -> CounterAvailability.UNSUPPORTED
+            })
+    })
+}
+
+internal fun decodeCounterEngine(metadata: List<Pack>): CounterEngine {
     val definition = metadata.singleOrNull() as? MapPack ?: invalidCounters()
     val engine = CounterEngine()
     for (field in listOf("default", "custom")) {
@@ -22,27 +42,14 @@ internal fun decodeCounters(agent: AgentIdentity, metadata: List<Pack>, response
         validateCounterXml(bytes)
         if (!engine.parse(bytes)) invalidCounters()
     }
-    val values = if (agent.alive) decodeCounterValues(response) else emptyMap()
-    val names = engine.getCounterSet(agent.objType) + values.keys
-    if (names.size > 5000) invalidCounters()
-    return RealtimeCounters(agent, names.map { name ->
-        if (name.isBlank() || name.length > 256 || name.any(Char::isISOControl)) invalidCounters()
-        val raw = values[name]
-        val number = when (raw) {
-            is DecimalValue -> raw.value.toString()
-            is FloatValue -> raw.value.takeIf { it.isFinite() }?.toString() ?: invalidCounters()
-            is DoubleValue -> raw.value.takeIf { it.isFinite() }?.toString() ?: invalidCounters()
-            else -> null
-        }
-        val known = engine.isCounterOf(name, agent.objType)
-        CounterReading(name, if (known) engine.getCounterDisplayName(agent.objType, name) else null,
-            if (known) engine.getCounterUnit(agent.objType, name) else null, number,
-            when {
-                raw == null -> CounterAvailability.UNAVAILABLE
-                number != null -> CounterAvailability.AVAILABLE
-                else -> CounterAvailability.UNSUPPORTED
-            })
-    })
+    return engine
+}
+
+internal fun decodeCounterNumber(raw: Value?): String? = when (raw) {
+    is DecimalValue -> raw.value.toString()
+    is FloatValue -> raw.value.takeIf { it.isFinite() }?.toString() ?: invalidCounters()
+    is DoubleValue -> raw.value.takeIf { it.isFinite() }?.toString() ?: invalidCounters()
+    else -> null
 }
 
 private fun decodeCounterValues(response: List<Pack>): Map<String, Value> {

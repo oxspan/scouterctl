@@ -13,19 +13,15 @@ Starting with diagnostics and data capture, the project aims to cover configurat
 
 ## Quick start
 
-Download a ZIP and its `SHA256SUMS` from [Releases](https://github.com/oxspan/scouterctl/releases), then follow the [installation guide](QUICKSTART.md#prerequisites).
+Install the Linux x64 or Windows x64 command package from [Releases](https://github.com/oxspan/scouterctl/releases) (1.0.0 and later), following the [installation guide](docs/installation.md).
 
-Requires JDK 21. See [supported Collector versions](docs/supported-versions.md) for online commands.
+Requires JDK 21. See [supported Collector versions](docs/supported-versions.md).
 
-From the extracted directory, check your Collector connection (Bash):
-
-```bash
-SCOUTERCTL_JAR="scouterctl-$(cat version.txt)-all.jar"
-java -jar "$SCOUTERCTL_JAR" doctor \
-  --host 127.0.0.1 --port 6100 --user guest --interactive
+```sh
+scouterctl doctor --host 127.0.0.1 --port 6100 --user guest --interactive
 ```
 
-Replace the connection values with your own; the command prompts for your password. Continue with [connection setup and transaction queries](QUICKSTART.md#connect-and-find-a-target).
+Continue with [usage and examples](QUICKSTART.md). Published 0.x JAR packages use the [legacy instructions](docs/legacy-jar.md).
 
 ## How it works
 
@@ -39,7 +35,7 @@ flowchart LR
 
 ## Documentation
 
-- [Usage and examples](QUICKSTART.md)
+- [Usage and examples](QUICKSTART.md) · [Command installation](docs/installation.md)
 - [Architecture](docs/architecture.md)
 - [JSON output and exit codes](docs/cli-contract.md) · [Capture compatibility](docs/capture-compatibility.md)
 - [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)

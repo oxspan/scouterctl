@@ -70,9 +70,10 @@ internal class RecoveryProxy(
         while (!listener.isClosed) {
             val command = try { input.readText() } catch (_: EOFException) { return }
             check(command in setOf(RequestCmd.LOGIN, RequestCmd.TRANX_LOAD_TIME_GROUP_V2,
-                RequestCmd.TRANX_PROFILE, RequestCmd.XLOG_READ_BY_TXID, RequestCmd.GET_TEXT_PACK))
+                RequestCmd.TRANX_PROFILE, RequestCmd.XLOG_READ_BY_TXID, RequestCmd.GET_TEXT_PACK,
+                RequestCmd.OBJECT_LIST_LOAD_DATE, RequestCmd.GET_XML_COUNTER, RequestCmd.COUNTER_PAST_TIME))
             val session = input.readLong()
-            val request = input.readMapPack()
+            val request = if (command == RequestCmd.GET_XML_COUNTER) null else input.readMapPack()
             if (command == commandToPause && ++matches == occurrence) {
                 entered.countDown()
                 check(released.await(15, TimeUnit.SECONDS)) { "Recovery boundary was not released" }
@@ -80,7 +81,7 @@ internal class RecoveryProxy(
             try {
                 targetOutput.writeText(command)
                 targetOutput.writeLong(session)
-                targetOutput.writePack(request)
+                if (request != null) targetOutput.writePack(request)
                 targetOutput.flush()
                 while (true) {
                     val flag = targetInput.readByte()

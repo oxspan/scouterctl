@@ -1,81 +1,26 @@
-# scouterctl — Quick start
+# Quick start
 
-A CLI for querying observability data from a Scouter Collector and exporting it as JSON/JSONL files. See the CLI output and capture format guides for supported behavior.
-
-## Prerequisites
-
-You need JDK 21 and access to a [supported Scouter Collector release](https://github.com/oxspan/scouterctl/blob/develop/docs/supported-versions.md). The Java runtime, Collector, and Agent are not included in the package. Check `java -version` first: an older runtime cannot start this JAR and cannot return the CLI's JSON errors.
-
-Download one ZIP and its `SHA256SUMS` from the same release into an empty directory.
-
-On Linux:
+Install a Linux x64 or Windows x64 command package using the [installation guide](docs/installation.md). JDK 21 is required; Collector and Agent JVMs are independent.
 
 ```sh
-sha256sum -c SHA256SUMS
-unzip scouterctl-*-poc.zip
-cd scouterctl-*/
+scouterctl --version
+scouterctl --help
 ```
 
-Start in the extracted directory containing the executable JAR:
+Examples below use Bash and this command array:
 
-```sh
-SCOUTERCTL_JAR="scouterctl-$(cat version.txt)-all.jar"
-java -jar "$SCOUTERCTL_JAR" --version
-java -jar "$SCOUTERCTL_JAR" --help
+```bash
+SCOUTERCTL=(scouterctl)
 ```
 
-The version output matches the included `version.txt`. Offline `inspect` needs only JDK 21 and a v2 or v3 capture, with no account or Collector connection.
-
-On macOS, use `shasum -a 256 -c SHA256SUMS` instead of `sha256sum -c SHA256SUMS`, then use the same unzip and Bash commands.
-
-On Windows with PowerShell 7:
-
-Start inside the extracted directory and use the JAR filename as shown below. This also supports Korean installation directories. For non-ASCII command arguments, use the UTF-8 argument-file example below. Unicode text inside captures and JSON output is preserved.
-
-```powershell
-$archive = Get-Item ./scouterctl-*-poc.zip
-$expected = (Get-Content ./SHA256SUMS -Raw).Trim()
-$actual = (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($expected -cne "$actual  $($archive.Name)") { throw 'Checksum mismatch' }
-Expand-Archive -LiteralPath $archive.FullName -DestinationPath .
-Set-Location $archive.Name.Replace('-poc.zip', '')
-$SCOUTERCTL_JAR = "scouterctl-$((Get-Content version.txt -Raw).Trim())-all.jar"
-java -jar $SCOUTERCTL_JAR --version
-java -jar $SCOUTERCTL_JAR --help
-```
-
-For online commands in PowerShell, set the password with `$env:SCOUTERCTL_PASSWORD = Read-Host 'Collector password' -MaskInput`, then run `java -jar $SCOUTERCTL_JAR --host 127.0.0.1 --port 6100 --user guest doctor` with your connection values. Clear the environment value afterward with `Remove-Item Env:SCOUTERCTL_PASSWORD`. Replace the Bash array invocation in later examples with `java -jar $SCOUTERCTL_JAR` and the same connection flags. Passwords are not stored in the CLI configuration.
-
-### Windows Unicode paths and arguments
-
-The Windows JDK 21 launcher can replace characters outside the system code page before scouterctl starts. Changing only the console code page or `file.encoding` does not repair direct arguments. Use `Set-Location -LiteralPath` to enter the installation directory and pass only the ASCII JAR filename, not its full Korean path.
-
-For Korean connection names, accounts, capture paths or service filters, save the arguments in a UTF-8 file **without a BOM**, then pass `@query.args` **after** the JAR filename. This file is read by scouterctl's argument parser, not the Java launcher:
-
-```powershell
-Set-Location -LiteralPath 'C:/도구/scouterctl'
-$SCOUTERCTL_JAR = "scouterctl-$((Get-Content version.txt -Raw).Trim())-all.jar"
-@'
-inspect search
---directory "C:/관측 자료/캡처"
---service-name "/결제<GET>"
---include-text
-'@ | Set-Content -LiteralPath query.args -Encoding utf8NoBOM
-java -Dfile.encoding=UTF-8 -jar $SCOUTERCTL_JAR '@query.args'
-```
-
-Quote values containing spaces, `#` or quotes; inside quoted values, escape `"` as `\"` and `\` as `\\`. Forward slashes avoid Windows path escaping. Paths inside the file are relative to the shell's current directory, not the argument file. Keep the JAR and argument filenames ASCII. Keep passwords in `SCOUTERCTL_PASSWORD` or the interactive prompt, not in argument files.
-
-The same file can contain `context add --name 운영 --user 관측계정`, followed by a separate invocation of `context use --name 운영`. Context names accept 1–64 Unicode code points: letters, decimal digits, combining marks, dots, underscores and hyphens, starting with a letter or digit. Names are stored exactly as entered, without case folding or Unicode normalization; visually identical spellings with different code points are distinct. Older versions that only accept ASCII names cannot read a config containing Unicode names; use a separate `SCOUTERCTL_CONFIG` file if switching back.
-
-This workflow covers Korean installation folders and Unicode values read from argument files. Direct Unicode launcher arguments and installation paths containing emoji remain outside the supported Windows scope. See the [JDK launcher change](https://www.oracle.com/java/technologies/javase/21-0-9-relnotes.html) and [argument-file syntax](https://picocli.info/#AtFiles).
+On Windows, run `scouterctl` directly from PowerShell or Command Prompt and pass the same options. The native executable supports Korean installation folders and direct Unicode arguments; keep emoji out of the installation path. For published 0.x JAR assets, see [legacy launch instructions](docs/legacy-jar.md).
 
 ## Connect and find a target
 
 These examples use Bash. Obtain the Collector's TCP host, port, and an account from its administrator. The defaults are `127.0.0.1:6100`; a Web API URL or port is not the Collector TCP endpoint. Replace the three connection values below once. The array keeps the same endpoint/account for subsequent online commands in this shell; it contains no password.
 
 ```sh
-SCOUTERCTL=(java -jar "$SCOUTERCTL_JAR" --host 127.0.0.1 --port 6100 --user guest)
+SCOUTERCTL=(scouterctl --host 127.0.0.1 --port 6100 --user guest)
 read -r -s -p 'Collector password: ' SCOUTERCTL_PASSWORD
 printf '\n'
 export SCOUTERCTL_PASSWORD
@@ -103,11 +48,11 @@ Messages suggest a next check, not a definitive network diagnosis. A timeout can
 ## Service summaries from a saved capture
 
 ```sh
-java -jar "$SCOUTERCTL_JAR" inspect summary --directory ./capture --include-text
-java -jar "$SCOUTERCTL_JAR" inspect summary --directory ./capture --sort elapsed --limit 10
-java -jar "$SCOUTERCTL_JAR" inspect summary --directory ./capture --sort requests
+scouterctl inspect summary --directory ./capture --include-text
+scouterctl inspect summary --directory ./capture --sort elapsed --limit 10
+scouterctl inspect summary --directory ./capture --sort requests
 # Use services[].slowest.txid or services[].slowestError.txid with the existing detail command:
-java -jar "$SCOUTERCTL_JAR" inspect --directory ./capture --txid '<TXID>' --include-text
+scouterctl inspect --directory ./capture --txid '<TXID>' --include-text
 ```
 
 `inspect summary` scans a v2 or v3 capture offline and groups by XLog `serviceHash` within the capture's source/object/time window. Each service includes `requests`, `errors`, `errorRate` (a fraction from 0 to 1), `elapsedTotalMs`, `averageElapsedMs`, `maxElapsedMs`, missing-profile/name counts and representative requests. Errors mean nonzero XLog error hashes, not HTTP status codes. Durations describe entire requests, not SQL durations. Every captured XLog counts, including separate Servlet error dispatches; these counts are not necessarily the number of incoming HTTP requests.
@@ -123,11 +68,11 @@ The scan retains one page, duplicate-detection IDs and one accumulator per servi
 ## Saved connections and terminal input
 
 ```sh
-java -jar "$SCOUTERCTL_JAR" context add --name local --host 127.0.0.1 --port 6100 --user observer
-java -jar "$SCOUTERCTL_JAR" context list
-java -jar "$SCOUTERCTL_JAR" context use --name local
-java -jar "$SCOUTERCTL_JAR" auth login
-java -jar "$SCOUTERCTL_JAR" object list --interactive
+scouterctl context add --name local --host 127.0.0.1 --port 6100 --user observer
+scouterctl context list
+scouterctl context use --name local
+scouterctl auth login
+scouterctl object list --interactive
 ```
 
 `context add` saves the supplied host, port and account without connecting or selecting it. Names are unique; existing entries are not overwritten. `context use` selects an existing entry for subsequent commands. These local commands require explicit arguments and never prompt. `auth login` checks the selected Collector and credentials, then disconnects; it does **not** save a password or session. Each subsequent command needs `SCOUTERCTL_PASSWORD` or its own `--interactive` input.
@@ -186,6 +131,30 @@ Both commands return `data.agent` and a sorted `data.counters` array; `get` sele
 
 These are the latest values in the Collector cache. The response supplies no sample timestamp, and the counters need not share a measurement window. The CLI does not certify freshness or replace missing values with zero. See [Host and process counters](https://github.com/oxspan/scouterctl/blob/develop/docs/host-counters.md) for Host Agent setup and tested combinations. Some counters need another producer: for example, `ProcCpu` can remain unavailable without the Host Agent, and GC counters may need another collection cycle after startup. TPS, response time and error rate are Agent aggregates, so they need not match a client-side HTTP batch's count or error fraction. The commands do not write settings or query historical time series.
 
+## Stored counter history and export
+
+Use the Collector's storage date and IANA timezone for a one-day JSONL stream:
+
+```bash
+scouterctl counter history --object-hash 123456 --counter HeapUsed \
+  --date 20261107 --from 2026-11-07T00:00:00Z --to 2026-11-07T01:00:00Z \
+  --timezone UTC --no-input > heap.jsonl
+```
+
+For multiple days, save checkpointed chunks and repeat the same query with `--resume`:
+
+```bash
+scouterctl counter export --object-hash 123456 --counter HeapUsed \
+  --from 2026-11-06T00:00:00Z --to 2026-11-08T00:00:00Z \
+  --timezone UTC --directory heap-export --max-chunks 24 --no-input
+# Exit 8 means more windows remain. Reuse the same source and query:
+scouterctl counter export --object-hash 123456 --counter HeapUsed \
+  --from 2026-11-06T00:00:00Z --to 2026-11-08T00:00:00Z \
+  --timezone UTC --directory heap-export --max-chunks 24 --resume --no-input
+```
+
+Supply connection options or a saved context and `SCOUTERCTL_PASSWORD`. Missing samples are omitted, not zero-filled. Units describe the current Collector definition; completion does not certify total telemetry coverage. See [counter history](docs/counter-history.md) and [resumable export](docs/counter-export.md) for output and limits.
+
 ## Query and export
 
 Run these commands with the password environment variable set. Replace the example object hash, date, time zone, and transaction ID with values from your environment.
@@ -218,7 +187,7 @@ Inspect a saved transaction after disconnecting from the Collector:
 
 ```sh
 unset SCOUTERCTL_PASSWORD
-java -jar "$SCOUTERCTL_JAR" inspect --directory ./incident-profiles \
+scouterctl inspect --directory ./incident-profiles \
   --txid 9223372036854775806 --include-text
 ```
 
@@ -227,10 +196,10 @@ Replace the directory with the v3 bundle you created. Omit `--include-text` to e
 To find a transaction ID first, search the same bundle offline:
 
 ```sh
-java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles \
+scouterctl inspect search --directory ./incident-profiles \
   --min-elapsed-ms 300 --limit 10
-java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles --errors-only
-java -jar "$SCOUTERCTL_JAR" inspect search --directory ./incident-profiles \
+scouterctl inspect search --directory ./incident-profiles --errors-only
+scouterctl inspect search --directory ./incident-profiles \
   --service-name '/checkout<GET>' --include-text
 ```
 
@@ -247,8 +216,8 @@ unset SCOUTERCTL_PASSWORD
 ## Compare saved captures
 
 ```sh
-java -jar "$SCOUTERCTL_JAR" inspect compare --before ./before --after ./after
-java -jar "$SCOUTERCTL_JAR" inspect compare --before ./before --after ./after --include-text --limit 100
+scouterctl inspect compare --before ./before --after ./after
+scouterctl inspect compare --before ./before --after ./after --include-text --limit 100
 ```
 
 Both directories must contain v2 or v3 captures created with `capture --include-profiles`. The command reads every referenced page, needs no credentials or Collector connection, and leaves both captures unchanged. Use completed captures that are no longer being written.
@@ -275,7 +244,7 @@ For scripting, see the [CLI output contract](https://github.com/oxspan/scouterct
 - `--include-text` is supported by `profile get`, `capture --include-profiles`, and `inspect`. V3 pages contain XLogs, profile availability, profiles, completeness and optional dictionary snapshots; existing v2 pages remain readable. Inspect uses only these stored values.
 - Profile capture is limited to 10,000 pages and 16 MiB per page. A smaller page size may be needed for large profiles; changing the query requires a new capture. Resume may leave unreferenced page files, which are ignored. Checksums detect accidental corruption; the manifest is not signed.
 - Capture completion indicates that the requested execution has finished, not that all traffic is included. Concurrent writes and durability during power loss are not guaranteed.
-- Online commands require a [supported Collector release](https://github.com/oxspan/scouterctl/blob/develop/docs/supported-versions.md); unverified versions are rejected. Run the packaged JAR with JDK 21. On Windows, use the documented relative-JAR and UTF-8 argument-file workflow for Korean paths and Unicode values.
+- Online commands require a [supported Collector release](https://github.com/oxspan/scouterctl/blob/develop/docs/supported-versions.md); unverified versions are rejected. Use JDK 21 for the CLI. The Windows x64 command supports Korean paths and direct Unicode arguments; legacy JAR limitations are documented separately.
 
 Exit codes: `0` success, `2` invalid input/resume conditions, `3` authentication/session error, `5` connection failure/timeout, `6` protocol error, `7` target, setting or profile/transaction unavailable, `8` partial completion or capture limit, `9` version mismatch, `10` I/O or integrity error.
 

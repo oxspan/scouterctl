@@ -61,6 +61,32 @@ class JsonOutput(private val stream: PrintStream) {
         })
     }
 
+    fun counterHistoryEvent(event: CounterHistoryEvent) = when (event) {
+        is CounterHistoryEvent.Start -> emit(buildJsonObject {
+            put("type", "start")
+            put("schemaVersion", "scouterctl.counter-stream/v1")
+            put("source", json.encodeToJsonElement(event.source.toDto()))
+            put("query", json.encodeToJsonElement(event.query.toDto()))
+            put("target", json.encodeToJsonElement(event.target.toDto()))
+            put("counter", json.encodeToJsonElement(event.counter.toDto()))
+            put("resolution", "stored-realtime")
+            put("intervalMs", JsonNull)
+            put("missingValues", "omitted")
+            put("metadataScope", "current-collector-definition")
+        })
+        is CounterHistoryEvent.Record -> emit(buildJsonObject {
+            put("type", "record")
+            put("data", json.encodeToJsonElement(event.point.toDto()))
+        })
+        is CounterHistoryEvent.Complete -> emit(buildJsonObject {
+            put("type", "complete")
+            put("executionComplete", true)
+            put("records", event.records)
+            put("upstreamCoverage", "unknown")
+            put("sampling", "unknown")
+        })
+    }
+
     private fun emit(value: JsonElement) {
         stream.println(value)
         if (stream.checkError()) throw OperationFailure(ErrorCode.IO_ERROR, "Output stream failed")
