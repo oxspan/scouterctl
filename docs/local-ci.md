@@ -10,11 +10,11 @@ The wrapper selects only the `build` job in `.github/workflows/ci-release.yml`. 
 
 ## WSL setup
 
-Start Docker Desktop with its Linux engine and enable the current distribution under Settings > Resources > WSL Integration. Confirm `docker info` works inside WSL. Install [act](https://nektosact.com/installation/); this setup was prepared with v0.2.97. The wrapper uses `act` from PATH, `ACT_BIN` when supplied, or the Git-ignored `.local/tools/act-0.2.97/act` executable.
+Start Docker Desktop with its Linux engine and enable the current distribution under Settings > Resources > WSL Integration. Confirm `docker info` works inside WSL. Install [act](https://nektosact.com/installation/). The wrapper supports act v0.2.97. The wrapper uses `act` from PATH, `ACT_BIN` when supplied, or the Git-ignored `.local/tools/act-0.2.97/act` executable.
 
 The first run downloads runner images, actions, JDK and Gradle dependencies. `--action-offline-mode` reuses already cached actions/images on later runs; it does not promise a network-free build. `ACT_IMAGE` can override the default `ghcr.io/catthehacker/ubuntu:act-24.04` image.
 
-The local workflow uses the current working tree instead of checking out GitHub source. GitHub Gradle caching is disabled under act. Local artifact steps pin `upload-artifact v4.6.2`, which act v0.2.97 supports; hosted uploads keep v7. Recheck this compatibility before updating the local upload action. The wrapper does not load `.env`, `.secrets` or `.vars`, and does not pass a GitHub token. The Docker socket is not mounted into the job container. On WSL with Docker Desktop, the artifact server binds to WSL loopback and the container reaches it through `host.docker.internal` and Windows localhost forwarding. Other environments use act's bridge-network address. If uploads fail, check this connection before rerunning the build.
+The local workflow uses the current working tree instead of checking out GitHub source. GitHub Gradle caching is disabled under act. Local artifact steps pin `upload-artifact v4.6.2`, which act v0.2.97 supports; hosted uploads keep v7. The wrapper does not load `.env`, `.secrets` or `.vars`, and does not pass a GitHub token. The Docker socket is not mounted into the job container. On WSL with Docker Desktop, the artifact server binds to WSL loopback and the container reaches it through `host.docker.internal` and Windows localhost forwarding. Other environments use act's bridge-network address. If uploads fail, check this connection before rerunning the build.
 
 ## Validation boundaries
 
@@ -35,8 +35,8 @@ Local act runs supplement shared CI; they do not replace checks on contributions
 | Push to master | Linux and Windows, then the existing release workflow |
 | Manual dispatch | Linux and Windows; historical 0.x asset repair uses its tagged package format |
 
-A newer commit cancels an older run of the same PR. Master release runs are not cancelled by this policy. Scale validation remains opt-in. Documentation-only PRs still receive the baseline Linux check, keeping check names and branch expectations predictable.
+A newer commit cancels an older run of the same PR. Master release runs are not cancelled by this policy. Scale validation remains opt-in. Documentation-only PRs also receive the baseline Linux check.
 
 Check results for the latest PR revision before merging. Contributors can run act before pushing for faster feedback. Local success alone does not establish that hosted checks passed, and a skipped or absent check is not a pass.
 
-See [act's compatibility limits](https://nektosact.com/not_supported.html) and [artifact-server documentation](https://nektosact.com/usage/index.html#action-artifacts).
+For failed jobs, see [CI troubleshooting](ci-runner-recovery.md). See [act's compatibility limits](https://nektosact.com/not_supported.html) and [artifact-server documentation](https://nektosact.com/usage/index.html#action-artifacts).
