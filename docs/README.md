@@ -1,5 +1,7 @@
 # Documentation
 
+English | [한국어](ko/README.md)
+
 Start with [installation](installation.md) and the [quick start](../QUICKSTART.md).
 
 ## Using scouterctl

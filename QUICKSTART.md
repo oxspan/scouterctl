@@ -1,5 +1,7 @@
 # Quick start
 
+English | [한국어](QUICKSTART.ko.md)
+
 Install the [Linux x64 or Windows x64 command package](docs/installation.md) with JDK 21, then check:
 
 ```sh

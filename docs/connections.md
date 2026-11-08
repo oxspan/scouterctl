@@ -1,5 +1,7 @@
 # Connections and authentication
 
+English | [한국어](ko/connections.md)
+
 Create a named connection once, or select an existing context. Replace the example endpoint and account with values supplied by your Collector administrator. Use another name if `local` already exists.
 
 ```sh

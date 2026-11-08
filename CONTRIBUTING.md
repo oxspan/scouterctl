@@ -1,5 +1,7 @@
 # Contributing to scouterctl
 
+English | [한국어](CONTRIBUTING.ko.md)
+
 Bug reports, documentation improvements and focused Kotlin changes are welcome. For vulnerabilities, follow [SECURITY.md](SECURITY.md) rather than posting details in an issue.
 
 ## Get started
@@ -29,6 +31,7 @@ For a local Linux installation, use `./gradlew installDist` and run `build/insta
 - Preserve the [CLI output format](docs/cli-contract.md) and [capture compatibility rules](docs/capture-compatibility.md). Explain migrations when a change breaks either format.
 - Test observable behavior with the existing fixtures and subprocess harnesses. Choose checks appropriate to the change; documentation-only edits do not need new runtime tests.
 - Keep credentials, real captures, local configuration and generated evidence out of commits. Use synthetic, sanitized examples in reports and fixtures.
+- Update the relevant English and Korean guides together when installation or usage changes.
 
 ## Branches and pull requests
 
