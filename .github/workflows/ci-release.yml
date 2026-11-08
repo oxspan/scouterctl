@@ -55,7 +55,7 @@ jobs:
             master:develop|master:hotfix/*|master:release-please--branches--master) ;;
             *) echo "Unsupported PR route: $HEAD_BRANCH -> $BASE_BRANCH" >&2; exit 1 ;;
           esac
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: '21'
@@ -92,7 +92,7 @@ jobs:
           retention-days: 14
       - name: Save local test results
         if: ${{ always() && env.ACT == 'true' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2; act artifact API
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v4.6.2; act artifact API
         with:
           name: test-results-ubuntu-latest
           path: build/test-results/test/*.xml
@@ -106,7 +106,7 @@ jobs:
           retention-days: 14
       - name: Save local package
         if: ${{ env.ACT == 'true' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2; act artifact API
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v4.6.2; act artifact API
         with:
           name: release-package
           path: ${{ steps.package.outputs.package_path }}
@@ -128,7 +128,7 @@ jobs:
         with:
           ref: ${{ inputs.release_tag || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: '21'
