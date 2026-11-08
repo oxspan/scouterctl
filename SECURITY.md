@@ -1,5 +1,7 @@
 # Security policy
 
+English | [한국어](SECURITY.ko.md)
+
 ## Reporting a vulnerability
 
 Please use [GitHub private vulnerability reporting](https://github.com/oxspan/scouterctl/security/advisories/new) when **Report a vulnerability** is available in this repository's Security tab. Reports should include the affected scouterctl and Collector versions, operating system and Java version, reproduction steps, and expected impact.

@@ -1,5 +1,7 @@
 # scouterctl
 
+English | [한국어](README.ko.md)
+
 A CLI for operating [Scouter](https://github.com/scouter-project/scouter) from your terminal and automation workflows.
 
 Starting with diagnostics and data capture, the project aims to cover configuration management and Agent operations.
