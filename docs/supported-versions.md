@@ -1,6 +1,6 @@
 # Supported Collector versions
 
-Online commands accept the releases below. Versions outside this list, including unlisted patch releases and snapshots, return `VERSION_MISMATCH` (exit 9).
+Support targets Scouter 2.x; 1.x releases are outside the support scope. Online commands accept the releases below. Versions outside this list, including unlisted patch releases and snapshots, return `VERSION_MISMATCH` (exit 9).
 
 | Collector releases | Matching Agent and Java 8 HTTP/JDBC service | Agent 2.21.3 and Spring Boot 3 on Java 21 |
 | --- | --- | --- |

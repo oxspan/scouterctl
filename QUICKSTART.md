@@ -71,6 +71,8 @@ When the chunk budget is reached (exit `8`), repeat with the same query and `--r
 
 ## Results and next steps
 
+See [command and output examples](docs/examples.md) for actual login, counter, SQL/error, JSONL and error responses.
+
 Online results use JSON or JSONL. Read the exit code and completion fields; successful extraction does not prove that the Collector retained all traffic. Transaction IDs are strings and must not be converted through floating-point numbers.
 
 Clear `SCOUTERCTL_PASSWORD` when finished. See [output and exit codes](docs/cli-contract.md), [connection troubleshooting](docs/connections.md#connection-troubleshooting), [supported versions](docs/supported-versions.md), or the [documentation index](docs/README.md).
