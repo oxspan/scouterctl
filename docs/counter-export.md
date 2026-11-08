@@ -3,12 +3,13 @@
 `counter export` saves a counter's stored samples over multiple days. It splits the interval into smaller, non-overlapping windows and checkpoints each completed file. Use [counter history](counter-history.md) for a single-day JSONL stream on stdout.
 
 ```sh
+mkdir captures
 scouterctl counter export \
   --object-hash 123 --counter HeapUsed \
   --from 2026-11-01T00:00:00+09:00 \
   --to 2026-11-04T00:00:00+09:00 \
   --timezone Asia/Seoul --chunk-minutes 60 \
-  --directory heap-export --max-chunks 24 --no-input
+  --directory captures/heap-export --max-chunks 24 --no-input
 
 # Same source, interval, timezone, object, counter and chunk size:
 scouterctl counter export \
@@ -16,10 +17,10 @@ scouterctl counter export \
   --from 2026-11-01T00:00:00+09:00 \
   --to 2026-11-04T00:00:00+09:00 \
   --timezone Asia/Seoul --chunk-minutes 60 \
-  --directory heap-export --max-chunks 100 --resume --no-input
+  --directory captures/heap-export --max-chunks 100 --resume --no-input
 ```
 
-Supply connection options or a saved context and `SCOUTERCTL_PASSWORD`. The first invocation requires a new directory. Resume requires an existing valid checkpoint and a connection to the same Collector. Use the same query and chunk size; only the per-invocation `--max-chunks` budget may change.
+Create the parent `captures` directory if it does not exist. Supply connection options or a saved context and `SCOUTERCTL_PASSWORD`. The first invocation requires a new directory. Resume requires an existing valid checkpoint and a connection to the same Collector. Use the same query and chunk size; only the per-invocation `--max-chunks` budget may change.
 
 ## Files and completion
 
@@ -42,4 +43,5 @@ Collector replies are decoded and buffered before a file is written. Sample/file
 
 Counter units/labels come from the current Collector definition at each query, not a versioned historical definition. A resumed export may therefore contain different per-chunk definitions. Completed chunks are not refreshed for late-arriving data; this is a checkpointed extraction, not a Collector-wide snapshot or a live tail. Historical object absence and sampling/retention remain visible limitations.
 
-The opt-in Kotlin `counterHistorySmoke` checks basic multi-day export/resume on all 18 [listed Collector releases](supported-versions.md), with Linux Java 8 Collector/matching Agents and a Linux JDK 21 CLI. Full Collector restart recovery and native Windows checks, including Linux-to-Windows resume, cover 2.8.1 and 2.21.3 separately. These results do not certify the other releases on Windows/macOS or change existing XLog capture/readers.
+
+See [supported versions](supported-versions.md) and [Testing](testing.md) for the validation scope and reproducible integration tasks.

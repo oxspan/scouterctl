@@ -12,8 +12,8 @@ The request's `max=1000` limits **stored profile blocks**, not decoded steps. A 
 Online `profile get` and offline `inspect` return exit `8` and result-level `executionComplete=false` for a known truncated profile. They still return the available profile data. `unknown` retains the previous exit behavior; success is not proof that all upstream activity was captured.
 
 ```sh
-java -jar scouterctl-VERSION-all.jar profile get --date YYYYMMDD --txid TXID
-java -jar scouterctl-VERSION-all.jar inspect --directory CAPTURE --txid TXID
+scouterctl profile get --date YYYYMMDD --txid TXID
+scouterctl inspect --directory CAPTURE --txid TXID
 ```
 
 ## Capture compatibility and limits

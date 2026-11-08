@@ -1,6 +1,6 @@
 # Capture scale validation
 
-Run the opt-in **Capture scale validation** GitHub Actions workflow on a branch to measure offline `inspect compare`. It builds one CLI JAR and one synthetic capture archive, then verifies and uses the same bytes on Linux, Windows and macOS. It does not publish a release or run on every pull request. You can also enable `scale_validation` when manually running **CI and release**, including on a feature branch.
+Run the opt-in **Capture scale validation** GitHub Actions workflow on a branch to measure offline `inspect compare`. It builds one CLI JAR and one synthetic capture archive, then verifies and uses the same bytes on Linux, Windows and macOS. It does not publish a release or run on every pull request. The macOS measurement job is outside the supported release-platform scope. You can also enable `scale_validation` when manually running **CI and release**, including on a feature branch.
 
 For a local Linux, macOS or Windows checkout with JDK 21:
 
@@ -33,4 +33,4 @@ Successful cases run three times in fresh JVMs. Rejected cases run once. Expecte
 - Three sequential fresh JVM runs do not control disk cache, host contention, CPU architecture, antivirus, or JIT effects. Compare results within their recorded host context; do not rank operating systems by these numbers.
 - Coverage stops at 100,000 records per input with a small SQL profile. It does not establish capacity at the capture format's maximum page count, huge individual profiles, concurrent writers, online capture throughput, or production service latency. Input files must remain immutable during comparison.
 
-The `scale-results-*` artifacts retain raw CLI output, memory measurements and `report.json` for 14 days. The report records runtime/OS/architecture, processor count, heap settings, JAR and input-fingerprint SHA-256, paired input bytes, and individual execution measurements. Input archive checksums are also printed in job logs. No private installation paths or measured host performance claims belong in the project README.
+The `scale-results-*` artifacts retain CLI output, memory measurements and `report.json` for 14 days. The report records runtime/OS/architecture, processor count, heap settings, JAR and input-fingerprint SHA-256, paired input bytes, and individual execution measurements. Input archive checksums are also printed in job logs.

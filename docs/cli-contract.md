@@ -1,14 +1,14 @@
-# CLI output and compatibility contract
+# JSON output and exit codes
 
-This contract describes the current CLI boundary for scripts. It is separate from the CLI release version and the on-disk [capture format](capture-compatibility.md). It does not turn this POC into a general Scouter protocol client: online access supports the [listed Collector releases](supported-versions.md).
+This guide describes the output consumed by scripts and other tools. Output schemas are versioned separately from CLI releases and the [capture file format](capture-compatibility.md). Online commands support the [listed Collector releases](supported-versions.md).
 
 ## Process and channels
 
 - Normal command output is UTF-8 JSON on stdout, terminated by a newline. `xlog search` and `counter history` emit JSONL: parse each nonempty line as one JSON object.
 - Command and argument errors also go to stdout as JSON. Do not assume stderr is the error API. Keep stdout and stderr separate when parsing.
 - Explicit interactive password input uses a terminal and a human-readable prompt on stderr. Automation should provide `SCOUTERCTL_PASSWORD` and use `--no-input`; it must not depend on prompt text.
-- `--help` and `--version` are plain-text stdout with exit 0, outside the JSON contract. Help layout and diagnostic messages may change. Parse error codes rather than message text.
-- This contract applies after the JVM and CLI start successfully. A missing/incompatible JVM, process termination or an unwritable output stream can prevent a valid JSON response. Missing or malformed output must not be treated as successful execution.
+- `--help` and `--version` are plain-text stdout with exit 0, outside the JSON format. Help layout and diagnostic messages may change. Parse error codes rather than message text.
+- These formats apply after the JVM and CLI start successfully. A missing/incompatible JVM, process termination or an unwritable output stream can prevent a valid JSON response. Missing or malformed output must not be treated as successful execution.
 
 ## Single-result commands
 
@@ -56,7 +56,7 @@ A mid-response EOF currently maps to `IO_ERROR` (10), whereas socket exceptions/
 {"type":"complete","executionComplete":true,"upstreamCoverage":"unknown","sampling":"unknown"}
 ```
 
-The abbreviated objects illustrate event shape, not executable JSON fixtures. There are zero or more `record` events. `record` and `complete` events do not repeat `schemaVersion`; they inherit the stream contract from `start`.
+The abbreviated objects illustrate event shape, not executable JSON fixtures. There are zero or more `record` events. `record` and `complete` events do not repeat `schemaVersion`; they inherit the stream schema from `start`.
 
 A successful stream has exactly one final `complete` event and exit 0. Failure after streaming starts ends with the `scouterctl.error/v1` error object and a nonzero exit, without `complete`. Failure before streaming starts may emit only the error object. A page budget produces `PARTIAL_RESULT` and exit 8; earlier records must not be mistaken for the full query. A killed process or failed output transport may leave no terminal event.
 
@@ -71,8 +71,8 @@ A consumer should accept the stream schema, process records, then require both t
 - `txid`, `gxid`, `caller`, and cursor transaction IDs are decimal strings, including negative values and the full signed 64-bit range. Never convert them through a floating-point number.
 - Hashes, counts, durations and timestamps retain their command-defined numeric types and units. Timestamps such as `endTime`, `from` and `to` are epoch milliseconds; elapsed durations are milliseconds. Do not infer units from a display label.
 - JSON booleans are booleans, not strings. `null` is not interchangeable with 0, an empty string, an empty array or an absent field. For example, `current: null` means no selected context; `updated: null` is not an update count of zero. Dictionary status and text availability must be read together.
-- Object-member order and whitespace are not part of the contract. Consumers must tolerate added fields at every object level while validating fields they use. The current capture-file reader is stricter; JSON output tolerance does not change the [capture compatibility rules](capture-compatibility.md).
+- Object-member order and whitespace are not part of the format. Consumers must tolerate added fields at every object level while validating fields they use. The current capture-file reader is stricter; JSON output tolerance does not change the [capture compatibility rules](capture-compatibility.md).
 - Removing/renaming existing fields, changing their type, units or meaning, or changing established event semantics requires a new affected output schema version and documented migration. Existing error codes and exit meanings must not be silently repurposed. Enum/status additions that require new interpretation also need an explicit compatibility decision rather than being assumed safe.
 - New commands and additive fields can be introduced without changing existing envelopes. Changing existing command syntax or defaults in a way that breaks scripts requires release notes and a migration path. This document does not promise indefinite support for every old release.
 
-Use [Quick start](../QUICKSTART.md) for supported commands and data semantics, [profile completeness](profile-completeness.md) for truncation signals, and [architecture](architecture.md) for presentation/serialization ownership. Core and application models do not own JSON envelopes or numeric process exit codes.
+Use the [command guides](README.md#using-scouterctl) for command-specific fields and behavior, [profile completeness](profile-completeness.md) for truncation signals, and [architecture](architecture.md) for presentation/serialization ownership. Core and application models do not own JSON envelopes or numeric process exit codes.
