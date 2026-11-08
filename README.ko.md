@@ -17,13 +17,19 @@
 
 [릴리스](https://github.com/oxspan/scouterctl/releases)에서 Linux x64 또는 Windows x64 ZIP을 받아 [설치 안내](docs/ko/installation.md)에 따라 설치합니다.
 
-JDK 21이 필요합니다. Collector의 버전은 [지원 버전 목록(영문)](docs/supported-versions.md)을 확인하세요.
+JDK 21이 필요합니다. Scouter 2.x 중 검증한 [지원 버전 목록(영문)](docs/supported-versions.md)을 확인하세요.
 
 ```sh
 scouterctl doctor --host 127.0.0.1 --port 6100 --user guest --interactive
 ```
 
-이어서 [빠른 시작](QUICKSTART.ko.md)을 따라 연결·조회·추출을 실행할 수 있습니다.
+성공 응답의 일부 필드입니다.
+
+```json
+{"ok":true,"data":{"version":"2.8.1 2020-05-14 23:36 GMT"},"executionComplete":true}
+```
+
+[명령과 실행 결과 예시](docs/ko/examples.md)를 보거나 [빠른 시작](QUICKSTART.ko.md)을 따라 실행할 수 있습니다.
 
 ## 동작 방식
 

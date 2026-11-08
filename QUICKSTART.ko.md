@@ -73,6 +73,8 @@ scouterctl counter export --object-hash 123456 --counter HeapUsed \
 
 ## 결과 확인
 
+실제 로그인·지표·SQL/오류·JSONL·인증 오류 출력은 [명령과 실행 결과 예시](docs/ko/examples.md)에서 볼 수 있습니다.
+
 온라인 결과는 JSON 또는 JSONL입니다. 종료 코드와 완료 여부를 함께 확인하세요. 추출 완료는 Collector가 모든 트래픽을 보관했다는 뜻이 아닙니다. 트랜잭션 ID는 문자열이며 부동소수점 숫자로 바꾸면 안 됩니다.
 
 작업이 끝나면 `SCOUTERCTL_PASSWORD`를 지우세요. [연결 문제 해결](docs/ko/connections.md#연결-문제-해결), [출력 형식과 종료 코드(영문)](docs/cli-contract.md), [지원 버전(영문)](docs/supported-versions.md), [문서 목록](docs/ko/README.md)에서 자세한 내용을 확인할 수 있습니다.

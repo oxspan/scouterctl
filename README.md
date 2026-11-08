@@ -17,13 +17,19 @@ Starting with diagnostics and data capture, the project aims to cover configurat
 
 Install the Linux x64 or Windows x64 command package from [Releases](https://github.com/oxspan/scouterctl/releases), following the [installation guide](docs/installation.md).
 
-Requires JDK 21. See [supported Collector versions](docs/supported-versions.md).
+Requires JDK 21. See the [verified Scouter 2.x releases](docs/supported-versions.md).
 
 ```sh
 scouterctl doctor --host 127.0.0.1 --port 6100 --user guest --interactive
 ```
 
-Continue with [usage and examples](QUICKSTART.md).
+Selected fields from a successful response:
+
+```json
+{"ok":true,"data":{"version":"2.8.1 2020-05-14 23:36 GMT"},"executionComplete":true}
+```
+
+See [commands and output examples](docs/examples.md), or continue with the [quick start](QUICKSTART.md).
 
 ## How it works
 
