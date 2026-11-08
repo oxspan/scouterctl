@@ -1,5 +1,7 @@
 # Install scouterctl
 
+English | [한국어](ko/installation.md)
+
 Download the ZIP for your platform and `SHA256SUMS` from the same [GitHub Release](https://github.com/oxspan/scouterctl/releases):
 
 | Platform | Archive | Runtime |

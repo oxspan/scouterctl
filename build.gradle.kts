@@ -37,7 +37,11 @@ tasks.startScripts {
 distributions {
     main {
         contents {
-            from("README.md", "QUICKSTART.md", "CONTRIBUTING.md", "CHANGELOG.md", "LICENSE", "SECURITY.md")
+            from(
+                "README.md", "README.ko.md", "QUICKSTART.md", "QUICKSTART.ko.md",
+                "CONTRIBUTING.md", "CONTRIBUTING.ko.md", "SECURITY.md", "SECURITY.ko.md",
+                "CHANGELOG.md", "LICENSE",
+            )
             from(packageVersion)
             from("docs") { into("docs") }
             from("vendor") {
