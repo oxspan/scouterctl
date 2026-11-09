@@ -47,7 +47,7 @@ internal class MemorySource(
     override fun counterHistory(query: CounterHistoryQuery): CounterHistory = throw OperationFailure(ErrorCode.NOT_FOUND, "No history in memory fixture")
     override fun realtimeCounters(objHash: Int): RealtimeCounters = throw OperationFailure(ErrorCode.NOT_FOUND, "No Agent in memory fixture")
     override fun objects(date: String?): List<ObjectRecord> = emptyList()
-    override fun page(query: Query, cursor: Cursor) = fetch(cursor)
+    override fun page(query: Query, cursor: Cursor, includeText: Boolean) = fetch(cursor)
     override fun profile(date: String, txid: Long, includeText: Boolean) = profile(txid)
     override fun close() { closed = true }
 }

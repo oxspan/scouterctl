@@ -27,6 +27,8 @@ scouterctl capture \
   --include-profiles --directory captures/incident-001
 ```
 
+Add `--include-text` to `xlog search` to resolve service names and error text without downloading profiles. Error text can contain sensitive values, including bound values or values from existing database rows.
+
 The destination directory must not exist for a new capture. If the export is interrupted or partially completes, add `--resume` to the same capture command. Each query covers one date and one object over `[from,to)`. Set `--timezone` to the Collector's actual time zone.
 
 The example saves profiles in a v3 bundle. Add `--include-text` to the capture command only when you intend to store potentially sensitive service, SQL and error text; the default page size is 25 and the maximum is 100. Resume v3 with the same flags and query. Existing v2 bundles remain readable but cannot be resumed by this version; see [Capture compatibility](capture-compatibility.md). Missing profiles are recorded and retried on resume; connection failures preserve earlier page checkpoints. See [Capture recovery](capture-recovery.md) for interruption handling and the limits of recovery.

@@ -100,8 +100,8 @@ private fun Cli.validateGeneralOptions(command: String) {
         invalid("Search filters require inspect search")
     }
     if (includeProfiles && command != "capture") invalid("--include-profiles requires capture")
-    if (includeText && command !in setOf("profile get", "inspect", "inspect search") && !(command == "capture" && includeProfiles)) {
-        invalid("--include-text requires profile get, inspect or capture --include-profiles")
+    if (includeText && command !in setOf("xlog search", "profile get", "inspect", "inspect search") && !(command == "capture" && includeProfiles)) {
+        invalid("--include-text requires xlog search, profile get, inspect or capture --include-profiles")
     }
 }
 
@@ -118,7 +118,7 @@ private fun Cli.onlineRequest(command: String): OnlineRequest {
         "doctor", "auth login" -> OnlineRequest.Doctor(command == "auth login")
         "object list" -> OnlineRequest.Objects(date?.also(::validateStorageDate))
         "profile get" -> OnlineRequest.Profile(required(date, "--date"), required(txid, "--txid"), includeText)
-        "xlog search" -> OnlineRequest.Search(required(query, "query"), maxPages)
+        "xlog search" -> OnlineRequest.Search(required(query, "query"), maxPages, includeText)
         "capture" -> OnlineRequest.Capture(
             required(query, "query"), required(directory, "--directory"), resume, maxPages, includeProfiles, includeText,
         )

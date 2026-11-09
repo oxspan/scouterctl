@@ -11,7 +11,7 @@ interface ObservationSource : AutoCloseable {
     fun counterHistory(query: CounterHistoryQuery): CounterHistory
     fun realtimeCounters(objHash: Int): RealtimeCounters
     fun objects(date: String? = null): List<ObjectRecord>
-    fun page(query: Query, cursor: Cursor): XLogPage
+    fun page(query: Query, cursor: Cursor, includeText: Boolean = false): XLogPage
     fun profile(date: String, txid: Long, includeText: Boolean = false): ProfileRecord
 }
 

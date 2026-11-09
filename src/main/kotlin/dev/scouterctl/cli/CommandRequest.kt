@@ -27,7 +27,7 @@ sealed interface OnlineRequest : CommandRequest {
     data class Counters(val objHash: Int, val name: String?) : OnlineRequest
     data class Objects(val date: String?) : OnlineRequest
     data class Profile(val date: String, val txid: Long, val includeText: Boolean) : OnlineRequest
-    data class Search(val query: Query, val maxPages: Int) : OnlineRequest
+    data class Search(val query: Query, val maxPages: Int, val includeText: Boolean = false) : OnlineRequest
     data class Capture(val query: Query, val directory: Path, val resume: Boolean,
         val maxPages: Int, val includeProfiles: Boolean, val includeText: Boolean) : OnlineRequest
 }

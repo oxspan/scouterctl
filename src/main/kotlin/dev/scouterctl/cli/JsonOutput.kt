@@ -55,7 +55,15 @@ class JsonOutput(private val stream: PrintStream) {
         })
         is XLogEvent.Record -> emit(buildJsonObject {
             put("type", "record")
-            put("data", json.encodeToJsonElement(event.value.toDto()))
+            val record = json.encodeToJsonElement(event.value.toDto()).jsonObject
+            val data = event.text?.let { text ->
+                buildJsonObject {
+                    record.forEach { (key, value) -> put(key, value) }
+                    put("service", json.encodeToJsonElement(text.service.toDto()))
+                    put("error", json.encodeToJsonElement(text.error?.toDto()))
+                }
+            } ?: record
+            put("data", data)
         })
         XLogEvent.Complete -> emit(buildJsonObject {
             put("type", "complete")

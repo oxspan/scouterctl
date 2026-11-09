@@ -62,4 +62,8 @@ data class Query(val date: String, val from: Long, val to: Long, val timezone: S
     }
 }
 
-data class XLogPage(val records: List<XLogRecord>, val cursor: Cursor, val hasMore: Boolean)
+data class XLogPageText(val services: Map<Int, String>, val errors: Map<Int, String>)
+
+data class XLogPage(
+    val records: List<XLogRecord>, val cursor: Cursor, val hasMore: Boolean, val text: XLogPageText? = null,
+)
