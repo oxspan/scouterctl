@@ -10,6 +10,8 @@ import java.io.PrintStream
 import java.net.SocketException
 import java.net.SocketTimeoutException
 
+private const val STORAGE_DATE_UNVERIFIED = "unverified"
+
 class JsonOutput(private val stream: PrintStream) {
     fun run(operation: () -> Int): Int {
         try {
@@ -32,12 +34,13 @@ class JsonOutput(private val stream: PrintStream) {
             return failure(OperationFailure(ErrorCode.PROTOCOL_ERROR, "Response could not be decoded"))
         }
     }
-    fun result(data: JsonElement, complete: Boolean = true): Int {
+    fun result(data: JsonElement, complete: Boolean = true, xlogCapture: Boolean = false): Int {
         emit(buildJsonObject {
             put("schemaVersion", "scouterctl.result/v1")
             put("ok", true)
             put("data", data)
             put("executionComplete", complete)
+            if (xlogCapture) put("storageDateVerification", STORAGE_DATE_UNVERIFIED)
         })
         return if (complete) 0 else 8
     }
@@ -48,6 +51,7 @@ class JsonOutput(private val stream: PrintStream) {
             put("schemaVersion", "scouterctl.stream/v1")
             put("source", json.encodeToJsonElement(event.source.toDto()))
             put("query", json.encodeToJsonElement(event.query.toDto()))
+            put("storageDateVerification", STORAGE_DATE_UNVERIFIED)
         })
         is XLogEvent.Record -> emit(buildJsonObject {
             put("type", "record")
