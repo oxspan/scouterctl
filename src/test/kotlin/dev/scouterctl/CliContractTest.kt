@@ -28,7 +28,7 @@ class CliContractTest : FunSpec({
             listOf(doctor, objects, profile).forEach { it.exit shouldBe 0 }
             doctor.data()["group"]?.jsonPrimitive?.content shouldBe "guest"
             objects.events.single()["data"]!!.jsonArray.single().jsonObject["objName"]!!.jsonPrimitive.content shouldBe "/fixture"
-            val decoded = json.decodeFromJsonElement<ProfileRecordDto>(profile.data()).toModel()
+            val decoded = decodeLiveProfile(profile.data())
             decoded.steps shouldContainExactly listOf(ProfileStep("MESSAGE", 1),
                 ProfileStep("SQL3", 2, SqlProfile(123, 7, 0, 1)),
                 ProfileStep("SQL3", 3, SqlProfile(456, 11, -789, -3)))
@@ -123,6 +123,11 @@ class CliContractTest : FunSpec({
         }
     }
 })
+
+private val liveProfileJson = Json(json) { ignoreUnknownKeys = true }
+
+internal fun decodeLiveProfile(data: JsonElement): ProfileRecord =
+    liveProfileJson.decodeFromJsonElement<ProfileRecordDto>(data).toModel()
 
 internal class ContractCli(private val temp: Path) {
     fun run(server: WireFixture, args: List<String>): Outcome =

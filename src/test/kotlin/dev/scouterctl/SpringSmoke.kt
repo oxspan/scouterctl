@@ -143,7 +143,7 @@ fun main(args: Array<String>) {
                 check((row.errorHash != 0) == expectedError) { "$route error flag: ${row.errorHash}" }
                 val event = cli.run("profile-${route.substringAfterLast('/')}-${index + 1}",
                     listOf("profile", "get", "--date", date, "--txid", row.txid)).single()
-                val profile = json.decodeFromJsonElement<ProfileRecordDto>(event["data"]!!).toModel()
+                val profile = decodeLiveProfile(event["data"]!!)
                 check(profile.txid == row.txid && profile.steps.isNotEmpty())
                 val sql = profile.steps.mapNotNull { it.sql }
                 if (route == "/poc/ok" || route == "/error") check(sql.isEmpty()) else {

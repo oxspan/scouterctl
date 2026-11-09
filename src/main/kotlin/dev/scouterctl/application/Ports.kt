@@ -12,7 +12,7 @@ interface ObservationSource : AutoCloseable {
     fun realtimeCounters(objHash: Int): RealtimeCounters
     fun objects(date: String? = null): List<ObjectRecord>
     fun page(query: Query, cursor: Cursor, includeText: Boolean = false): XLogPage
-    fun profile(date: String, txid: Long, includeText: Boolean = false): ProfileRecord
+    fun profile(date: String, txid: Long, includeText: Boolean = false, includeStepDetails: Boolean = false): ProfileRecord
 }
 
 interface CaptureRepository {

@@ -32,7 +32,16 @@ data class ProfileTransaction(
     val status: String, val service: DictionaryText? = null, val error: DictionaryText? = null,
 )
 
-data class ProfileStep(val type: String, val order: Int, val sql: SqlProfile? = null)
+data class ProfileTarget(val address: String?, val port: Int? = null)
+
+data class ProfileStepDetails(
+    val startTimeMs: Int, val parent: Int, val elapsedMs: Int? = null, val errorHash: Int? = null,
+    val target: ProfileTarget? = null,
+)
+
+data class ProfileStep(
+    val type: String, val order: Int, val sql: SqlProfile? = null, val details: ProfileStepDetails? = null,
+)
 
 enum class ProfileCompleteness { UNKNOWN, TRUNCATED }
 
