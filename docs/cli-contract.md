@@ -51,7 +51,7 @@ A mid-response EOF currently maps to `IO_ERROR` (10), whereas socket exceptions/
 `xlog search` uses `scouterctl.stream/v1` on its first `start` event:
 
 ```text
-{"type":"start","schemaVersion":"scouterctl.stream/v1","source":{...},"query":{...}}
+{"type":"start","schemaVersion":"scouterctl.stream/v1","source":{...},"query":{...},"storageDateVerification":"unverified"}
 {"type":"record","data":{...}}
 {"type":"complete","executionComplete":true,"upstreamCoverage":"unknown","sampling":"unknown"}
 ```
@@ -62,7 +62,9 @@ A successful stream has exactly one final `complete` event and exit 0. Failure a
 
 A consumer should accept the stream schema, process records, then require both the final `complete` event and exit 0 before marking the query complete. Use `capture` and its checkpoints when resumable extraction is needed.
 
-`counter history` uses its own `scouterctl.counter-stream/v1` schema with the same start/record/complete lifecycle. Its start includes the dated target and counter metadata, and records contain stored timestamps and numeric strings. See [counter history](counter-history.md) for missing values, units and query limits. XLog stream fields and schemas are unchanged.
+`storageDateVerification: "unverified"` means the CLI used the supplied XLog storage date without confirmation from the Collector. An incorrect date can produce an empty completed query. XLog `capture` reports the same field in its outer result envelope.
+
+`counter history` uses its own `scouterctl.counter-stream/v1` schema with the same start/record/complete lifecycle. Its start includes the dated target and counter metadata, and records contain stored timestamps and numeric strings. See [counter history](counter-history.md) for missing values, units and query limits.
 
 `counter export` returns a single manifest result and writes JSONL chunk files. Its `scouterctl.counter-capture/v1` format is separate from XLog captures. See [resumable counter export](counter-export.md) for budgets, checkpoints and completion semantics.
 

@@ -56,10 +56,10 @@ class OnlineCommands(
         val options = CaptureOptions(request.resume, request.maxPages, "${endpoint.host}:${endpoint.port}", request.includeText)
         return if (request.includeProfiles) {
             val manifest = captureEvidence(source, request.query, options, evidence(request.directory))
-            output.result(json.encodeToJsonElement(manifest.toDto()), manifest.complete)
+            output.result(json.encodeToJsonElement(manifest.toDto()), manifest.complete, xlogCapture = true)
         } else {
             val manifest = capture(source, request.query, options, captures(request.directory))
-            output.result(json.encodeToJsonElement(manifest.toDto()), manifest.executionComplete)
+            output.result(json.encodeToJsonElement(manifest.toDto()), manifest.executionComplete, xlogCapture = true)
         }
     }
 }

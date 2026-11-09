@@ -49,6 +49,8 @@ scouterctl capture --object-hash 123456 --date 20261107 \
   --include-profiles --directory captures/incident-001 --no-input
 ```
 
+캡처 결과의 `storageDateVerification: "unverified"`는 입력한 저장 날짜를 Collector에서 확인하지 않았다는 뜻입니다. 조회가 완료됐는데 결과가 비어 있으면 저장 날짜를 확인하세요.
+
 중단되거나 일부만 저장됐으면 같은 명령에 `--resume`을 붙여 재개합니다. 서비스명·SQL·오류 원문을 저장하려는 경우에만 캡처할 때 `--include-text`를 추가하세요. 민감한 애플리케이션 정보가 포함될 수 있습니다. 자세한 사용법은 [캡처와 오프라인 분석(영문)](docs/captures.md)에 있습니다.
 
 ## 4. Collector 없이 분석

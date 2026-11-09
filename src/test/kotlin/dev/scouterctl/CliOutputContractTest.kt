@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.engine.spec.tempdir
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.*
+import java.nio.file.Files
 
 class CliOutputContractTest : FunSpec({
     test("single-result envelopes distinguish available data from complete execution") {
@@ -30,6 +31,25 @@ class CliOutputContractTest : FunSpec({
                 result["data"]!!.jsonObject["txid"] shouldBe JsonPrimitive(WireFixture.ids.first().toString())
                 result["data"]!!.jsonObject["completeness"] shouldBe JsonPrimitive("truncated")
                 result.containsKey("error") shouldBe false
+            }
+        }
+    }
+
+    test("XLog capture reports the unverified date outside the persisted manifest") {
+        val root = tempdir().toPath()
+        val cli = ContractCli(root)
+        val window = listOf("--date", "20261101", "--from", "2026-11-01T00:00:00Z",
+            "--to", "2026-11-01T00:01:00Z", "--timezone", "UTC", "--object-hash", "42")
+        WireFixture().use { source ->
+            for (includeProfiles in listOf(false, true)) {
+                val destination = root.resolve(if (includeProfiles) "profiles" else "xlogs")
+                val capture = listOf("capture", "--directory", destination.toString()) + window
+                val result = cli.run(source, if (includeProfiles) capture + "--include-profiles" else capture)
+                result.exit shouldBe 0
+                result.events.single()["storageDateVerification"] shouldBe JsonPrimitive("unverified")
+                val manifest = Json.parseToJsonElement(Files.readString(destination.resolve("manifest.json"))).jsonObject
+                result.data() shouldBe manifest
+                manifest.containsKey("storageDateVerification") shouldBe false
             }
         }
     }
@@ -62,6 +82,7 @@ class CliOutputContractTest : FunSpec({
                 result.stderr shouldBe ""
                 result.events.first()["schemaVersion"] shouldBe JsonPrimitive("scouterctl.stream/v1")
                 result.events.first()["type"] shouldBe JsonPrimitive("start")
+                result.events.first()["storageDateVerification"] shouldBe JsonPrimitive("unverified")
                 val records = result.events.drop(1).dropLast(1)
                 records.size shouldBe if (limited) 2 else 3
                 records.forEachIndexed { index, record ->
