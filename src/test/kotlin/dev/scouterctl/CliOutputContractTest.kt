@@ -35,6 +35,29 @@ class CliOutputContractTest : FunSpec({
         }
     }
 
+    test("object list with a storage date returns the recorded objects in the usual result shape") {
+        val cli = ContractCli(tempdir().toPath())
+        WireFixture().use { source ->
+            val result = cli.run(source, listOf("object", "list", "--date", "20260101"))
+            result.exit shouldBe 0
+            result.stderr shouldBe ""
+            result.events.single()["data"] shouldBe Json.parseToJsonElement(
+                """[{"serverId":"fixture","objHash":42,"objName":"/historical-fixture","objType":"java","alive":false}]""",
+            )
+        }
+    }
+
+    test("object list rejects invalid storage dates before connecting") {
+        val cli = ContractCli(tempdir().toPath())
+        WireFixture(Fault.AUTH).use { source ->
+            for (date in listOf("2026-01-01", "20260229")) {
+                val result = cli.run(source, listOf("object", "list", "--date", date))
+                result.exit shouldBe 2
+                result.events.single()["error"]!!.jsonObject["code"] shouldBe JsonPrimitive("INVALID_ARGUMENT")
+            }
+        }
+    }
+
     test("XLog capture reports the unverified date outside the persisted manifest") {
         val root = tempdir().toPath()
         val cli = ContractCli(root)

@@ -40,6 +40,8 @@ scouterctl counter get --object-hash 123456 --counter HeapUsed --no-input
 
 ## 3. 트랜잭션과 프로파일 저장
 
+Collector를 재시작한 뒤에도 `scouterctl object list --date 20261107 --no-input`으로 해당 저장 날짜에 기록된 `objHash`를 찾을 수 있습니다. 저장된 목록에는 실시간 상태가 없어 날짜를 지정하면 `alive: false`로 표시합니다. 현재 상태는 날짜를 빼고 `object list`로 확인하세요.
+
 조회할 자료가 저장된 날짜와 Collector의 시간대를 사용합니다. 아래는 UTC 예시입니다. `captures`가 없으면 먼저 만들고, 캡처마다 새 하위 디렉터리를 지정하세요.
 
 ```sh

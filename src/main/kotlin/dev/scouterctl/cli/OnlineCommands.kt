@@ -37,7 +37,7 @@ class OnlineCommands(
                     0
                 }
                 is OnlineRequest.Counters -> output.result(json.encodeToJsonElement(realtimeCounters(observation, request.objHash, request.name).toDto(observation.info)))
-                OnlineRequest.Objects -> output.result(json.encodeToJsonElement(observation.objects().map { it.toDto() }))
+                is OnlineRequest.Objects -> output.result(json.encodeToJsonElement(observation.objects(request.date).map { it.toDto() }))
                 is OnlineRequest.Profile -> profile(observation, request)
                 is OnlineRequest.Search -> {
                     streamXLogs(observation, request.query, request.maxPages, output::event)

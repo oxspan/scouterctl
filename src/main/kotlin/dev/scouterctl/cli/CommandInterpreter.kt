@@ -109,15 +109,14 @@ private fun Cli.onlineRequest(command: String): OnlineRequest {
     if (maxPages !in 1..40) invalid("Use --max-pages 1..40")
     val query = if (command in setOf("xlog search", "capture")) query() else null
     if (command == "profile get") {
-        if (!required(date, "--date").matches(Regex("[0-9]{8}"))) invalid("Use an 8-digit storage date")
-        LocalDate.parse(required(date, "--date"), DateTimeFormatter.BASIC_ISO_DATE)
+        validateStorageDate(required(date, "--date"))
         required(txid, "--txid")
     }
     if (command == "capture") required(directory, "--directory")
     if (includeProfiles && required(query, "query").pageSize > 100) invalid("Profile capture page-size must be 1..100")
     return when (command) {
         "doctor", "auth login" -> OnlineRequest.Doctor(command == "auth login")
-        "object list" -> OnlineRequest.Objects
+        "object list" -> OnlineRequest.Objects(date?.also(::validateStorageDate))
         "profile get" -> OnlineRequest.Profile(required(date, "--date"), required(txid, "--txid"), includeText)
         "xlog search" -> OnlineRequest.Search(required(query, "query"), maxPages)
         "capture" -> OnlineRequest.Capture(
@@ -125,6 +124,11 @@ private fun Cli.onlineRequest(command: String): OnlineRequest {
         )
         else -> invalid("Unknown command")
     }
+}
+
+private fun validateStorageDate(date: String) {
+    if (!date.matches(Regex("[0-9]{8}"))) invalid("Use an 8-digit storage date")
+    LocalDate.parse(date, DateTimeFormatter.BASIC_ISO_DATE)
 }
 
 private fun Cli.query(): Query = Query(required(date, "--date"),

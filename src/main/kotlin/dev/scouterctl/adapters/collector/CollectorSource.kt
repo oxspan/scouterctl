@@ -141,8 +141,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
     }
 
     override fun counterHistory(query: CounterHistoryQuery): CounterHistory = collectorOperation {
-        val targets = exchange(RequestCmd.OBJECT_LIST_LOAD_DATE, MapPack().apply { put("date", query.date) })
-        val target = decodeCounterTarget(query.objHash, targets)
+        val target = decodeCounterTarget(query.objHash, datedObjects(query.date))
         val metadata = exchange(RequestCmd.GET_XML_COUNTER)
         val response = exchange(RequestCmd.COUNTER_PAST_TIME, MapPack().apply {
             put("objHash", query.objHash.toLong()); put("counter", query.counter)
@@ -197,7 +196,13 @@ class CollectorSource private constructor(private val socket: Socket, private va
         }
     }
 
-    override fun objects(): List<ObjectRecord> = collectorOperation {
+    private fun datedObjects(date: String): List<CounterTarget> =
+        decodeDatedObjects(exchange(RequestCmd.OBJECT_LIST_LOAD_DATE, MapPack().apply { put("date", date) }))
+
+    override fun objects(date: String?): List<ObjectRecord> = collectorOperation {
+        if (date != null) return@collectorOperation datedObjects(date).map {
+            ObjectRecord(info.serverId, it.objHash, it.objName, it.objType, alive = false)
+        }
         exchange(RequestCmd.OBJECT_LIST_REAL_TIME).map {
             val p = it as? ObjectPack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected object pack")
             ObjectRecord(info.serverId, p.objHash, p.objName ?: "", p.objType ?: "", p.alive)

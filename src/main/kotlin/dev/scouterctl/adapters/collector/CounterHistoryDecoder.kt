@@ -5,22 +5,29 @@ import scouter.lang.pack.MapPack
 import scouter.lang.pack.Pack
 import scouter.lang.value.*
 
-internal fun decodeCounterTarget(objHash: Int, targets: List<Pack>): CounterTarget {
-    val objects = targets.singleOrNull() as? MapPack ?: invalidHistory()
-    val hashes = objects.get("objHash") as? ListValue ?: invalidHistory()
-    val names = objects.get("objName") as? ListValue ?: invalidHistory()
-    val types = objects.get("objType") as? ListValue ?: invalidHistory()
-    if (hashes.size() > 10000 || names.size() != hashes.size() || types.size() != hashes.size()) invalidHistory()
-    val matches = (0 until hashes.size()).map { index ->
-        val hash = (hashes.get(index) as? DecimalValue)?.value ?: invalidHistory()
-        if (hash !in Int.MIN_VALUE..Int.MAX_VALUE) invalidHistory()
-        val name = (names.get(index) as? TextValue)?.value ?: invalidHistory()
-        val type = (types.get(index) as? TextValue)?.value ?: invalidHistory()
+internal fun decodeDatedObjects(response: List<Pack>): List<CounterTarget> {
+    val objects = response.singleOrNull() as? MapPack ?: invalidDatedObjects()
+    val hashes = objects.get("objHash") as? ListValue ?: invalidDatedObjects()
+    val names = objects.get("objName") as? ListValue ?: invalidDatedObjects()
+    val types = objects.get("objType") as? ListValue ?: invalidDatedObjects()
+    if (hashes.size() > 10000 || names.size() != hashes.size() || types.size() != hashes.size()) invalidDatedObjects()
+    return (0 until hashes.size()).map { index ->
+        val hash = (hashes.get(index) as? DecimalValue)?.value ?: invalidDatedObjects()
+        if (hash !in Int.MIN_VALUE..Int.MAX_VALUE) invalidDatedObjects()
+        val name = (names.get(index) as? TextValue)?.value ?: invalidDatedObjects()
+        val type = (types.get(index) as? TextValue)?.value ?: invalidDatedObjects()
         CounterTarget(hash.toInt(), name, type)
-    }.filter { it.objHash == objHash }
+    }
+}
+
+private fun invalidDatedObjects(): Nothing =
+    throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid dated object list response")
+
+internal fun decodeCounterTarget(objHash: Int, targets: List<CounterTarget>): CounterTarget {
+    val matches = targets.filter { it.objHash == objHash }
     if (matches.size > 1) invalidHistory()
-    val target = matches.singleOrNull() ?: throw OperationFailure(ErrorCode.NOT_FOUND, "Object was not found on the requested date")
-    return target
+    return matches.singleOrNull()
+        ?: throw OperationFailure(ErrorCode.NOT_FOUND, "Object was not found on the requested date")
 }
 
 internal fun decodeCounterHistory(query: CounterHistoryQuery, target: CounterTarget, metadata: List<Pack>, response: List<Pack>): CounterHistory {
