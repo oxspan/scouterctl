@@ -37,9 +37,13 @@ For a local Linux installation, use `./gradlew installDist` and run `build/insta
 
 | Change | Start from | PR target |
 | --- | --- | --- |
-| Feature, regular fix, tests or documentation (`feature/*`) | `develop` | `develop` |
-| Urgent release fix (`hotfix/*`) | `master` | `master` |
+| Feature, regular fix, tests or documentation (`feature/<issue>[-<slug>]`) | `develop` | `develop` |
+| Urgent release fix (`hotfix/<issue>[-<slug>]`) | `master` | `master` |
 | Release-ready integration | `develop` | `master` |
+
+Use the issue number without `#`, as in `feature/59`. A short lowercase, hyphen-separated description is optional and recommended for readability, as in `feature/59-object-list`. For small maintenance changes without an issue, use `feature/<slug>`. Dependabot and release-please use their generated branch names.
+
+Reference the issue with `Refs #59` in a PR to `develop`. When the fix is included in a PR to `master`, use `Closes #59` to close the issue on merge.
 
 `master` is the default and release branch; `develop` integrates upcoming changes. Release branches are not currently used. Keep each PR focused and explain the problem, resulting behavior, validation actually performed, and compatibility risks.
 
