@@ -58,6 +58,8 @@ A mid-response EOF currently maps to `IO_ERROR` (10), whereas socket exceptions/
 
 The abbreviated objects illustrate event shape, not executable JSON fixtures. There are zero or more `record` events. `record` and `complete` events do not repeat `schemaVersion`; they inherit the stream schema from `start`.
 
+With `xlog search --include-text`, each record adds `service` and `error` dictionary fields alongside the existing hashes. Dictionary entries have `hash`, `text`, and `status`. Missing entries have `status: "unresolved"` and `text: null`. A zero error hash yields `error: null`. Both dictionary fields are absent by default. Error text may contain sensitive values.
+
 A successful stream has exactly one final `complete` event and exit 0. Failure after streaming starts ends with the `scouterctl.error/v1` error object and a nonzero exit, without `complete`. Failure before streaming starts may emit only the error object. A page budget produces `PARTIAL_RESULT` and exit 8; earlier records must not be mistaken for the full query. A killed process or failed output transport may leave no terminal event.
 
 A consumer should accept the stream schema, process records, then require both the final `complete` event and exit 0 before marking the query complete. Use `capture` and its checkpoints when resumable extraction is needed.

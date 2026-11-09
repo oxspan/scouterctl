@@ -40,7 +40,7 @@ class OnlineCommands(
                 is OnlineRequest.Objects -> output.result(json.encodeToJsonElement(observation.objects(request.date).map { it.toDto() }))
                 is OnlineRequest.Profile -> profile(observation, request)
                 is OnlineRequest.Search -> {
-                    streamXLogs(observation, request.query, request.maxPages, output::event)
+                    streamXLogs(observation, request.query, request.maxPages, request.includeText, output::event)
                     0
                 }
                 is OnlineRequest.Capture -> capture(observation, endpoint, request)

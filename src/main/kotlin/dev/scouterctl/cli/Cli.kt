@@ -37,7 +37,7 @@ class Cli(private val dispatcher: CommandDispatcher, private val output: JsonOut
     @Option(names = ["--after"], description = ["inspect compare: candidate v2/v3 capture directory"]) var after: Path? = null
     @Option(names = ["--resume"]) var resume: Boolean = false
     @Option(names = ["--include-profiles"], description = ["Capture profiles in a v3 offline bundle"]) var includeProfiles: Boolean = false
-    @Option(names = ["--include-text"], description = ["Include potentially sensitive dictionary text in profile get, profile capture or inspect"])
+    @Option(names = ["--include-text"], description = ["Include potentially sensitive dictionary text in xlog search, profile get, profile capture or inspect"])
     var includeText: Boolean = false
     @Option(names = ["--limit"], description = ["inspect search/summary/compare: 1..1000 requests/services; default 20"]) var limit: Int? = null
     @Option(names = ["--sort"], description = ["inspect summary: errors, elapsed (maximum), requests; default errors"]) var summarySort: String? = null

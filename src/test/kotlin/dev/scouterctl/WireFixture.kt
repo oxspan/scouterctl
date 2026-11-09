@@ -32,7 +32,7 @@ enum class Fault {
 }
 
 class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPassword: String? = null,
-    private val collectorVersion: String = "2.21.3 test") : AutoCloseable {
+    private val collectorVersion: String = "2.21.3 test", private val xlogErrorHash: Int = 0) : AutoCloseable {
     private val server = ServerSocket(0, 8, InetAddress.getLoopbackAddress())
     val port: Int = server.localPort
     private val executor = Executors.newSingleThreadExecutor()
@@ -241,6 +241,7 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 for (index in start until end) send(output, XLogPack().apply {
                                     this.txid = ids[index]; gxid = Long.MIN_VALUE + 1; caller = 9007199254740993L
                                     objHash = 42; endTime = baseTime + index; elapsed = 30; service = 10
+                                    if (index == 0) error = xlogErrorHash
                                     text1 = "secret-token"; ipaddr = byteArrayOf(127, 0, 0, 1)
                                 })
                                 if (fault != Fault.MISSING_META) send(output, MapPack().apply {

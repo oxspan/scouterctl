@@ -209,7 +209,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
         }
     }
 
-    override fun page(query: Query, cursor: Cursor): XLogPage = collectorOperation {
+    override fun page(query: Query, cursor: Cursor, includeText: Boolean): XLogPage = collectorOperation {
         query.validate()
         val request = MapPack().apply {
             put("date", query.date); put("stime", query.from); put("etime", query.to - 1)
@@ -237,7 +237,11 @@ class CollectorSource private constructor(private val socket: Socket, private va
         if (more && (records.isEmpty() || next.bucketTime == 0L || next.txid == "0" || next == cursor)) {
             throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Non-advancing XLog cursor")
         }
-        XLogPage(records, next, more)
+        val text = if (includeText) XLogPageText(
+            dictionary(query.date, TextTypes.SERVICE, records.map { it.serviceHash }),
+            dictionary(query.date, TextTypes.ERROR, records.map { it.errorHash }.filter { it != 0 }),
+        ) else null
+        XLogPage(records, next, more, text)
     }
 
     override fun profile(date: String, txid: Long, includeText: Boolean): ProfileRecord = collectorOperation {
