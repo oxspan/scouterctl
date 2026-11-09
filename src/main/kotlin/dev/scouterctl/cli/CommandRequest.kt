@@ -25,7 +25,7 @@ sealed interface OnlineRequest : CommandRequest {
     data class CounterExport(val query: CounterExportQuery, val directory: Path, val resume: Boolean, val maxChunks: Int) : OnlineRequest
     data class CounterHistory(val query: CounterHistoryQuery) : OnlineRequest
     data class Counters(val objHash: Int, val name: String?) : OnlineRequest
-    data object Objects : OnlineRequest
+    data class Objects(val date: String?) : OnlineRequest
     data class Profile(val date: String, val txid: Long, val includeText: Boolean) : OnlineRequest
     data class Search(val query: Query, val maxPages: Int) : OnlineRequest
     data class Capture(val query: Query, val directory: Path, val resume: Boolean,

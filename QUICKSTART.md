@@ -38,6 +38,8 @@ See [status, settings and current counters](docs/inspection.md) for available fi
 
 ## 3. Save transactions and profiles
 
+Use `scouterctl object list --date 20261107 --no-input` to find an `objHash` recorded on that storage date, even after a Collector restart. Dated results use `alive: false` because the stored list has no live status. Use `object list` without a date to check current status.
+
 Use the Collector's storage date and timezone. This example assumes UTC. Create the parent `captures` directory if it does not exist, and use a new capture directory:
 
 ```sh

@@ -24,7 +24,7 @@ class Cli(private val dispatcher: CommandDispatcher, private val output: JsonOut
     @Option(names = ["--key"], description = ["collector config / agent config: exact setting name"]) var settingKey: String? = null
     @Option(names = ["--chunk-minutes"], description = ["counter export: 1..1440; default 60, split at Collector midnight"]) var chunkMinutes: Int? = null
     @Option(names = ["--max-chunks"], description = ["counter export: chunks per invocation; default 24"]) var maxChunks: Int? = null
-    @Option(names = ["--date"]) var date: String? = null
+    @Option(names = ["--date"], description = ["Collector storage date (YYYYMMDD). For object list, selects recorded objects."]) var date: String? = null
     @Option(names = ["--from"]) var from: String? = null
     @Option(names = ["--to"]) var to: String? = null
     @Option(names = ["--timezone"], description = ["Operator-declared collector IANA timezone"] ) var timezone: String? = null
