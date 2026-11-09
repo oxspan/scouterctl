@@ -11,8 +11,6 @@ import scouter.lang.pack.*
 import scouter.lang.TextTypes
 import scouter.lang.step.Step
 import scouter.lang.step.StepControl
-import scouter.lang.step.SqlStep
-import scouter.lang.step.SqlStep3
 import scouter.lang.value.BooleanValue
 import scouter.lang.value.ListValue
 import scouter.lang.value.TextValue
@@ -244,7 +242,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
         XLogPage(records, next, more, text)
     }
 
-    override fun profile(date: String, txid: Long, includeText: Boolean): ProfileRecord = collectorOperation {
+    override fun profile(date: String, txid: Long, includeText: Boolean, includeStepDetails: Boolean): ProfileRecord = collectorOperation {
         val request = MapPack().apply { put("date", date); put("txid", txid); put("max", 1000) }
         val packs = exchange(RequestCmd.TRANX_PROFILE, request)
         if (packs.isEmpty()) throw OperationFailure(ErrorCode.NOT_FOUND, "Profile unavailable")
@@ -253,9 +251,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
             val p = it as? XLogProfilePack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected profile pack")
             (Step.toObjects(p.profile) ?: emptyArray()).map { step ->
                 if (step is StepControl && step.code == 0 && step.message == " ** Profile Truncated ** ") truncated = true
-                val sql = if (step is SqlStep) SqlProfile(step.hash, step.elapsed, step.error,
-                    (step as? SqlStep3)?.updated) else null
-                ProfileStep(step.stepTypeName, step.order, sql)
+                step.toProfileStep(includeStepDetails = includeStepDetails, includeText = includeText)
             }
         }
         val profile = ProfileRecord(txid.toString(), steps, completeness =
@@ -280,6 +276,9 @@ class CollectorSource private constructor(private val socket: Socket, private va
         val errors = dictionary(date, TextTypes.ERROR,
             (sql.map { it.errorHash } + listOfNotNull(transaction?.error)).filter { it != 0 })
         val service = transaction?.let { dictionary(date, TextTypes.SERVICE, listOf(it.service)) }
+        val targetNotice = if (profile.steps.any { it.details?.target != null })
+            " Socket and API call targets are included when recorded and may contain sensitive addresses."
+            else ""
         return profile.copy(
             steps = profile.steps.map { step -> step.copy(sql = step.sql?.let {
                 it.copy(statement = DictionaryText(it.hash, statements[it.hash]),
@@ -288,7 +287,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
             transaction = if (transaction == null) ProfileTransaction("unavailable") else ProfileTransaction(
                 "available", DictionaryText(transaction.service, service?.get(transaction.service)),
                 if (transaction.error == 0) null else DictionaryText(transaction.error, errors[transaction.error])),
-            detail = "Service, SQL and error dictionary text included. Bind fields and other free text omitted. Dictionary text may contain sensitive values. Error text can include bound values or stored row values.",
+            detail = "Service, SQL and error dictionary text included.$targetNotice Bind fields and other free text omitted. Dictionary text may contain sensitive values. Error text can include bound values or stored row values.",
         )
     }
 

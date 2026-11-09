@@ -3,6 +3,10 @@ package dev.scouterctl
 import scouter.io.DataInputX
 import scouter.io.DataOutputX
 import scouter.lang.pack.*
+import scouter.lang.step.ApiCallStep
+import scouter.lang.step.ApiCallStep2
+import scouter.lang.step.HashedMessageStep
+import scouter.lang.step.SocketStep
 import scouter.lang.step.MessageStep
 import scouter.lang.step.SqlStep3
 import scouter.lang.step.Step
@@ -28,7 +32,7 @@ enum class Fault {
     NONE, STATUS_MALFORMED, CONFIG_MALFORMED, CONFIG_DUPLICATE, CONFIG_INVALID_VISIBLE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
-    PROFILE_TRUNCATED, PROFILE_OTHER_CONTROL, PROFILE_MANY_STEPS, PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
+    PROFILE_NETWORK, PROFILE_TRUNCATED, PROFILE_OTHER_CONTROL, PROFILE_MANY_STEPS, PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
 }
 
 class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPassword: String? = null,
@@ -260,7 +264,20 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 val missing = request.getLong("txid") == ids[1] &&
                                     (fault == Fault.PROFILE_MISSING || (fault == Fault.PROFILE_MISSING_ONCE && !profileMissed))
                                 if (missing) profileMissed = true else send(output, XLogProfilePack().apply {
-                                    profile = if (fault == Fault.PROFILE_TRUNCATED || fault == Fault.PROFILE_OTHER_CONTROL) Step.toBytes(arrayOf(
+                                    profile = if (fault == Fault.PROFILE_NETWORK) Step.toBytes(arrayOf(
+                                        HashedMessageStep().apply { index = 0; hash = 77 },
+                                        SqlStep3().apply { index = 1; start_time = 350; hash = 123; elapsed = 7 },
+                                        SocketStep().apply {
+                                            index = 2; parent = 1; start_time = 400; elapsed = 25; error = -510
+                                            ipaddr = byteArrayOf(192.toByte(), 0, 2, 17); port = 443
+                                        },
+                                        ApiCallStep().apply {
+                                            index = 3; parent = 1; start_time = 430; elapsed = 180; error = -519
+                                            opt = 1; address = "internal-target.example:9443"
+                                        },
+                                        ApiCallStep2().apply { index = 4; parent = 1; start_time = 650; elapsed = 50 },
+                                        StepControl().apply { code = 7; message = "private-control-message" },
+                                    )) else if (fault == Fault.PROFILE_TRUNCATED || fault == Fault.PROFILE_OTHER_CONTROL) Step.toBytes(arrayOf(
                                         SqlStep3().apply { index = 1; hash = 123; elapsed = 7 },
                                         StepControl().apply { code = if (fault == Fault.PROFILE_TRUNCATED) 0 else 7; message = " ** Profile Truncated ** " }
                                     )) else if (fault == Fault.PROFILE_MANY_STEPS) Step.toBytes(Array(1001) { number ->

@@ -30,7 +30,7 @@ internal class SpringOfflineCheck(private val work: Path) {
             val resolved = runOfflineCli(work, args + "--include-text")
             check(resolved.exit == 0 && resolved.stderr.isEmpty())
             val inspection = json.decodeFromJsonElement<InspectionDto>(resolved.data()).toModel()
-            check(inspection.record.profile == json.decodeFromJsonElement<ProfileRecordDto>(expected).toModel())
+            check(inspection.record.profile == decodeLiveProfile(expected))
             check(inspection.record.xlog == saved.xlog)
             val structural = runOfflineCli(work, args)
             check(structural.exit == 0 && structural.stderr.isEmpty())

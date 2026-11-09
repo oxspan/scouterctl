@@ -199,7 +199,7 @@ fun main(args: Array<String>) {
             for (route in expected.keys) {
                 val row = rows.first { it.serviceHash == HashUtil.hash(route) }
                 val event = cli.run("profile-${route.substringAfterLast('/')}", listOf("profile", "get", "--date", date, "--txid", row.txid)).single()
-                val profile = json.decodeFromJsonElement<ProfileRecordDto>(event["data"]!!).toModel()
+                val profile = decodeLiveProfile(event["data"]!!)
                 check(profile.steps.any { it.type.startsWith("METHOD") }) { "Missing method instrumentation: $route" }
                 if (route == "/poc/sql") check(profile.steps.any { it.type.startsWith("SQL") }) { "Missing JDBC instrumentation" }
             }

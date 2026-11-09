@@ -33,6 +33,8 @@ The destination directory must not exist for a new capture. If the export is int
 
 The example saves profiles in a v3 bundle. Add `--include-text` to the capture command only when you intend to store potentially sensitive service, SQL and error text; the default page size is 25 and the maximum is 100. Resume v3 with the same flags and query. Existing v2 bundles remain readable but cannot be resumed by this version; see [Capture compatibility](capture-compatibility.md). Missing profiles are recorded and retried on resume; connection failures preserve earlier page checkpoints. See [Capture recovery](capture-recovery.md) for interruption handling and the limits of recovery.
 
+Live `profile get` steps include `startTimeMs` relative to the transaction start and the recorded `parent` step index when the Collector provides them. Compare step start times to identify gaps. `SOCKET`, `APICALL` and `APICALL2` steps also report `elapsedMs` and `errorHash` (zero means no recorded error). When `--include-text` is set, `target` can include the recorded address and socket port. Treat those addresses as sensitive. Capture files retain the existing v3 step layout.
+
 Profile results include `completeness`: `truncated` means the Collector explicitly reported omitted blocks; `unknown` does not certify completeness. Known truncation makes `profile get` and `inspect` return exit 8 with the available data. See [Profile completeness](profile-completeness.md), including compatibility with older capture readers.
 
 Inspect a saved transaction after disconnecting from the Collector:

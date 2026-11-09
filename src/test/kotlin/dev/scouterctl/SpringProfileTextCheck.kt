@@ -1,15 +1,12 @@
 package dev.scouterctl
 
 import dev.scouterctl.core.*
-import dev.scouterctl.adapters.serialization.*
-
-import kotlinx.serialization.json.*
 
 class SpringProfileTextCheck(private val cli: AgentCli, private val date: String) {
     fun verify(row: XLogRecord, route: String) {
         val event = cli.run("text-profile-${row.txid}",
             listOf("profile", "get", "--date", date, "--txid", row.txid, "--include-text")).single()
-        val profile = json.decodeFromJsonElement<ProfileRecordDto>(event["data"]!!).toModel()
+        val profile = decodeLiveProfile(event["data"]!!)
         val transaction = checkNotNull(profile.transaction)
         val serviceName = if (route == "/error") route else "$route<GET>"
         check(profile.txid == row.txid)
