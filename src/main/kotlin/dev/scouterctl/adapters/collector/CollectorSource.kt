@@ -279,7 +279,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
             transaction = if (transaction == null) ProfileTransaction("unavailable") else ProfileTransaction(
                 "available", DictionaryText(transaction.service, service?.get(transaction.service)),
                 if (transaction.error == 0) null else DictionaryText(transaction.error, errors[transaction.error])),
-            detail = "service, SQL and error dictionary text included; bind fields and other free text omitted; dictionary text may contain sensitive values",
+            detail = "Service, SQL and error dictionary text included. Bind fields and other free text omitted. Dictionary text may contain sensitive values. Error text can include bound values or stored row values.",
         )
     }
 
