@@ -26,6 +26,8 @@ Linux 명령 ZIP의 빌드·검증:
 
 커버리지 리포트를 만들고 라인·분기 최소 기준을 검증하려면 `./gradlew -Pcoverage=true coverageCheck`를 실행합니다. 테스트 JVM과 CLI 자식 프로세스를 함께 집계하며, 라인 90%·분기 80% 미만이면 실패합니다. 기본 `test` 실행에는 커버리지를 적용하지 않습니다. HTML/XML 리포트와 요약은 `build/reports/jacoco/`에 생성됩니다. 측정 범위와 CI 동작은 [테스트 안내(영문)](docs/testing.md#coverage)를 참고하세요.
 
+같은 저장소의 PR에는 Linux 테스트 통과·실패·오류·스킵 수, 라인·분기 커버리지와 최소 기준, CI 결과와 실행 링크를 코멘트로 표시합니다. 재실행하면 기존 봇 코멘트를 갱신하며, 이전 커밋의 결과는 게시하지 않습니다. Windows 검사는 워크플로우에서 별도로 확인합니다. 포크 PR은 Actions 요약과 artifact를 제공하며 코멘트는 작성하지 않습니다.
+
 ## 코드와 테스트
 
 - CLI 기능은 Kotlin으로 작성합니다. Kotest `FunSpec`과 matcher를 사용하며 실행에는 JUnit Platform을 사용합니다. 네이티브 [Windows 실행기(영문)](https://github.com/oxspan/scouterctl/blob/master/native/windows/README.md)는 별도 플랫폼 구성 요소입니다.

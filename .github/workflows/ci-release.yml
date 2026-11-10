@@ -87,14 +87,19 @@ jobs:
           [[ -z "${EXPECTED_TAG:-}" || "$EXPECTED_TAG" == "v$version" ]]
           printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
           printf 'sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Summarize test coverage
+      - name: Summarize tests and coverage
         if: ${{ always() && inputs.release_tag == '' }}
         run: |
-          if [[ -f build/reports/jacoco/summary.md ]]; then
-            cat build/reports/jacoco/summary.md >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo 'Coverage report unavailable; check the build and test logs.' >> "$GITHUB_STEP_SUMMARY"
-          fi
+          python3 .github/scripts/summarize-tests.py
+          cat build/reports/ci/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload PR test summary
+        if: ${{ always() && github.event_name == 'pull_request' && !env.ACT }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-test-summary
+          path: build/reports/ci/summary.md
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload coverage reports
         if: ${{ always() && !env.ACT && hashFiles('build/reports/jacoco/**') != '' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -138,6 +143,57 @@ jobs:
           name: release-package
           path: ${{ steps.package.outputs.package_path }}
           if-no-files-found: error
+
+  test-comment:
+    name: Comment test results
+    needs: build
+    if: >-
+      always() && !cancelled() && github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Download test summary
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pr-test-summary
+          path: ci-summary
+      - name: Create or update the PR comment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const marker = '<!-- scouterctl-ci-test-summary -->';
+            const {owner, repo} = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const head = context.payload.pull_request.head.sha;
+            const {data: pr} = await github.rest.pulls.get({owner, repo, pull_number: issue_number});
+            if (pr.state !== 'open' || pr.head.sha !== head) {
+              core.info('Skipping results for an outdated or closed pull request.');
+              return;
+            }
+            // Read report text only. Never check out or execute PR code with this token.
+            const file = 'ci-summary/summary.md';
+            const summary = fs.existsSync(file) && fs.statSync(file).size <= 16000
+              ? fs.readFileSync(file, 'utf8')
+              : 'Test and coverage summary unavailable. Check the workflow logs.';
+            const run = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const body = `${marker}\n**Linux CI: ${process.env.BUILD_RESULT}** · Commit \`${head.slice(0, 7)}\`\n\n${summary}\n[Workflow logs and report artifacts](${run})\n\n_Updated on each CI run. Windows checks, when required, are reported separately in the workflow._`;
+            const comments = await github.paginate(github.rest.issues.listComments,
+              {owner, repo, issue_number, per_page: 100});
+            const previous = comments.find(comment =>
+              comment.user?.login === 'github-actions[bot]' && comment.body?.startsWith(marker));
+            if (previous) {
+              await github.rest.issues.updateComment({owner, repo, comment_id: previous.id, body});
+            } else {
+              await github.rest.issues.createComment({owner, repo, issue_number, body});
+            }
 
   portable:
     name: Windows command package
