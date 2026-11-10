@@ -26,7 +26,7 @@ For a local Linux installation, use `./gradlew installDist` and run `build/insta
 
 To generate coverage reports and enforce the line/branch minimums, run `./gradlew -Pcoverage=true coverageCheck`. This includes the test JVM and CLI subprocesses. See [testing](docs/testing.md#coverage) for measurement scope and report locations.
 
-Same-repository PRs receive a bot comment with Linux test counts, coverage/thresholds, the CI result and run links. Re-runs update the existing comment and outdated commits are skipped. Windows checks remain in the workflow; fork PRs receive the Actions summary and artifacts without a comment.
+Same-repository PRs receive a bot comment with Linux test counts, coverage/thresholds, the CI result and run links. Re-runs update the existing comment and outdated commits are skipped. Windows checks remain in the workflow; fork and Dependabot PRs receive the Actions summary and artifacts without a comment because their tokens are read-only.
 
 ## Code and tests
 

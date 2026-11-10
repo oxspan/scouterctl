@@ -29,7 +29,7 @@ No Codecov credentials are needed. PR coverage comparisons and configuring a req
 
 For same-repository PRs, CI creates one bot comment showing Linux test totals (passed, failed, errors, skipped), line/branch coverage and minimums, the build result, tested commit, and workflow/artifact links. Later runs update that comment. Failed builds still report available results; missing reports are marked unavailable. Results from outdated commits are not posted. Windows checks remain visible separately in the workflow.
 
-The comment job reads a Markdown artifact and has write permission only for PR comments; it does not check out or execute PR code. Fork PRs keep read-only build permissions and receive the Actions summary/artifacts without a bot comment. Local act runs still select only the build job.
+The comment job reads a Markdown artifact and has write permission only for PR comments; it does not check out or execute PR code. Fork and Dependabot PRs use read-only tokens and receive the Actions summary/artifacts without a bot comment. Local act runs still select only the build job.
 
 ## Collector and Agent checks
 
