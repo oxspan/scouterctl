@@ -4,7 +4,10 @@ plugins {
     kotlin("jvm") version "2.4.10"
     kotlin("plugin.serialization") version "2.4.10"
     application
+    jacoco
 }
+
+apply(from = "gradle/coverage.gradle.kts")
 group = "dev.scouterctl"
 version = providers.gradleProperty("candidateVersion").orElse(
     providers.fileContents(layout.projectDirectory.file("version.txt")).asText.map(String::trim)).get()

@@ -105,6 +105,7 @@ private class InstalledCommand(work: Path) {
                 environment().remove("SCOUTERCTL_PASSWORD")
                 environment().remove("JAVA_OPTS")
                 environment().remove("SCOUTERCTL_OPTS")
+                environment().withCliCoverage()
                 environment()["PATH"] = if (javaHome == null) launcher.parent.toString()
                     else "${launcher.parent}${java.io.File.pathSeparator}${environment()["PATH"]}"
                 if (javaHome == null) environment().remove("JAVA_HOME") else environment()["JAVA_HOME"] = javaHome

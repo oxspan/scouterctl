@@ -7,8 +7,7 @@ import java.util.concurrent.TimeUnit
 internal fun runOfflineCli(work: Path, args: List<String>): Outcome {
     val output = Files.createTempFile(work, "inspect-", ".jsonl")
     val stderr = Files.createTempFile(work, "inspect-", ".stderr")
-    val child = ProcessBuilder(listOf(Path.of(System.getProperty("java.home"), "bin/java").toString(),
-        "-jar", System.getProperty("cli.jar")) + args).apply {
+    val child = ProcessBuilder(cliJavaCommand() + args).apply {
         environment().remove("SCOUTERCTL_PASSWORD")
     }.redirectOutput(output.toFile()).redirectError(stderr.toFile()).start()
     try {

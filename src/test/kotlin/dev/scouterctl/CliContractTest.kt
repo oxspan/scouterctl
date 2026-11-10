@@ -141,8 +141,7 @@ internal class ContractCli(private val temp: Path) {
         val stderr = Files.createTempFile(temp, "stderr", ".txt")
         val stdout = Files.createTempFile(temp, "stdout", ".jsonl")
         val launchArgs = if (System.getProperty("os.name").startsWith("Windows")) listOf(utf8Arguments(temp, args)) else args
-        val process = ProcessBuilder(listOf(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-            "-jar", System.getProperty("cli.jar")) + launchArgs)
+        val process = ProcessBuilder(cliJavaCommand() + launchArgs)
             .directory(temp.toFile())
             .redirectOutput(stdout.toFile()).redirectError(stderr.toFile()).apply {
                 environment().remove("SCOUTERCTL_PASSWORD")

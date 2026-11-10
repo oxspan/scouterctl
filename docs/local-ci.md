@@ -6,7 +6,7 @@ Use focused Gradle tests during development. Before a PR handoff or after changi
 scripts/ci-local.sh
 ```
 
-The wrapper selects only the `build` job in `.github/workflows/ci-release.yml`. It runs JDK setup, Kotest, canonical command packaging and package verification, then stores uploaded artifacts under `.local/act/artifacts/`. It does not select the portable, scale or release jobs. Local runs consume no GitHub-hosted runner minutes.
+The wrapper selects only the `build` job in `.github/workflows/ci-release.yml`. It runs JDK setup, Kotest with coverage verification, canonical command packaging and package verification, then stores uploaded artifacts (including coverage reports) under `.local/act/artifacts/`. It does not select the portable, scale or release jobs. Local runs consume no GitHub-hosted runner minutes.
 
 ## WSL setup
 

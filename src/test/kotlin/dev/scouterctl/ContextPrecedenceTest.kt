@@ -19,8 +19,7 @@ class ContextPrecedenceTest : FunSpec({
                 val directory = tempdir().toPath()
                 val stdout = directory.resolve("stdout.json")
                 val stderr = directory.resolve("stderr.txt")
-                val process = ProcessBuilder(listOf(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                    "-jar", System.getProperty("cli.jar")) + args).apply {
+                val process = ProcessBuilder(cliJavaCommand() + args).apply {
                     environment().remove("SCOUTERCTL_CONFIG")
                     environment().remove("XDG_CONFIG_HOME")
                     environment().remove("SCOUTERCTL_PASSWORD")

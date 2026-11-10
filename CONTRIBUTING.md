@@ -24,6 +24,8 @@ To build and verify the Linux command package:
 
 For a local Linux installation, use `./gradlew installDist` and run `build/install/scouterctl/bin/scouterctl`. Native Windows packaging additionally requires the pinned toolchain; see [releasing](docs/releasing.md). Real Collector/Agent/Spring checks are opt-in and described in [testing](docs/testing.md). Use [local CI](docs/local-ci.md) to run the workflow build with act when needed.
 
+To generate coverage reports and enforce the line/branch minimums, run `./gradlew -Pcoverage=true coverageCheck`. This includes the test JVM and CLI subprocesses. See [testing](docs/testing.md#coverage) for measurement scope and report locations.
+
 ## Code and tests
 
 - Implement CLI behavior in Kotlin. Use Kotest `FunSpec` and matchers; JUnit Platform runs Kotest, while test APIs remain Kotest. The native [Windows launcher](https://github.com/oxspan/scouterctl/blob/master/native/windows/README.md) is a separate platform boundary.
