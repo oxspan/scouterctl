@@ -12,8 +12,9 @@ import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
 
 class CaptureStore(private val directory: Path) : CaptureRepository {
-    override fun create() = fileOperation { Files.createDirectory(directory); Unit }
+    override fun create() = createCaptureDirectory(directory)
     override fun load(): CaptureManifest = fileOperation {
+        requireCaptureDirectory(directory)
         val content = Files.readString(directory.resolve("manifest.json"))
         requireCaptureSchema(content, "scouterctl.capture/v1")
         json.decodeFromString<CaptureManifestDto>(content).toModel()
