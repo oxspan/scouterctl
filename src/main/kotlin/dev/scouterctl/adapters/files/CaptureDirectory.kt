@@ -3,6 +3,7 @@ package dev.scouterctl.adapters.files
 import dev.scouterctl.core.ErrorCode
 import dev.scouterctl.core.OperationFailure
 import java.nio.file.FileAlreadyExistsException
+import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.NotDirectoryException
@@ -41,6 +42,9 @@ private fun requireDirectory(path: Path, missing: String, invalid: String) {
         throw OperationFailure(ErrorCode.INVALID_ARGUMENT, missing)
     } catch (_: NotDirectoryException) {
         throw OperationFailure(ErrorCode.INVALID_ARGUMENT, invalid)
+    } catch (error: FileSystemException) {
+        path.toAbsolutePath().parent?.let { requireDirectory(it, missing, invalid) }
+        throw error
     }
     if (!attributes.isDirectory) throw OperationFailure(ErrorCode.INVALID_ARGUMENT, invalid)
 }

@@ -18,9 +18,11 @@ class CapturePathTest : FunSpec({
         cli.run(inspect + "missing-capture", password = null).shouldFailWith(
             2, "INVALID_ARGUMENT", "Capture directory does not exist. Specify the path to an existing capture."
         )
-        cli.run(inspect + "not-a-directory", password = null).shouldFailWith(
-            2, "INVALID_ARGUMENT", "Capture path is not a directory. Specify the path to an existing capture."
-        )
+        for (path in listOf("not-a-directory", "not-a-directory/child", "not-a-directory/child/grandchild")) {
+            cli.run(inspect + path, password = null).shouldFailWith(
+                2, "INVALID_ARGUMENT", "Capture path is not a directory. Specify the path to an existing capture."
+            )
+        }
         cli.run(inspect + "empty-capture", password = null).shouldFailWith(
             10, "IO_ERROR", "Capture integrity or record validation failed"
         )
@@ -42,9 +44,14 @@ class CapturePathTest : FunSpec({
                 cli.run(server, args + listOf("--directory", "missing-parent/capture")).shouldFailWith(
                     2, "INVALID_ARGUMENT", "Capture parent directory does not exist. Create it before starting a capture."
                 )
-                cli.run(server, args + listOf("--directory", "occupied-file/capture")).shouldFailWith(
-                    2, "INVALID_ARGUMENT", "Capture parent path is not a directory. Choose an existing parent directory."
-                )
+                for (parent in listOf("occupied-file", "occupied-file/child", "occupied-file/child/grandchild")) {
+                    cli.run(server, args + listOf("--directory", "$parent/capture")).shouldFailWith(
+                        2, "INVALID_ARGUMENT", "Capture parent path is not a directory. Choose an existing parent directory."
+                    )
+                    cli.run(server, args + listOf("--resume", "--directory", parent)).shouldFailWith(
+                        2, "INVALID_ARGUMENT", "Capture path is not a directory. Specify the path to an existing capture."
+                    )
+                }
                 cli.run(server, args + listOf("--resume", "--directory", "missing-capture")).shouldFailWith(
                     2, "INVALID_ARGUMENT", "Capture directory does not exist. Specify the path to an existing capture."
                 )
