@@ -16,11 +16,9 @@ internal class TerminalCli(work: Path, args: List<String>, password: String? = n
         put("SCOUTERCTL_CONFIG", work.resolve("config.json").toString())
         put("TERM", "xterm")
         if (password != null) put("SCOUTERCTL_PASSWORD", password)
+        if (command != null) withCliCoverage()
     }
-    private val process = PtyProcessBuilder(((command ?: listOf(
-        Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-        "-jar", System.getProperty("cli.jar"),
-    )) + args).toTypedArray())
+    private val process = PtyProcessBuilder(((command ?: cliJavaCommand()) + args).toTypedArray())
         .setEnvironment(environment).setDirectory(work.toString())
         .setInitialColumns(2000).setInitialRows(50)
         .setUseWinConPty(true).setConPtyInheritCursor(false)
