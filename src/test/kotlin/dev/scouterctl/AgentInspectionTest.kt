@@ -28,14 +28,21 @@ class AgentInspectionTest : FunSpec({
             val result = cli.run(server, listOf("agent", "config", "--object-hash", "42"))
             result.exit shouldBe 0
             val settings = result.data()["settings"]!!.jsonArray.map { it.jsonObject }
-            settings.map { it["key"]!!.jsonPrimitive.content } shouldBe listOf("db_dir", "net_collector_tcp_port", "smtp_password")
-            val port = settings.single { it["key"] == JsonPrimitive("net_collector_tcp_port") }
-            port["value"] shouldBe JsonPrimitive("6100")
-            port["redacted"] shouldBe JsonPrimitive(false)
-            settings.filter { it != port }.forEach {
-                it["value"] shouldBe JsonNull
-                it["defaultValue"] shouldBe JsonNull
-                it["redacted"] shouldBe JsonPrimitive(true)
+            val visible = mapOf(
+                "net_collector_tcp_port" to ("6100" to "6100"),
+                "trace_sql_parameter_max_length" to ("0" to "20"),
+                "profile_http_parameter_enabled" to ("true" to "false"),
+                "profile_http_querystring_enabled" to ("true" to "false"),
+                "net_collector_ip" to ("collector.example.test" to "127.0.0.1"),
+                "obj_name" to ("fixture" to ""),
+                "obj_type" to ("java" to ""),
+            )
+            settings.map { it["key"]!!.jsonPrimitive.content } shouldBe (visible.keys + listOf("db_dir", "smtp_password")).sorted()
+            settings.forEach { setting ->
+                val expected = visible[setting["key"]!!.jsonPrimitive.content]
+                setting["value"] shouldBe (expected?.first?.let(::JsonPrimitive) ?: JsonNull)
+                setting["defaultValue"] shouldBe (expected?.second?.let(::JsonPrimitive) ?: JsonNull)
+                setting["redacted"] shouldBe JsonPrimitive(expected == null)
             }
             result.output shouldNotContain "private-"
             result.output shouldNotContain "/private/"
@@ -64,7 +71,8 @@ class AgentInspectionTest : FunSpec({
             AgentFailureCase(Fault.AGENT_DUPLICATE, "status", "42", 6),
             AgentFailureCase(Fault.AGENT_JVM_MALFORMED, "status", "42", 6),
             AgentFailureCase(Fault.CONFIG_MALFORMED, "config", "42", 6),
-            AgentFailureCase(Fault.CONFIG_INVALID_VISIBLE, "config", "42", 6))) {
+            AgentFailureCase(Fault.CONFIG_INVALID_VISIBLE, "config", "42", 6),
+            AgentFailureCase(Fault.CONFIG_INVALID_AGENT_TEXT, "config", "42", 6))) {
             WireFixture(fault).use { server ->
                 val result = cli.run(server, listOf("agent", command, "--object-hash", hash))
                 result.exit shouldBe exit

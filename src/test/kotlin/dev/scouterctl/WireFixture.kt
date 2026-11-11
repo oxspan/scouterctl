@@ -29,7 +29,7 @@ enum class Fault {
     HISTORY_EMPTY, HISTORY_MALFORMED, HISTORY_TIME_TYPE, HISTORY_OUTSIDE, HISTORY_NAN, HISTORY_TARGET_DUPLICATE,
     COUNTER_MALFORMED, COUNTER_DUPLICATE, COUNTER_NAN, COUNTER_XML_DTD, COUNTER_EMPTY, COUNTER_CUSTOM,
     AGENT_OFFLINE, AGENT_NO_RESPONSE, AGENT_JVM_MALFORMED, AGENT_DUPLICATE,
-    NONE, STATUS_MALFORMED, CONFIG_MALFORMED, CONFIG_DUPLICATE, CONFIG_INVALID_VISIBLE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
+    NONE, STATUS_MALFORMED, CONFIG_MALFORMED, CONFIG_DUPLICATE, CONFIG_INVALID_VISIBLE, CONFIG_INVALID_AGENT_TEXT, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
     PROFILE_NETWORK, PROFILE_TRUNCATED, PROFILE_OTHER_CONTROL, PROFILE_MANY_STEPS, PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
@@ -210,16 +210,28 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 newList("key").apply {
                                     add("smtp_password"); add(if (agent) "net_collector_tcp_port" else "net_tcp_listen_port"); add("db_dir")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("db_dir")
+                                    if (agent) {
+                                        add("trace_sql_parameter_max_length"); add("profile_http_parameter_enabled")
+                                        add("profile_http_querystring_enabled"); add("net_collector_ip"); add("obj_name"); add("obj_type")
+                                    }
                                 }
                                 newList("value").apply {
                                     add("private-config-marker"); add(6100L); add("/private/collector/data")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("duplicate-private-marker")
                                     if (fault == Fault.CONFIG_INVALID_VISIBLE) set(1, scouter.lang.value.TextValue("private-visible-marker"))
+                                    if (agent) {
+                                        add(0L); add(true); add(true); add("collector.example.test")
+                                        if (fault == Fault.CONFIG_INVALID_AGENT_TEXT) add(42L) else add("fixture")
+                                        add("java")
+                                    }
                                 }
                                 newList("default").apply {
                                     add("private-default-marker"); add(6100L)
                                     if (fault != Fault.CONFIG_MALFORMED) add("/private/default")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("duplicate-private-default")
+                                    if (agent) {
+                                        add(20L); add(false); add(false); add("127.0.0.1"); add(""); add("")
+                                    }
                                 }
                                 })
                             }
