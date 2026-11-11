@@ -20,6 +20,12 @@ A closed transport can report `IO_ERROR` (exit 10), whereas a refused connection
 
 Pages that were already committed are validated before resume. An incomplete page is fetched again, including profiles already read but not committed. Temporary files not referenced by the manifest are not evidence. Repeating resume on a complete capture preserves its data.
 
+## Local file failures on Windows
+
+Windows can deny an atomic file replacement while another program holds the destination open. The CLI briefly retries access-denied replacements, preserving the committed file and the atomic replacement operation. Persistent denial still returns `IO_ERROR` (exit 10); other filesystem failures are not retried. An access-denied error can also mean insufficient permissions.
+
+The message distinguishes local file I/O from Collector transport I/O. Close programs using the capture and check its path, permissions and available disk space. If the directory contains a valid committed manifest, rerun the original command with `--resume` after correcting the cause. If the first manifest could not be committed, preserve that directory and start a new capture in an unused directory. Do not promote a `.partial` file to a manifest or remove referenced pages to force recovery.
+
 ## Recovery limits
 
 Recovery preserves the records available in the fixed query window and the committed capture. It cannot recover telemetry that an agent or Collector lost during an outage, expired retention, deleted databases, or sampled requests. `executionComplete` does not certify complete upstream traffic; `upstreamCoverage` and `sampling` remain `unknown`.

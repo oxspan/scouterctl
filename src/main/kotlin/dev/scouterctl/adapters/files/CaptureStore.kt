@@ -7,8 +7,6 @@ import dev.scouterctl.application.CaptureRepository
 import dev.scouterctl.adapters.serialization.*
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption.ATOMIC_MOVE
-import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
 
 class CaptureStore(private val directory: Path) : CaptureRepository {
@@ -39,7 +37,7 @@ class CaptureStore(private val directory: Path) : CaptureRepository {
     private fun atomicWrite(path: Path, content: String) {
         val partial = path.resolveSibling(path.fileName.toString() + ".partial")
         Files.writeString(partial, content)
-        Files.move(partial, path, ATOMIC_MOVE, REPLACE_EXISTING)
+        replaceAtomically(partial, path)
     }
     private fun digest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
         .digest(bytes).joinToString("") { "%02x".format(it) }

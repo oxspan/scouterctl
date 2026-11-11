@@ -10,8 +10,6 @@ import java.nio.channels.OverlappingFileLockException
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption.ATOMIC_MOVE
-import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.nio.file.StandardOpenOption.*
 import java.security.MessageDigest
 import java.util.Locale
@@ -109,7 +107,7 @@ class CounterCaptureStore(private val directory: Path) : CounterCaptureRepositor
         Files.newOutputStream(partial, CREATE, TRUNCATE_EXISTING, WRITE, NOFOLLOW_LINKS).use {
             it.write(content.toByteArray(Charsets.UTF_8))
         }
-        Files.move(partial, directory.resolve(name), ATOMIC_MOVE, REPLACE_EXISTING)
+        replaceAtomically(partial, directory.resolve(name))
     }
 
     private fun digest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(Locale.ROOT, it) }

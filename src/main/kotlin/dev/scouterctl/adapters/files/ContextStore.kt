@@ -10,8 +10,6 @@ import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption.ATOMIC_MOVE
-import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.nio.file.StandardOpenOption.CREATE
 import java.nio.file.StandardOpenOption.WRITE
 import java.nio.file.attribute.PosixFilePermissions
@@ -44,7 +42,7 @@ class ContextStore(private val path: Path) : ContextRepository {
                 val temporary = Files.createTempFile(parent, ".scouterctl-", ".tmp", *attributes)
                 try {
                     Files.writeString(temporary, json.encodeToString(updated.toDto()) + "\n")
-                    Files.move(temporary, path, ATOMIC_MOVE, REPLACE_EXISTING)
+                    replaceAtomically(temporary, path)
                 } finally { Files.deleteIfExists(temporary) }
                 return@fileOperation updated
             }
