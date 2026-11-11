@@ -13,11 +13,10 @@ import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
 
 class EvidenceStore(private val directory: Path) : EvidenceRepository {
-    override fun create(): Unit = fileOperation {
-        Files.createDirectory(directory)
-    }
+    override fun create() = createCaptureDirectory(directory)
 
     override fun load(): EvidenceManifest = fileOperation {
+        requireCaptureDirectory(directory)
         val content = read("manifest.json", 8_388_608)
         requireCaptureSchema(content, "scouterctl.capture/v2", "scouterctl.capture/v3")
         val manifest = json.decodeFromString<EvidenceManifestDto>(content).toModel()
