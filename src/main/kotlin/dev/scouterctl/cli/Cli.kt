@@ -42,6 +42,8 @@ class Cli(private val dispatcher: CommandDispatcher, private val output: JsonOut
     ]) var includeProfiles: Boolean = false
     @Option(names = ["--include-text"], description = ["Include potentially sensitive dictionary text in xlog search, profile get, profile capture or inspect"])
     var includeText: Boolean = false
+    @Option(names = ["--group-sql"], description = ["profile get / inspect: aggregate decoded SQL steps by hash instead of returning steps"])
+    var groupSql: Boolean = false
     @Option(names = ["--limit"], description = ["inspect search/summary/compare: 1..1000 requests/services; default 20"]) var limit: Int? = null
     @Option(names = ["--sort"], description = ["inspect summary: errors, elapsed (maximum), requests; default errors"]) var summarySort: String? = null
     @Option(names = ["--min-elapsed-ms"], description = ["inspect search: inclusive minimum request duration"]) var minElapsedMs: Int? = null

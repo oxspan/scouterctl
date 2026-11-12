@@ -8,6 +8,9 @@ import java.time.format.DateTimeFormatter
 
 internal fun Cli.interpret(): CommandRequest {
     val command = words.joinToString(" ")
+    if (spec.commandLine().parseResult.hasMatchedOption("--group-sql") && command !in setOf("profile get", "inspect")) {
+        invalid("--group-sql requires profile get or inspect")
+    }
     if (command in setOf("context add", "context list", "context use")) return contextRequest(command)
     if (name != null) invalid("--name requires context add/use")
     if (command == "inspect compare") {
@@ -65,7 +68,7 @@ internal fun Cli.interpret(): CommandRequest {
         }
         "inspect" -> {
             if (resume) invalid("--resume requires capture")
-            OfflineRequest.Inspect(required(directory, "--directory"), required(txid, "--txid"), includeText)
+            OfflineRequest.Inspect(required(directory, "--directory"), required(txid, "--txid"), includeText, groupSql)
         }
         else -> onlineRequest(command)
     }
@@ -110,7 +113,7 @@ private fun Cli.onlineRequest(command: String): OnlineRequest {
     return when (command) {
         "doctor", "auth login" -> OnlineRequest.Doctor(command == "auth login")
         "object list" -> OnlineRequest.Objects(date?.also(::validateStorageDate))
-        "profile get" -> OnlineRequest.Profile(required(date, "--date"), required(txid, "--txid"), includeText)
+        "profile get" -> OnlineRequest.Profile(required(date, "--date"), required(txid, "--txid"), includeText, groupSql)
         "xlog search" -> OnlineRequest.Search(required(query, "query"), maxPages, includeText)
         "capture" -> OnlineRequest.Capture(
             required(query, "query"), required(directory, "--directory"), resume, maxPages, includeProfiles, includeText,
