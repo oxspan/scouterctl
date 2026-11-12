@@ -4,6 +4,7 @@ import dev.scouterctl.core.*
 
 interface ObservationSource : AutoCloseable {
     val info: ServerInfo
+    fun timezone(): CollectorTimezone?
     fun status(): CollectorStatus
     fun settings(): List<RuntimeSetting>
     fun agentStatus(objHash: Int): AgentStatus

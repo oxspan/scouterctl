@@ -39,6 +39,11 @@ class CollectorSource private constructor(private val socket: Socket, private va
     private var session = 0L
     override lateinit var info: ServerInfo
         private set
+    private val reportedTimezone by lazy {
+        collectorOperation { decodeCollectorTimezone(exchange(RequestCmd.SERVER_ENV), exchange(RequestCmd.SERVER_TIME)) }
+    }
+
+    override fun timezone(): CollectorTimezone? = reportedTimezone
 
     companion object {
         fun connect(endpoint: Endpoint, password: String, clientVersion: String): CollectorSource = collectorOperation {

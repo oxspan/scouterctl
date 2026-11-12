@@ -71,6 +71,8 @@ A consumer should accept the stream schema, process records, then require both t
 
 `storageDateVerification: "unverified"` means the CLI used the supplied XLog storage date without confirmation from the Collector. An incorrect date can produce an empty completed query. XLog `capture` reports the same field in its outer result envelope.
 
+Online window queries reject offset mismatches against the reported Collector JVM zone before streaming or writing captures. `doctor` and `collector status` expose the property's ID and a client-rule offset with explicit provenance; unavailable metadata remains `null`. These checks do not verify the storage calendar. See [Collector time zones](collector-timezone.md).
+
 `counter history` uses its own `scouterctl.counter-stream/v1` schema with the same start/record/complete lifecycle. Its start includes the dated target and counter metadata, and records contain stored timestamps and numeric strings. See [counter history](counter-history.md) for missing values, units and query limits.
 
 `counter export` returns a single manifest result and writes JSONL chunk files. Its `scouterctl.counter-capture/v1` format is separate from XLog captures. See [resumable counter export](counter-export.md) for budgets, checkpoints and completion semantics.

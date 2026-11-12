@@ -39,6 +39,7 @@ internal class MemorySource(
     private val profile: (Long) -> ProfileRecord = { ProfileRecord(it.toString(), emptyList()) },
 ) : ObservationSource {
     override val info = portSource
+    override fun timezone(): CollectorTimezone? = null
     var closed = false
     override fun status() = CollectorStatus(1, 2, 3)
     override fun settings(): List<RuntimeSetting> = emptyList()
