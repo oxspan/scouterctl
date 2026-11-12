@@ -39,6 +39,7 @@ private fun requireDirectory(path: Path, missing: String, invalid: String) {
     val attributes = try {
         Files.readAttributes(path, BasicFileAttributes::class.java)
     } catch (_: NoSuchFileException) {
+        path.toAbsolutePath().parent?.let { requireDirectory(it, missing, invalid) }
         throw OperationFailure(ErrorCode.INVALID_ARGUMENT, missing)
     } catch (_: NotDirectoryException) {
         throw OperationFailure(ErrorCode.INVALID_ARGUMENT, invalid)
