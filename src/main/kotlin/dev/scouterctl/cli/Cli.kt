@@ -16,7 +16,7 @@ import java.util.concurrent.Callable
         "Password: SCOUTERCTL_PASSWORD, or --interactive for hidden terminal input. Passwords are never saved.",
         "TCP has no native TLS; use a trusted path."])
 class Cli(private val dispatcher: CommandDispatcher, private val output: JsonOutput) : Callable<Int> {
-    @Parameters(arity = "1..2", paramLabel = "COMMAND") lateinit var words: List<String>
+    @Parameters(arity = "1..2", paramLabel = "COMMAND") var words: List<String> = emptyList()
     @Mixin val connection = ConnectionOptions()
     @Spec lateinit var spec: CommandSpec
     @Option(names = ["--name"], description = ["Name for context add/use"]) var name: String? = null
