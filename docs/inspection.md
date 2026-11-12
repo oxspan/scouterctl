@@ -12,6 +12,8 @@ scouterctl collector config --key net_tcp_listen_port
 
 Status reports `usedHeapBytes`, `committedHeapBytes` and `serverTimeEpochMs`. Committed heap is not the JVM maximum heap. Collector metadata accompanies both results.
 
+`doctor` and status also report the [Collector's JVM time-zone ID and client-rule offset](collector-timezone.md), including their provenance and reference time. This is separate from storage-date verification.
+
 Configuration lists runtime settings exposed by the Collector alongside their defaults. Values are strings. The CLI shows values only for selected port, HTTP-enable and retention settings; other entries have `value: null`, `defaultValue: null` and `redacted: true`. Filtering by `--key` does not reveal hidden values. A missing setting exits 7. This is not a raw configuration-file export, and it does not include arbitrary custom properties.
 
 These commands do not write settings or require a local Agent. They authenticate with the selected Collector account. Successful access does not prove that the Collector enforces distinct permissions for every operation; `effectivePermission` remains `unknown`.

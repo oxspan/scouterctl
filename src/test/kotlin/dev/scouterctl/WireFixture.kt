@@ -25,6 +25,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 enum class Fault {
+    TIMEZONE_SEOUL, TIMEZONE_MISSING, TIMEZONE_INVALID, TIMEZONE_TYPE, TIMEZONE_TIME_TYPE,
     COUNTER_EXPORT,
     HISTORY_EMPTY, HISTORY_MALFORMED, HISTORY_TIME_TYPE, HISTORY_OUTSIDE, HISTORY_NAN, HISTORY_TARGET_DUPLICATE,
     COUNTER_MALFORMED, COUNTER_DUPLICATE, COUNTER_NAN, COUNTER_XML_DTD, COUNTER_EMPTY, COUNTER_CUSTOM,
@@ -128,6 +129,19 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                             RequestCmd.SERVER_STATUS -> send(output, MapPack().apply {
                                 put("used", 1024L); put("total", 4096L); put("time", baseTime)
                                 if (fault == Fault.STATUS_MALFORMED) put("used", "private-status-value")
+                            })
+                            RequestCmd.SERVER_ENV -> send(output, MapPack().apply {
+                                if (fault != Fault.TIMEZONE_MISSING) put("user.timezone", when (fault) {
+                                    Fault.TIMEZONE_SEOUL -> "Asia/Seoul"
+                                    Fault.TIMEZONE_INVALID -> "private-invalid-zone"
+                                    else -> "UTC"
+                                })
+                                if (fault == Fault.TIMEZONE_TYPE) put("user.timezone", 42L)
+                                put("private.password", "private-zone-env-token")
+                            })
+                            RequestCmd.SERVER_TIME -> send(output, MapPack().apply {
+                                put("time", baseTime)
+                                if (fault == Fault.TIMEZONE_TIME_TYPE) put("time", "private-time-value")
                             })
                             RequestCmd.GET_XML_COUNTER -> send(output, MapPack().apply {
                                 val xml = if (fault == Fault.COUNTER_XML_DTD)
