@@ -16,7 +16,9 @@ class OfflineCommands(private val repository: (Path) -> EvidenceRepository, priv
     }
     private fun inspect(request: OfflineRequest.Inspect): Int {
         val result = inspectCapture(repository(request.directory), request.txid, request.includeText)
-        return output.result(json.encodeToJsonElement(result.toDto()), result.captureExecutionComplete && result.unavailableProfiles == 0 &&
+        val data = if (request.groupSql) result.toSqlSummaryJson(result.record.profile?.let { summarizeSql(it, request.includeText) })
+            else json.encodeToJsonElement(result.toDto())
+        return output.result(data, result.captureExecutionComplete && result.unavailableProfiles == 0 &&
             result.record.profile?.completeness != ProfileCompleteness.TRUNCATED)
     }
     private fun search(request: OfflineRequest.Search): Int {
