@@ -46,6 +46,8 @@ The example message is illustrative. `error.code` is the machine-readable identi
 
 A mid-response EOF currently maps to `IO_ERROR` (10), whereas socket exceptions/timeouts map to `CONNECTION_FAILED` (5). Exit 8 therefore needs both the exit status and the envelope: it can carry available data or describe a failure without data. Treat unrecognized nonzero exits as failures rather than guessing a known category.
 
+Local file failures and Collector transport I/O have distinct human-readable messages while retaining `IO_ERROR` (10). Integrity errors retain their specific messages. See [capture recovery](capture-recovery.md) before retrying a failed file write; a `.partial` file is not a committed checkpoint.
+
 ## Streaming commands
 
 `xlog search` uses `scouterctl.stream/v1` on its first `start` event:

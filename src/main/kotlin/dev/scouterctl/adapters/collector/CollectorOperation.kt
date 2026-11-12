@@ -20,7 +20,7 @@ internal inline fun <T> collectorOperation(block: () -> T): T = try {
     throw OperationFailure(ErrorCode.CONNECTION_FAILED,
         "Collector connection failed; check --host, --port and TCP access")
 } catch (_: IOException) {
-    throw OperationFailure(ErrorCode.IO_ERROR, "Transport or artifact I/O failed")
+    throw OperationFailure(ErrorCode.IO_ERROR, "Collector transport I/O failed; retry the query or check the Collector connection")
 } catch (_: IllegalArgumentException) {
     throw UnexpectedFailure(ErrorCode.INVALID_ARGUMENT, "Invalid argument or manifest")
 } catch (_: java.time.DateTimeException) {
