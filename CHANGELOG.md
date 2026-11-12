@@ -1,5 +1,29 @@
 # 변경 기록
 
+## [1.1.0](https://github.com/oxspan/scouterctl/compare/v1.0.0...v1.1.0) (2026-11-12)
+
+
+### Features
+
+* ✨ Group profile SQL steps by hash ([b1dd2fa](https://github.com/oxspan/scouterctl/commit/b1dd2fae9a0933e51984dffee9f6ddd5daaffce0))
+* ✨ List objects by Collector storage date ([8a25b30](https://github.com/oxspan/scouterctl/commit/8a25b30ac581de685a09f8832856aca25b67ea26))
+* ✨ Resolve XLog dictionary text on request ([08a59fd](https://github.com/oxspan/scouterctl/commit/08a59fd0e2ae4ad3f884a16483dba26ce051c3f0))
+* ✨ Show approved Agent configuration values ([a7af022](https://github.com/oxspan/scouterctl/commit/a7af0229438e48060fa8061c580312c0a19cbb67))
+* ✨ Show timing and network outcomes in live profiles ([672dacf](https://github.com/oxspan/scouterctl/commit/672dacf7ddb9d4d6c8aa6a8357ab0ec8db3931dd))
+* 🔀 Promote Collector diagnostics and capture improvements ([#87](https://github.com/oxspan/scouterctl/issues/87)) ([30d6106](https://github.com/oxspan/scouterctl/commit/30d6106aee4ad83b39ce43496df9321315032a8f))
+
+
+### Bug Fixes
+
+* 🐛 Avoid duplicate profile capture resume scans ([defecb2](https://github.com/oxspan/scouterctl/commit/defecb25d3977a543d7276babe0e3cd2b7ef3fc0)), closes [#74](https://github.com/oxspan/scouterctl/issues/74)
+* 🐛 Clarify sensitive values in profile error text ([2ad5f49](https://github.com/oxspan/scouterctl/commit/2ad5f496750a4b452d1f2847f7582e90fa97925d))
+* 🐛 Diagnose Windows file ancestors before missing paths ([df26cd3](https://github.com/oxspan/scouterctl/commit/df26cd353b786d4e1123d13d9bd6e3e53cb01dd3)), closes [#75](https://github.com/oxspan/scouterctl/issues/75)
+* 🐛 Explain invalid capture directory paths ([53d4c1b](https://github.com/oxspan/scouterctl/commit/53d4c1b5ea2adf9d3d403b552b9ff9f353ebd3da)), closes [#75](https://github.com/oxspan/scouterctl/issues/75)
+* 🐛 Improve command help and option diagnostics ([22c81fa](https://github.com/oxspan/scouterctl/commit/22c81fa3f176a18d825567bfd40293b915052cc3)), closes [#65](https://github.com/oxspan/scouterctl/issues/65)
+* 🐛 Report unverified XLog storage dates ([8d0cbf5](https://github.com/oxspan/scouterctl/commit/8d0cbf5c04ff218f463859847fdc3c86fccaed34))
+* 🐛 Retry denied Windows file replacements ([da33d93](https://github.com/oxspan/scouterctl/commit/da33d93593db66fb2a43cb950c72b8179a3d0523)), closes [#58](https://github.com/oxspan/scouterctl/issues/58)
+* 🐛 Validate reported Collector time zones ([10c2019](https://github.com/oxspan/scouterctl/commit/10c2019d70fe25a8aa7d6e721f85754435b5b6e0)), closes [#57](https://github.com/oxspan/scouterctl/issues/57)
+
 ## [1.0.0](https://github.com/oxspan/scouterctl/compare/v0.3.0...v1.0.0) (2026-11-07)
 
 
