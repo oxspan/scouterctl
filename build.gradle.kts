@@ -183,6 +183,18 @@ listOf("scaleFixtures" to "generate", "scaleCheck" to "run").forEach { (taskName
     }
 }
 
+tasks.register<JavaExec>("resumeReadCheck") {
+    group = "verification"
+    description = "Measure synthetic profile-capture resume reads and elapsed time (opt-in)."
+    dependsOn(tasks.testClasses)
+    val externalJar = providers.gradleProperty("cliJar")
+    classpath = if (externalJar.isPresent) files(file(externalJar.get())) + sourceSets.test.get().runtimeClasspath
+        else sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.ResumeReadBenchmarkKt")
+    maxHeapSize = "512m"
+    args(providers.gradleProperty("resumeReadResults").getOrElse("build/resume-read-results"))
+}
+
 // Opt-in fixture for matching legacy Collector/Agent releases on Java 8.
 val legacyFixture = sourceSets.create("legacyFixture")
 configurations.named(legacyFixture.implementationConfigurationName) {
