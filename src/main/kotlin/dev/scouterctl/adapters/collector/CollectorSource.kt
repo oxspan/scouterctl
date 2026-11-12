@@ -4,6 +4,7 @@ import dev.scouterctl.core.*
 import dev.scouterctl.application.ObservationSource
 import dev.scouterctl.application.collectorSettingValueIsVisible
 import dev.scouterctl.application.agentSettingValueIsVisible
+import dev.scouterctl.application.agentTextSettingValueIsVisible
 
 import scouter.io.DataInputX
 import scouter.io.DataOutputX
@@ -135,7 +136,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
         if (!agent.alive) throw OperationFailure(ErrorCode.NOT_FOUND, "Agent is not alive")
         val response = exchange(RequestCmd.LIST_CONFIGURE_WAS, MapPack().apply { put("objHash", objHash.toLong()) })
         if (response.isEmpty()) throw OperationFailure(ErrorCode.NOT_FOUND, "Agent settings are unavailable")
-        AgentConfiguration(agent, parseSettings(response, ::agentSettingValueIsVisible))
+        AgentConfiguration(agent, parseSettings(response, ::agentSettingValueIsVisible, ::agentTextSettingValueIsVisible))
     }
 
     override fun counterHistory(query: CounterHistoryQuery): CounterHistory = collectorOperation {
@@ -165,7 +166,11 @@ class CollectorSource private constructor(private val socket: Socket, private va
         return AgentIdentity(agent.objHash, agent.objName ?: "", agent.objType ?: "", agent.alive, agent.version ?: "unknown")
     }
 
-    private fun parseSettings(response: List<Pack>, valueIsVisible: (String) -> Boolean): List<RuntimeSetting> {
+    private fun parseSettings(
+        response: List<Pack>,
+        valueIsVisible: (String) -> Boolean,
+        textValueIsVisible: (String) -> Boolean = { false },
+    ): List<RuntimeSetting> {
         val pack = response.singleOrNull() as? MapPack
             ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one runtime settings response")
         fun items(key: String): ListValue = pack.get(key) as? ListValue
@@ -177,10 +182,14 @@ class CollectorSource private constructor(private val socket: Socket, private va
             throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Inconsistent runtime settings lists")
         }
         val seen = mutableSetOf<String>()
-        fun visibleValue(value: Value): String = when (value) {
-            is DecimalValue -> value.value.toString()
-            is BooleanValue -> value.value.toString()
-            else -> throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid operational setting value")
+        fun invalidValue(): Nothing = throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid operational setting value")
+        fun visibleValue(key: String, value: Value): String {
+            if (textValueIsVisible(key)) return (value as? TextValue)?.value ?: invalidValue()
+            return when (value) {
+                is DecimalValue -> value.value.toString()
+                is BooleanValue -> value.value.toString()
+                else -> invalidValue()
+            }
         }
         return (0 until keys.size()).map { index ->
             val key = (keys.get(index) as? TextValue)?.value
@@ -189,8 +198,8 @@ class CollectorSource private constructor(private val socket: Socket, private va
                 throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid or duplicate runtime setting key")
             }
             val visible = valueIsVisible(key)
-            RuntimeSetting(key, if (visible) visibleValue(values.get(index)) else null,
-                if (visible) visibleValue(defaults.get(index)) else null, !visible)
+            RuntimeSetting(key, if (visible) visibleValue(key, values.get(index)) else null,
+                if (visible) visibleValue(key, defaults.get(index)) else null, !visible)
         }
     }
 

@@ -9,7 +9,7 @@ internal inline fun <T> fileOperation(block: () -> T): T = try {
 } catch (error: OperationFailure) {
     throw error
 } catch (_: IOException) {
-    throw OperationFailure(ErrorCode.IO_ERROR, "Transport or artifact I/O failed")
+    throw OperationFailure(ErrorCode.IO_ERROR, "Local file I/O failed; check the path, permissions and available disk space")
 } catch (_: IllegalArgumentException) {
     throw UnexpectedFailure(ErrorCode.INVALID_ARGUMENT, "Invalid argument or manifest")
 } catch (_: java.time.DateTimeException) {

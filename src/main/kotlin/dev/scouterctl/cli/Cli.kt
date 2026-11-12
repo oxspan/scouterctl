@@ -16,7 +16,7 @@ import java.util.concurrent.Callable
         "Password: SCOUTERCTL_PASSWORD, or --interactive for hidden terminal input. Passwords are never saved.",
         "TCP has no native TLS; use a trusted path."])
 class Cli(private val dispatcher: CommandDispatcher, private val output: JsonOutput) : Callable<Int> {
-    @Parameters(arity = "1..2", paramLabel = "COMMAND") lateinit var words: List<String>
+    @Parameters(arity = "1..2", paramLabel = "COMMAND") var words: List<String> = emptyList()
     @Mixin val connection = ConnectionOptions()
     @Spec lateinit var spec: CommandSpec
     @Option(names = ["--name"], description = ["Name for context add/use"]) var name: String? = null
@@ -36,9 +36,14 @@ class Cli(private val dispatcher: CommandDispatcher, private val output: JsonOut
     @Option(names = ["--before"], description = ["inspect compare: baseline v2/v3 capture directory"]) var before: Path? = null
     @Option(names = ["--after"], description = ["inspect compare: candidate v2/v3 capture directory"]) var after: Path? = null
     @Option(names = ["--resume"]) var resume: Boolean = false
-    @Option(names = ["--include-profiles"], description = ["Capture profiles in a v3 offline bundle"]) var includeProfiles: Boolean = false
+    @Option(names = ["--include-profiles"], description = [
+        "Capture profiles in a v3 bundle for offline inspect.",
+        "Default capture writes an XLog-only v1 bundle.",
+    ]) var includeProfiles: Boolean = false
     @Option(names = ["--include-text"], description = ["Include potentially sensitive dictionary text in xlog search, profile get, profile capture or inspect"])
     var includeText: Boolean = false
+    @Option(names = ["--group-sql"], description = ["profile get / inspect: aggregate decoded SQL steps by hash instead of returning steps"])
+    var groupSql: Boolean = false
     @Option(names = ["--limit"], description = ["inspect search/summary/compare: 1..1000 requests/services; default 20"]) var limit: Int? = null
     @Option(names = ["--sort"], description = ["inspect summary: errors, elapsed (maximum), requests; default errors"]) var summarySort: String? = null
     @Option(names = ["--min-elapsed-ms"], description = ["inspect search: inclusive minimum request duration"]) var minElapsedMs: Int? = null

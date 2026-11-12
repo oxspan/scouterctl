@@ -11,7 +11,7 @@ sealed interface ContextRequest : CommandRequest {
     data class Use(val name: String?) : ContextRequest
 }
 sealed interface OfflineRequest : CommandRequest {
-    data class Inspect(val directory: Path, val txid: Long, val includeText: Boolean) : OfflineRequest
+    data class Inspect(val directory: Path, val txid: Long, val includeText: Boolean, val groupSql: Boolean = false) : OfflineRequest
     data class Search(val directory: Path, val filter: EvidenceFilter, val includeText: Boolean) : OfflineRequest
     data class Summary(val directory: Path, val options: ServiceSummaryOptions) : OfflineRequest
     data class Compare(val before: Path, val after: Path, val options: ComparisonOptions) : OfflineRequest
@@ -26,7 +26,7 @@ sealed interface OnlineRequest : CommandRequest {
     data class CounterHistory(val query: CounterHistoryQuery) : OnlineRequest
     data class Counters(val objHash: Int, val name: String?) : OnlineRequest
     data class Objects(val date: String?) : OnlineRequest
-    data class Profile(val date: String, val txid: Long, val includeText: Boolean) : OnlineRequest
+    data class Profile(val date: String, val txid: Long, val includeText: Boolean, val groupSql: Boolean = false) : OnlineRequest
     data class Search(val query: Query, val maxPages: Int, val includeText: Boolean = false) : OnlineRequest
     data class Capture(val query: Query, val directory: Path, val resume: Boolean,
         val maxPages: Int, val includeProfiles: Boolean, val includeText: Boolean) : OnlineRequest

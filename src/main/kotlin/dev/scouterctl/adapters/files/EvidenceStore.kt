@@ -8,16 +8,13 @@ import kotlinx.serialization.encodeToString
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption.ATOMIC_MOVE
-import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
 
 class EvidenceStore(private val directory: Path) : EvidenceRepository {
-    override fun create(): Unit = fileOperation {
-        Files.createDirectory(directory)
-    }
+    override fun create() = createCaptureDirectory(directory)
 
     override fun load(): EvidenceManifest = fileOperation {
+        requireCaptureDirectory(directory)
         val content = read("manifest.json", 8_388_608)
         requireCaptureSchema(content, "scouterctl.capture/v2", "scouterctl.capture/v3")
         val manifest = json.decodeFromString<EvidenceManifestDto>(content).toModel()
@@ -90,7 +87,7 @@ class EvidenceStore(private val directory: Path) : EvidenceRepository {
             java.nio.file.StandardOpenOption.TRUNCATE_EXISTING, java.nio.file.StandardOpenOption.WRITE).use {
             it.write(content.toByteArray(Charsets.UTF_8))
         }
-        Files.move(partial, directory.resolve(name), ATOMIC_MOVE, REPLACE_EXISTING)
+        replaceAtomically(partial, directory.resolve(name))
     }
 
     private fun digest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")

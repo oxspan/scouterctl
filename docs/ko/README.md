@@ -12,6 +12,7 @@
 - [설치·업데이트·이전 버전으로 전환·제거](installation.md)
 - [빠른 시작](../../QUICKSTART.ko.md)
 - [연결과 비밀번호](connections.md)
+- [프로파일 SQL 집계](profile-sql-summary.md)
 - [기여 안내](../../CONTRIBUTING.ko.md) · [보안 안내](../../SECURITY.ko.md)
 
 ## 상세 사용법

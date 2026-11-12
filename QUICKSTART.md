@@ -7,6 +7,7 @@ Install the [Linux x64 or Windows x64 command package](docs/installation.md) wit
 ```sh
 scouterctl --version
 scouterctl --help
+scouterctl capture --help
 ```
 
 ## 1. Connect to a Collector
@@ -52,6 +53,8 @@ scouterctl capture --object-hash 123456 --date 20261107 \
 The capture result reports `storageDateVerification: "unverified"`. Check the supplied storage date when a completed query returns no records.
 
 Repeat the same command with `--resume` after interruption or partial completion. Add `--include-text` at capture time only if you intend to store potentially sensitive service names, SQL and error text. See [capture and offline analysis](docs/captures.md).
+
+Windows briefly retries temporary file replacement denial. If a local file error persists, close programs using the capture and check permissions and free disk space. Resume only when a valid committed manifest exists; otherwise preserve the failed directory and choose a new destination. See [capture recovery](docs/capture-recovery.md).
 
 ## 4. Inspect without a Collector
 

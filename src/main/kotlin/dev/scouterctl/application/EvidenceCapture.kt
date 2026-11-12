@@ -6,6 +6,7 @@ fun captureEvidence(source: ObservationSource, query: Query, request: CaptureOpt
     query.validate()
     if (query.pageSize > 100) throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Profile capture page-size must be 1..100")
     val reader = EvidenceReader(source, query.date, request.includeText)
+    val ids = mutableSetOf<String>()
     var manifest = if (request.resume) store.load().also {
         if (it.schemaVersion != "scouterctl.capture/v3") {
             throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Resume requires a v3 profile capture; preserve this capture and start a new directory")
@@ -13,7 +14,7 @@ fun captureEvidence(source: ObservationSource, query: Query, request: CaptureOpt
         if (it.source != source.info || it.query != query || it.endpoint != request.endpoint || it.textIncluded != request.includeText) {
             throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Resume source, query or text policy differs from manifest")
         }
-        store.validate(it)
+        store.forEachRecord(it) { record -> ids.add(record.xlog.txid) }
     } else {
         store.create()
         EvidenceManifest(source = source.info, endpoint = request.endpoint, query = query, textIncluded = request.includeText)
@@ -35,8 +36,6 @@ fun captureEvidence(source: ObservationSource, query: Query, request: CaptureOpt
             store.save(manifest)
             return manifest
         }
-        val ids = mutableSetOf<String>()
-        manifest.pages.indices.forEach { index -> store.readPage(manifest, index).forEach { ids.add(it.xlog.txid) } }
         repeat(request.maxPages) {
             if (manifest.pages.size >= 10000) throw OperationFailure(ErrorCode.PARTIAL_RESULT, "Evidence capture limit of 10000 pages reached")
             val page = source.page(query, manifest.cursor)

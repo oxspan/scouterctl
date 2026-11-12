@@ -29,10 +29,10 @@ enum class Fault {
     HISTORY_EMPTY, HISTORY_MALFORMED, HISTORY_TIME_TYPE, HISTORY_OUTSIDE, HISTORY_NAN, HISTORY_TARGET_DUPLICATE,
     COUNTER_MALFORMED, COUNTER_DUPLICATE, COUNTER_NAN, COUNTER_XML_DTD, COUNTER_EMPTY, COUNTER_CUSTOM,
     AGENT_OFFLINE, AGENT_NO_RESPONSE, AGENT_JVM_MALFORMED, AGENT_DUPLICATE,
-    NONE, STATUS_MALFORMED, CONFIG_MALFORMED, CONFIG_DUPLICATE, CONFIG_INVALID_VISIBLE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
+    NONE, STATUS_MALFORMED, CONFIG_MALFORMED, CONFIG_DUPLICATE, CONFIG_INVALID_VISIBLE, CONFIG_INVALID_AGENT_TEXT, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
-    PROFILE_NETWORK, PROFILE_TRUNCATED, PROFILE_OTHER_CONTROL, PROFILE_MANY_STEPS, PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
+    PROFILE_NETWORK, PROFILE_TRUNCATED, PROFILE_OTHER_CONTROL, PROFILE_MANY_STEPS, PROFILE_REPEATED_SQL, PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
 }
 
 class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPassword: String? = null,
@@ -210,16 +210,28 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 newList("key").apply {
                                     add("smtp_password"); add(if (agent) "net_collector_tcp_port" else "net_tcp_listen_port"); add("db_dir")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("db_dir")
+                                    if (agent) {
+                                        add("trace_sql_parameter_max_length"); add("profile_http_parameter_enabled")
+                                        add("profile_http_querystring_enabled"); add("net_collector_ip"); add("obj_name"); add("obj_type")
+                                    }
                                 }
                                 newList("value").apply {
                                     add("private-config-marker"); add(6100L); add("/private/collector/data")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("duplicate-private-marker")
                                     if (fault == Fault.CONFIG_INVALID_VISIBLE) set(1, scouter.lang.value.TextValue("private-visible-marker"))
+                                    if (agent) {
+                                        add(0L); add(true); add(true); add("collector.example.test")
+                                        if (fault == Fault.CONFIG_INVALID_AGENT_TEXT) add(42L) else add("fixture")
+                                        add("java")
+                                    }
                                 }
                                 newList("default").apply {
                                     add("private-default-marker"); add(6100L)
                                     if (fault != Fault.CONFIG_MALFORMED) add("/private/default")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("duplicate-private-default")
+                                    if (agent) {
+                                        add(20L); add(false); add(false); add("127.0.0.1"); add(""); add("")
+                                    }
                                 }
                                 })
                             }
@@ -277,7 +289,13 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                         },
                                         ApiCallStep2().apply { index = 4; parent = 1; start_time = 650; elapsed = 50 },
                                         StepControl().apply { code = 7; message = "private-control-message" },
-                                    )) else if (fault == Fault.PROFILE_TRUNCATED || fault == Fault.PROFILE_OTHER_CONTROL) Step.toBytes(arrayOf(
+                                    )) else if (fault == Fault.PROFILE_REPEATED_SQL) Step.toBytes(Array<Step>(3004) { number ->
+                                        if (number < 4) HashedMessageStep().apply { index = number; hash = 77 }
+                                        else SqlStep3().apply {
+                                            index = number; hash = 123; elapsed = 2; error = if (number % 100 == 0) -789 else 0
+                                            param = "password=secret-token"
+                                        }
+                                    }) else if (fault == Fault.PROFILE_TRUNCATED || fault == Fault.PROFILE_OTHER_CONTROL) Step.toBytes(arrayOf(
                                         SqlStep3().apply { index = 1; hash = 123; elapsed = 7 },
                                         StepControl().apply { code = if (fault == Fault.PROFILE_TRUNCATED) 0 else 7; message = " ** Profile Truncated ** " }
                                     )) else if (fault == Fault.PROFILE_MANY_STEPS) Step.toBytes(Array(1001) { number ->

@@ -16,6 +16,8 @@ scouterctl profile get --date YYYYMMDD --txid TXID
 scouterctl inspect --directory CAPTURE --txid TXID
 ```
 
+Add [`--group-sql`](profile-sql-summary.md) to aggregate decoded SQL steps by hash. The summary preserves these completeness and exit semantics.
+
 ## Capture compatibility and limits
 
 The completeness value is stored with profiles in newly written v3 captures and survives text redaction during inspection. Existing captures without the field read as `unknown`; their former control-step text/code was not stored, so it cannot reliably be reconstructed. Reading an old capture does not rewrite it.
