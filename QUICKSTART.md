@@ -7,6 +7,7 @@ Install the [Linux x64 or Windows x64 command package](docs/installation.md) wit
 ```sh
 scouterctl --version
 scouterctl --help
+scouterctl capture --help
 ```
 
 ## 1. Connect to a Collector

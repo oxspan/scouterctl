@@ -19,9 +19,11 @@ fun runCli(args: Array<String>) {
         OnlineCommands(contexts, { endpoint, password -> CollectorSource.connect(endpoint, password, BuildInfo.version) },
             ::CaptureStore, ::EvidenceStore, ::CounterCaptureStore, TerminalPasswordInput(), output),
     )
-    val command = CommandLine(Cli(dispatcher, output))
+    val cli = Cli(dispatcher, output)
+    val command = CommandLine(cli)
+    cli.configureHelp(command)
     command.commandSpec.version("scouterctl ${BuildInfo.version}")
-    command.setParameterExceptionHandler { _, _ -> output.failure(OperationFailure(ErrorCode.INVALID_ARGUMENT, "Invalid command arguments; use --help")) }
+    command.setParameterExceptionHandler { error, _ -> output.failure(argumentFailure(error)) }
     exitProcess(command.execute(*args))
 }
 

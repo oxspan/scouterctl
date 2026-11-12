@@ -8,6 +8,7 @@ This guide describes the output consumed by scripts and other tools. Output sche
 - Command and argument errors also go to stdout as JSON. Do not assume stderr is the error API. Keep stdout and stderr separate when parsing.
 - Explicit interactive password input uses a terminal and a human-readable prompt on stderr. Automation should provide `SCOUTERCTL_PASSWORD` and use `--no-input`; it must not depend on prompt text.
 - `--help` and `--version` are plain-text stdout with exit 0, outside the JSON format. Help layout and diagnostic messages may change. Parse error codes rather than message text.
+- `scouterctl COMMAND --help` shows that command's required and accepted options, combinations and an example (for example `scouterctl capture --help` or `scouterctl counter history --help`). A command-family help request such as `scouterctl counter --help` lists its commands. Help contains no ANSI escapes when output is redirected or `NO_COLOR` is set, including an empty value.
 - These formats apply after the JVM and CLI start successfully. A missing/incompatible JVM, process termination or an unwritable output stream can prevent a valid JSON response. Missing or malformed output must not be treated as successful execution.
 
 ## Single-result commands
@@ -31,6 +32,8 @@ Completion never certifies traffic coverage, sampling, comparability or profile 
 ```
 
 The example message is illustrative. `error.code` is the machine-readable identifier; `error.message` is a human-readable string. An error object contains no result data. During a stream, previously emitted records remain on stdout but are not a complete result.
+
+Unknown options, invalid/missing option values and unsupported command-option combinations identify the offending option in `error.message` where available. Argument values are not echoed; error schema and exit codes are unchanged.
 
 | Exit | Error code when an error object is emitted | Meaning |
 | --- | --- | --- |

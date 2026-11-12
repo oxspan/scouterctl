@@ -7,6 +7,7 @@ JDK 21과 [운영체제에 맞는 ZIP](docs/ko/installation.md)을 설치한 뒤
 ```sh
 scouterctl --version
 scouterctl --help
+scouterctl capture --help
 ```
 
 여러 줄로 적은 명령은 Bash 예시입니다. Windows에서는 각 명령을 한 줄로 입력하면 같은 옵션을 사용할 수 있습니다.
