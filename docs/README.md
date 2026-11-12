@@ -23,6 +23,8 @@ See [command and output examples](examples.md) for actual response shapes.
 - [Capture formats and older files](capture-compatibility.md)
 - [Interrupted capture recovery](capture-recovery.md)
 - [Profile completeness](profile-completeness.md)
+- [Collector time zone and query checks](collector-timezone.md)
+- [Grouped profile SQL output](profile-sql-summary.md)
 - [Security](../SECURITY.md)
 
 ## Development and maintenance

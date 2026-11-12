@@ -9,8 +9,7 @@ Starting with diagnostics and data capture, the project aims to cover configurat
 ## Features
 
 - Inspect Collector and Agent status, settings and real-time metrics; query transactions, SQL and errors.
-- Export resumable captures for offline investigation.
-- Search, summarize and compare saved captures.
+- Export resumable captures. Use `capture --include-profiles` when you plan to inspect, search, summarize or compare saved captures offline. See [capture compatibility](docs/capture-compatibility.md).
 - Use JSON/JSONL output in scripts and other tools.
 
 ## Quick start

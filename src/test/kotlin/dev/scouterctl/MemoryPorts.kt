@@ -39,6 +39,7 @@ internal class MemorySource(
     private val profile: (Long) -> ProfileRecord = { ProfileRecord(it.toString(), emptyList()) },
 ) : ObservationSource {
     override val info = portSource
+    override fun timezone(): CollectorTimezone? = null
     var closed = false
     override fun status() = CollectorStatus(1, 2, 3)
     override fun settings(): List<RuntimeSetting> = emptyList()
@@ -46,9 +47,9 @@ internal class MemorySource(
     override fun agentSettings(objHash: Int): AgentConfiguration = throw OperationFailure(ErrorCode.NOT_FOUND, "No Agent in memory fixture")
     override fun counterHistory(query: CounterHistoryQuery): CounterHistory = throw OperationFailure(ErrorCode.NOT_FOUND, "No history in memory fixture")
     override fun realtimeCounters(objHash: Int): RealtimeCounters = throw OperationFailure(ErrorCode.NOT_FOUND, "No Agent in memory fixture")
-    override fun objects(): List<ObjectRecord> = emptyList()
-    override fun page(query: Query, cursor: Cursor) = fetch(cursor)
-    override fun profile(date: String, txid: Long, includeText: Boolean) = profile(txid)
+    override fun objects(date: String?): List<ObjectRecord> = emptyList()
+    override fun page(query: Query, cursor: Cursor, includeText: Boolean) = fetch(cursor)
+    override fun profile(date: String, txid: Long, includeText: Boolean, includeStepDetails: Boolean) = profile(txid)
     override fun close() { closed = true }
 }
 

@@ -8,6 +8,7 @@ This guide describes the output consumed by scripts and other tools. Output sche
 - Command and argument errors also go to stdout as JSON. Do not assume stderr is the error API. Keep stdout and stderr separate when parsing.
 - Explicit interactive password input uses a terminal and a human-readable prompt on stderr. Automation should provide `SCOUTERCTL_PASSWORD` and use `--no-input`; it must not depend on prompt text.
 - `--help` and `--version` are plain-text stdout with exit 0, outside the JSON format. Help layout and diagnostic messages may change. Parse error codes rather than message text.
+- `scouterctl COMMAND --help` shows that command's required and accepted options, combinations and an example (for example `scouterctl capture --help` or `scouterctl counter history --help`). A command-family help request such as `scouterctl counter --help` lists its commands. Help contains no ANSI escapes when output is redirected or `NO_COLOR` is set, including an empty value.
 - These formats apply after the JVM and CLI start successfully. A missing/incompatible JVM, process termination or an unwritable output stream can prevent a valid JSON response. Missing or malformed output must not be treated as successful execution.
 
 ## Single-result commands
@@ -32,6 +33,8 @@ Completion never certifies traffic coverage, sampling, comparability or profile 
 
 The example message is illustrative. `error.code` is the machine-readable identifier; `error.message` is a human-readable string. An error object contains no result data. During a stream, previously emitted records remain on stdout but are not a complete result.
 
+Unknown options, invalid/missing option values and unsupported command-option combinations identify the offending option in `error.message` where available. Argument values are not echoed; error schema and exit codes are unchanged.
+
 | Exit | Error code when an error object is emitted | Meaning |
 | --- | --- | --- |
 | 0 | None | Requested command completed; scope limitations still apply |
@@ -46,23 +49,31 @@ The example message is illustrative. `error.code` is the machine-readable identi
 
 A mid-response EOF currently maps to `IO_ERROR` (10), whereas socket exceptions/timeouts map to `CONNECTION_FAILED` (5). Exit 8 therefore needs both the exit status and the envelope: it can carry available data or describe a failure without data. Treat unrecognized nonzero exits as failures rather than guessing a known category.
 
+Local file failures and Collector transport I/O have distinct human-readable messages while retaining `IO_ERROR` (10). Integrity errors retain their specific messages. See [capture recovery](capture-recovery.md) before retrying a failed file write; a `.partial` file is not a committed checkpoint.
+
 ## Streaming commands
 
 `xlog search` uses `scouterctl.stream/v1` on its first `start` event:
 
 ```text
-{"type":"start","schemaVersion":"scouterctl.stream/v1","source":{...},"query":{...}}
+{"type":"start","schemaVersion":"scouterctl.stream/v1","source":{...},"query":{...},"storageDateVerification":"unverified"}
 {"type":"record","data":{...}}
 {"type":"complete","executionComplete":true,"upstreamCoverage":"unknown","sampling":"unknown"}
 ```
 
 The abbreviated objects illustrate event shape, not executable JSON fixtures. There are zero or more `record` events. `record` and `complete` events do not repeat `schemaVersion`; they inherit the stream schema from `start`.
 
+With `xlog search --include-text`, each record adds `service` and `error` dictionary fields alongside the existing hashes. Dictionary entries have `hash`, `text`, and `status`. Missing entries have `status: "unresolved"` and `text: null`. A zero error hash yields `error: null`. Both dictionary fields are absent by default. Error text may contain sensitive values.
+
 A successful stream has exactly one final `complete` event and exit 0. Failure after streaming starts ends with the `scouterctl.error/v1` error object and a nonzero exit, without `complete`. Failure before streaming starts may emit only the error object. A page budget produces `PARTIAL_RESULT` and exit 8; earlier records must not be mistaken for the full query. A killed process or failed output transport may leave no terminal event.
 
 A consumer should accept the stream schema, process records, then require both the final `complete` event and exit 0 before marking the query complete. Use `capture` and its checkpoints when resumable extraction is needed.
 
-`counter history` uses its own `scouterctl.counter-stream/v1` schema with the same start/record/complete lifecycle. Its start includes the dated target and counter metadata, and records contain stored timestamps and numeric strings. See [counter history](counter-history.md) for missing values, units and query limits. XLog stream fields and schemas are unchanged.
+`storageDateVerification: "unverified"` means the CLI used the supplied XLog storage date without confirmation from the Collector. An incorrect date can produce an empty completed query. XLog `capture` reports the same field in its outer result envelope.
+
+Online window queries reject offset mismatches against the reported Collector JVM zone before streaming or writing captures. `doctor` and `collector status` expose the property's ID and a client-rule offset with explicit provenance; unavailable metadata remains `null`. These checks do not verify the storage calendar. See [Collector time zones](collector-timezone.md).
+
+`counter history` uses its own `scouterctl.counter-stream/v1` schema with the same start/record/complete lifecycle. Its start includes the dated target and counter metadata, and records contain stored timestamps and numeric strings. See [counter history](counter-history.md) for missing values, units and query limits.
 
 `counter export` returns a single manifest result and writes JSONL chunk files. Its `scouterctl.counter-capture/v1` format is separate from XLog captures. See [resumable counter export](counter-export.md) for budgets, checkpoints and completion semantics.
 
@@ -75,4 +86,4 @@ A consumer should accept the stream schema, process records, then require both t
 - Removing/renaming existing fields, changing their type, units or meaning, or changing established event semantics requires a new affected output schema version and documented migration. Existing error codes and exit meanings must not be silently repurposed. Enum/status additions that require new interpretation also need an explicit compatibility decision rather than being assumed safe.
 - New commands and additive fields can be introduced without changing existing envelopes. Changing existing command syntax or defaults in a way that breaks scripts requires release notes and a migration path. This document does not promise indefinite support for every old release.
 
-Use the [command guides](README.md#using-scouterctl) for command-specific fields and behavior, [profile completeness](profile-completeness.md) for truncation signals, and [architecture](architecture.md) for presentation/serialization ownership. Core and application models do not own JSON envelopes or numeric process exit codes.
+Use the [command guides](README.md#using-scouterctl) for command-specific fields and behavior, [profile completeness](profile-completeness.md) for truncation signals, [grouped SQL output](profile-sql-summary.md) for the optional profile summary schema, and [architecture](architecture.md) for presentation/serialization ownership. Core and application models do not own JSON envelopes or numeric process exit codes.

@@ -11,6 +11,26 @@ Use `gradlew.bat` on Windows. The suite uses local protocol/file/process fixture
 
 The following integration tasks start isolated Collector/Agent/application processes. Use test installations and data, never production directories. Gradle still runs on JDK 21 even when a fixture uses Java 8. Each task prints its evidence directory, stops its child processes and removes its temporary Collector account. Preserve useful output and remove the temporary directory when finished.
 
+## Coverage
+
+Run the complete suite, generate JaCoCo HTML/XML reports, and enforce minimum coverage:
+
+```sh
+./gradlew -Pcoverage=true coverageCheck
+```
+
+The initial minimums are 90% for lines and 80% for branches. Coverage includes all production classes from the main source set, combining the test JVM with packaged CLI subprocesses (including the extracted command launcher). Dependencies, test fixtures, optional real-Collector smoke checks, and scale measurements are outside this scope. Ordinary `test` runs leave coverage disabled; use the full suite without `--tests` for a comparable baseline. Coverage requires the locally built CLI, so do not combine it with `-PcliJar`.
+
+Each coverage run executes fresh tests, clears old execution data/reports, and writes a separate execution file for each CLI process. JVM arguments enable the agent without startup messages on stdout/stderr. Missing test JVM or subprocess data, empty report counters, or coverage below either minimum fails verification.
+
+Reports are written to `build/reports/jacoco/test/html/index.html` and `build/reports/jacoco/test/jacocoTestReport.xml`; `build/reports/jacoco/summary.md` contains counts, percentages, thresholds, and pass/fail results. Linux CI runs coverage and package verification in one Gradle invocation, publishes the summary, and retains reports for 14 days even when a threshold fails. Local act runs save the same reports as artifacts. Historical release-asset repair does not apply new coverage checks to tagged code.
+
+No Codecov credentials are needed. PR coverage comparisons and configuring a required merge check are separate follow-up work.
+
+For same-repository PRs, CI creates one bot comment showing Linux test totals (passed, failed, errors, skipped), line/branch coverage and minimums, the build result, tested commit, and workflow/artifact links. Later runs update that comment. Failed builds still report available results; missing reports are marked unavailable. Results from outdated commits are not posted. Windows checks remain visible separately in the workflow.
+
+The comment job reads a Markdown artifact and has write permission only for PR comments; it does not check out or execute PR code. Fork and Dependabot PRs use read-only tokens and receive the Actions summary/artifacts without a bot comment. Local act runs still select only the build job.
+
 ## Collector and Agent checks
 
 Use an isolated Collector installation and data directory. The optional smoke tools create their own configuration and accounts and stop the processes they start. Never point them at production data.

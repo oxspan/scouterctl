@@ -10,17 +10,18 @@ import java.nio.file.Path
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-internal class TerminalCli(work: Path, args: List<String>, password: String? = null, command: List<String>? = null) : AutoCloseable {
+internal class TerminalCli(work: Path, args: List<String>, password: String? = null, command: List<String>? = null,
+    noColor: String? = null) : AutoCloseable {
     private val environment = System.getenv().toMutableMap().apply {
         remove("SCOUTERCTL_PASSWORD")
         put("SCOUTERCTL_CONFIG", work.resolve("config.json").toString())
         put("TERM", "xterm")
+        remove("NO_COLOR")
+        if (noColor != null) put("NO_COLOR", noColor)
         if (password != null) put("SCOUTERCTL_PASSWORD", password)
+        if (command != null) withCliCoverage()
     }
-    private val process = PtyProcessBuilder(((command ?: listOf(
-        Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-        "-jar", System.getProperty("cli.jar"),
-    )) + args).toTypedArray())
+    private val process = PtyProcessBuilder(((command ?: cliJavaCommand()) + args).toTypedArray())
         .setEnvironment(environment).setDirectory(work.toString())
         .setInitialColumns(2000).setInitialRows(50)
         .setUseWinConPty(true).setConPtyInheritCursor(false)
@@ -38,7 +39,9 @@ internal class TerminalCli(work: Path, args: List<String>, password: String? = n
         }
     }
 
-    fun text(): String = synchronized(bytes) { bytes.toString(Charsets.UTF_8) }
+    fun rawText(): String = synchronized(bytes) { bytes.toString(Charsets.UTF_8) }
+
+    fun text(): String = rawText()
         .replace(Regex("\u001B\\[[0-?]*[ -/]*[@-~]"), "")
         .replace(Regex("\u001B\\][^\u0007]*(?:\u0007|\u001B\\\\)"), "")
         .replace("\r", "")

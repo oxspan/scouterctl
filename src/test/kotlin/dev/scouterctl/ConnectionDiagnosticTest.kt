@@ -36,7 +36,9 @@ class ConnectionDiagnosticTest : FunSpec({
             val result = ContractCli(tempdir().toPath()).run(server, profile)
             result.exit shouldBe 10
             val diagnostic = requireNotNull(result.diagnostic)
-            diagnostic["error"]!!.jsonObject["reason"] shouldBe JsonPrimitive("transport_or_artifact_io")
+            result.events.single()["error"]!!.jsonObject["message"] shouldBe
+                JsonPrimitive("Collector transport I/O failed; retry the query or check the Collector connection")
+            diagnostic["error"]!!.jsonObject["reason"] shouldBe JsonPrimitive("collector_transport_io")
             diagnostic["fixture"]!!.jsonObject["command"] shouldBe JsonPrimitive("dictionary")
             diagnostic.toString() shouldNotContain "secret-token"
             diagnostic.toString() shouldNotContain "private-address"

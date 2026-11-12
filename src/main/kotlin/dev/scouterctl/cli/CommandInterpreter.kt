@@ -8,15 +8,17 @@ import java.time.format.DateTimeFormatter
 
 internal fun Cli.interpret(): CommandRequest {
     val command = words.joinToString(" ")
+    if (spec.commandLine().parseResult.hasMatchedOption("--group-sql") && command !in setOf("profile get", "inspect")) {
+        invalid("--group-sql requires profile get or inspect")
+    }
     if (command in setOf("context add", "context list", "context use")) return contextRequest(command)
     if (name != null) invalid("--name requires context add/use")
     if (command == "inspect compare") {
-        allowedOptions(setOf("--before", "--after", "--limit", "--include-text", "--no-input"))
+        allowedOptions()
         return OfflineRequest.Compare(required(before, "--before"), required(after, "--after"), ComparisonOptions(limit ?: 20, includeText))
     }
     if (command == "counter export") {
-        allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input",
-            "--object-hash", "--counter", "--from", "--to", "--timezone", "--directory", "--resume", "--chunk-minutes", "--max-chunks"))
+        allowedOptions()
         val budget = maxChunks ?: 24
         if (budget !in 1..10000) invalid("Use max-chunks 1..10000")
         val query = CounterExportQuery(Instant.parse(required(from, "--from")).toEpochMilli(),
@@ -27,24 +29,20 @@ internal fun Cli.interpret(): CommandRequest {
     }
     if (chunkMinutes != null || maxChunks != null) invalid("--chunk-minutes and --max-chunks require counter export")
     if (command == "counter history") {
-        allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input",
-            "--object-hash", "--counter", "--date", "--from", "--to", "--timezone"))
+        allowedOptions()
         return OnlineRequest.CounterHistory(CounterHistoryQuery(required(date, "--date"),
             Instant.parse(required(from, "--from")).toEpochMilli(), Instant.parse(required(to, "--to")).toEpochMilli(),
             required(timezone, "--timezone"), required(objHash, "--object-hash"), required(counterName, "--counter")).also { it.validate() })
     }
     if (command in setOf("counter list", "counter get")) {
-        allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input", "--object-hash") +
-            if (command == "counter get") setOf("--counter") else emptySet())
+        allowedOptions()
         val counter = if (command == "counter get") required(counterName, "--counter") else null
         if (counter != null && (counter.isBlank() || counter.length > 256 || counter.any(Char::isISOControl))) invalid("Invalid counter name")
         return OnlineRequest.Counters(required(objHash, "--object-hash"), counter)
     }
     if (counterName != null) invalid("--counter requires counter get, counter history or counter export")
     if (command in setOf("collector status", "collector config", "agent status", "agent config")) {
-        allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input") +
-            (if (command.endsWith("config")) setOf("--key") else emptySet()) +
-            if (command.startsWith("agent ")) setOf("--object-hash") else emptySet())
+        allowedOptions()
         settingKey?.let { if (!it.matches(Regex("[A-Za-z_][A-Za-z0-9_.-]{0,255}"))) invalid("Use a setting name for --key") }
         return when (command) {
             "collector status" -> OnlineRequest.CollectorStatus
@@ -56,7 +54,7 @@ internal fun Cli.interpret(): CommandRequest {
     if (settingKey != null) invalid("--key requires collector config or agent config")
     if (before != null || after != null) invalid("--before and --after require inspect compare")
     if (command == "inspect summary") {
-        allowedOptions(setOf("--directory", "--limit", "--sort", "--include-text", "--no-input"))
+        allowedOptions()
         return OfflineRequest.Summary(required(directory, "--directory"),
             ServiceSummaryOptions(limit ?: 20, ServiceSort.parse(summarySort ?: "errors"), includeText))
     }
@@ -70,19 +68,14 @@ internal fun Cli.interpret(): CommandRequest {
         }
         "inspect" -> {
             if (resume) invalid("--resume requires capture")
-            OfflineRequest.Inspect(required(directory, "--directory"), required(txid, "--txid"), includeText)
+            OfflineRequest.Inspect(required(directory, "--directory"), required(txid, "--txid"), includeText, groupSql)
         }
         else -> onlineRequest(command)
     }
 }
 
 private fun Cli.contextRequest(command: String): ContextRequest {
-    val allowed = when (command) {
-        "context add" -> setOf("--name", "--host", "--port", "--user", "--no-input")
-        "context use" -> setOf("--name", "--no-input")
-        else -> setOf("--no-input")
-    }
-    allowedOptions(allowed)
+    allowedOptions()
     return when (command) {
         "context add" -> ContextRequest.Add(name, connection.host ?: "127.0.0.1", connection.port ?: 6100, connection.user)
         "context use" -> ContextRequest.Use(name)
@@ -94,14 +87,17 @@ private fun Cli.validateGeneralOptions(command: String) {
     val supported = setOf("doctor", "auth login", "object list", "xlog search", "profile get", "capture", "inspect", "inspect search")
     if (command !in supported) invalid("Unknown command")
     if (command == "auth login") {
-        allowedOptions(setOf("--host", "--port", "--user", "--context", "--timeout-ms", "--interactive", "--no-input"))
+        allowedOptions()
     }
     if (command != "inspect search" && (limit != null || minElapsedMs != null || errorsOnly || serviceHash != null || serviceName != null)) {
-        invalid("Search filters require inspect search")
+        val option = spec.commandLine().parseResult.matchedOptions().first {
+            it.longestName() in setOf("--limit", "--min-elapsed-ms", "--errors-only", "--service-hash", "--service-name")
+        }.longestName()
+        invalid("$option requires inspect search")
     }
     if (includeProfiles && command != "capture") invalid("--include-profiles requires capture")
-    if (includeText && command !in setOf("profile get", "inspect", "inspect search") && !(command == "capture" && includeProfiles)) {
-        invalid("--include-text requires profile get, inspect or capture --include-profiles")
+    if (includeText && command !in setOf("xlog search", "profile get", "inspect", "inspect search") && !(command == "capture" && includeProfiles)) {
+        invalid("--include-text requires xlog search, profile get, inspect or capture --include-profiles")
     }
 }
 
@@ -109,17 +105,16 @@ private fun Cli.onlineRequest(command: String): OnlineRequest {
     if (maxPages !in 1..40) invalid("Use --max-pages 1..40")
     val query = if (command in setOf("xlog search", "capture")) query() else null
     if (command == "profile get") {
-        if (!required(date, "--date").matches(Regex("[0-9]{8}"))) invalid("Use an 8-digit storage date")
-        LocalDate.parse(required(date, "--date"), DateTimeFormatter.BASIC_ISO_DATE)
+        validateStorageDate(required(date, "--date"))
         required(txid, "--txid")
     }
     if (command == "capture") required(directory, "--directory")
     if (includeProfiles && required(query, "query").pageSize > 100) invalid("Profile capture page-size must be 1..100")
     return when (command) {
         "doctor", "auth login" -> OnlineRequest.Doctor(command == "auth login")
-        "object list" -> OnlineRequest.Objects
-        "profile get" -> OnlineRequest.Profile(required(date, "--date"), required(txid, "--txid"), includeText)
-        "xlog search" -> OnlineRequest.Search(required(query, "query"), maxPages)
+        "object list" -> OnlineRequest.Objects(date?.also(::validateStorageDate))
+        "profile get" -> OnlineRequest.Profile(required(date, "--date"), required(txid, "--txid"), includeText, groupSql)
+        "xlog search" -> OnlineRequest.Search(required(query, "query"), maxPages, includeText)
         "capture" -> OnlineRequest.Capture(
             required(query, "query"), required(directory, "--directory"), resume, maxPages, includeProfiles, includeText,
         )
@@ -127,13 +122,19 @@ private fun Cli.onlineRequest(command: String): OnlineRequest {
     }
 }
 
+private fun validateStorageDate(date: String) {
+    if (!date.matches(Regex("[0-9]{8}"))) invalid("Use an 8-digit storage date")
+    LocalDate.parse(date, DateTimeFormatter.BASIC_ISO_DATE)
+}
+
 private fun Cli.query(): Query = Query(required(date, "--date"),
     Instant.parse(required(from, "--from")).toEpochMilli(), Instant.parse(required(to, "--to")).toEpochMilli(),
     required(timezone, "--timezone"), required(objHash, "--object-hash"), pageSize ?: if (includeProfiles) 25 else 1000).also { it.validate() }
 
-private fun Cli.allowedOptions(allowed: Set<String>) {
-    if (spec.commandLine().parseResult.matchedOptions().any { it.longestName() !in allowed }) {
-        invalid("Option is not supported by this command; use --help")
+private fun Cli.allowedOptions() {
+    val allowed = commandGuides.getValue(words.joinToString(" ")).allowed
+    spec.commandLine().parseResult.matchedOptions().firstOrNull { it.longestName() !in allowed }?.let {
+        invalid("Option ${it.longestName()} is not supported by this command; use --help")
     }
 }
 private fun invalid(message: String): Nothing = throw OperationFailure(ErrorCode.INVALID_ARGUMENT, message)

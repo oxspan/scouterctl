@@ -24,6 +24,10 @@ To build and verify the Linux command package:
 
 For a local Linux installation, use `./gradlew installDist` and run `build/install/scouterctl/bin/scouterctl`. Native Windows packaging additionally requires the pinned toolchain; see [releasing](docs/releasing.md). Real Collector/Agent/Spring checks are opt-in and described in [testing](docs/testing.md). Use [local CI](docs/local-ci.md) to run the workflow build with act when needed.
 
+To generate coverage reports and enforce the line/branch minimums, run `./gradlew -Pcoverage=true coverageCheck`. This includes the test JVM and CLI subprocesses. See [testing](docs/testing.md#coverage) for measurement scope and report locations.
+
+Same-repository PRs receive a bot comment with Linux test counts, coverage/thresholds, the CI result and run links. Re-runs update the existing comment and outdated commits are skipped. Windows checks remain in the workflow; fork and Dependabot PRs receive the Actions summary and artifacts without a comment because their tokens are read-only.
+
 ## Code and tests
 
 - Implement CLI behavior in Kotlin. Use Kotest `FunSpec` and matchers; JUnit Platform runs Kotest, while test APIs remain Kotest. The native [Windows launcher](https://github.com/oxspan/scouterctl/blob/master/native/windows/README.md) is a separate platform boundary.
@@ -37,9 +41,13 @@ For a local Linux installation, use `./gradlew installDist` and run `build/insta
 
 | Change | Start from | PR target |
 | --- | --- | --- |
-| Feature, regular fix, tests or documentation (`feature/*`) | `develop` | `develop` |
-| Urgent release fix (`hotfix/*`) | `master` | `master` |
+| Feature, regular fix, tests or documentation (`feature/<issue>[-<slug>]`) | `develop` | `develop` |
+| Urgent release fix (`hotfix/<issue>[-<slug>]`) | `master` | `master` |
 | Release-ready integration | `develop` | `master` |
+
+Use the issue number without `#`, as in `feature/59`. A short lowercase, hyphen-separated description is optional and recommended for readability, as in `feature/59-object-list`. For small maintenance changes without an issue, use `feature/<slug>`. Dependabot and release-please use their generated branch names.
+
+Reference the issue with `Refs #59` in a PR to `develop`. When the fix is included in a PR to `master`, use `Closes #59` to close the issue on merge.
 
 `master` is the default and release branch; `develop` integrates upcoming changes. Release branches are not currently used. Keep each PR focused and explain the problem, resulting behavior, validation actually performed, and compatibility risks.
 

@@ -18,6 +18,7 @@ internal fun connectionDiagnostic(exit: Int?, elapsedMs: Long, output: String, s
         "Collector timeout; check TCP access and --timeout-ms; upstream cancellation is not guaranteed" -> "socket_timeout"
         "Collector connection failed; check --host, --port and TCP access" -> "socket_failure"
         "Transport or artifact I/O failed" -> "transport_or_artifact_io"
+        "Collector transport I/O failed; retry the query or check the Collector connection" -> "collector_transport_io"
         else -> "unclassified"
     }
     return buildJsonObject {

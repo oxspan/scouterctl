@@ -92,8 +92,7 @@ private class UnicodeCli(work: Path) {
         val arguments = utf8Arguments(install, args)
         val stdout = install.resolve("stdout.txt")
         val stderr = install.resolve("stderr.txt")
-        val process = ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-            "-Dfile.encoding=UTF-8", "-jar", "scouterctl.jar", arguments)
+        val process = ProcessBuilder(cliJavaCommand("scouterctl.jar", listOf("-Dfile.encoding=UTF-8")) + arguments)
             .directory(install.toFile()).redirectOutput(stdout.toFile()).redirectError(stderr.toFile()).apply {
                 environment().remove("SCOUTERCTL_PASSWORD")
                 environment()["SCOUTERCTL_CONFIG"] = config.toString()

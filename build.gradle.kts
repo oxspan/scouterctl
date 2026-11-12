@@ -4,7 +4,10 @@ plugins {
     kotlin("jvm") version "2.4.10"
     kotlin("plugin.serialization") version "2.4.10"
     application
+    jacoco
 }
+
+apply(from = "gradle/coverage.gradle.kts")
 group = "dev.scouterctl"
 version = providers.gradleProperty("candidateVersion").orElse(
     providers.fileContents(layout.projectDirectory.file("version.txt")).asText.map(String::trim)).get()
@@ -178,6 +181,18 @@ listOf("scaleFixtures" to "generate", "scaleCheck" to "run").forEach { (taskName
         args(mode, providers.gradleProperty("scaleInputs").getOrElse("build/scale-inputs"))
         systemProperty("cli.jar", externalJar.getOrElse(layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
     }
+}
+
+tasks.register<JavaExec>("resumeReadCheck") {
+    group = "verification"
+    description = "Measure synthetic profile-capture resume reads and elapsed time (opt-in)."
+    dependsOn(tasks.testClasses)
+    val externalJar = providers.gradleProperty("cliJar")
+    classpath = if (externalJar.isPresent) files(file(externalJar.get())) + sourceSets.test.get().runtimeClasspath
+        else sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.ResumeReadBenchmarkKt")
+    maxHeapSize = "512m"
+    args(providers.gradleProperty("resumeReadResults").getOrElse("build/resume-read-results"))
 }
 
 // Opt-in fixture for matching legacy Collector/Agent releases on Java 8.

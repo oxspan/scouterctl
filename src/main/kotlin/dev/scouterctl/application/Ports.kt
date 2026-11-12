@@ -4,15 +4,16 @@ import dev.scouterctl.core.*
 
 interface ObservationSource : AutoCloseable {
     val info: ServerInfo
+    fun timezone(): CollectorTimezone?
     fun status(): CollectorStatus
     fun settings(): List<RuntimeSetting>
     fun agentStatus(objHash: Int): AgentStatus
     fun agentSettings(objHash: Int): AgentConfiguration
     fun counterHistory(query: CounterHistoryQuery): CounterHistory
     fun realtimeCounters(objHash: Int): RealtimeCounters
-    fun objects(): List<ObjectRecord>
-    fun page(query: Query, cursor: Cursor): XLogPage
-    fun profile(date: String, txid: Long, includeText: Boolean = false): ProfileRecord
+    fun objects(date: String? = null): List<ObjectRecord>
+    fun page(query: Query, cursor: Cursor, includeText: Boolean = false): XLogPage
+    fun profile(date: String, txid: Long, includeText: Boolean = false, includeStepDetails: Boolean = false): ProfileRecord
 }
 
 interface CaptureRepository {

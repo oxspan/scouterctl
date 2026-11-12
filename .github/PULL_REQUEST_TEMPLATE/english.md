@@ -6,7 +6,9 @@ See CONTRIBUTING.md for PR targets and merge methods.
 
 ## Why
 
-<!-- What problem does this solve? Link a related issue if there is one. -->
+<!-- What problem does this solve? If there is an issue, use Refs #59 for a PR to develop
+or Closes #59 for a PR to master that includes the fix. Replace 59 with the issue number.
+-->
 
 ## Changes
 

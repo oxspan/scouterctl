@@ -1,5 +1,7 @@
 # Capture scale validation
 
+For synthetic profile-capture resume reads and preparation timing, see [profile capture resume work](capture-resume-performance.md). The workflow below measures offline comparison, a separate workload.
+
 Run the opt-in **Capture scale validation** GitHub Actions workflow on a branch to measure offline `inspect compare`. It builds one CLI JAR and one synthetic capture archive, then verifies and uses the same bytes on Linux, Windows and macOS. It does not publish a release or run on every pull request. The macOS measurement job is outside the supported release-platform scope. You can also enable `scale_validation` when manually running **CI and release**, including on a feature branch.
 
 For a local Linux, macOS or Windows checkout with JDK 21:

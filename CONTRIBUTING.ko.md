@@ -24,6 +24,10 @@ Linux 명령 ZIP의 빌드·검증:
 
 개발용 설치는 `./gradlew installDist` 후 `build/install/scouterctl/bin/scouterctl`로 실행합니다. 네이티브 Windows 패키지는 별도 빌드 도구가 필요합니다. [릴리스 안내(영문)](docs/releasing.md)를 참고하세요. 실제 Collector·Agent·Spring 검사는 [테스트 안내(영문)](docs/testing.md)의 별도 작업이며, [로컬 CI(영문)](docs/local-ci.md)에서 act 실행 방법을 확인할 수 있습니다.
 
+커버리지 리포트를 만들고 라인·분기 최소 기준을 검증하려면 `./gradlew -Pcoverage=true coverageCheck`를 실행합니다. 테스트 JVM과 CLI 자식 프로세스를 함께 집계하며, 라인 90%·분기 80% 미만이면 실패합니다. 기본 `test` 실행에는 커버리지를 적용하지 않습니다. HTML/XML 리포트와 요약은 `build/reports/jacoco/`에 생성됩니다. 측정 범위와 CI 동작은 [테스트 안내(영문)](docs/testing.md#coverage)를 참고하세요.
+
+같은 저장소의 PR에는 Linux 테스트 통과·실패·오류·스킵 수, 라인·분기 커버리지와 최소 기준, CI 결과와 실행 링크를 코멘트로 표시합니다. 재실행하면 기존 봇 코멘트를 갱신하며, 이전 커밋의 결과는 게시하지 않습니다. Windows 검사는 워크플로우에서 별도로 확인합니다. 읽기 전용 토큰을 사용하는 포크·Dependabot PR은 Actions 요약과 artifact를 제공하며 코멘트는 작성하지 않습니다.
+
 ## 코드와 테스트
 
 - CLI 기능은 Kotlin으로 작성합니다. Kotest `FunSpec`과 matcher를 사용하며 실행에는 JUnit Platform을 사용합니다. 네이티브 [Windows 실행기(영문)](https://github.com/oxspan/scouterctl/blob/master/native/windows/README.md)는 별도 플랫폼 구성 요소입니다.
@@ -37,9 +41,13 @@ Linux 명령 ZIP의 빌드·검증:
 
 | 변경 | 시작 브랜치 | PR 대상 |
 | --- | --- | --- |
-| 기능·일반 수정·테스트·문서 (`feature/*`) | `develop` | `develop` |
-| 긴급 배포 수정 (`hotfix/*`) | `master` | `master` |
+| 기능·일반 수정·테스트·문서 (`feature/<이슈번호>[-<설명>]`) | `develop` | `develop` |
+| 긴급 배포 수정 (`hotfix/<이슈번호>[-<설명>]`) | `master` | `master` |
 | 배포할 변경 통합 | `develop` | `master` |
+
+`feature/59`처럼 `#`을 뺀 이슈 번호를 사용합니다. 작업을 알아보기 쉽도록 `feature/59-object-list`처럼 소문자와 하이픈으로 짧은 설명을 붙이는 것을 권장하며, 설명은 생략할 수 있습니다. 연결할 이슈가 없는 소규모 유지보수는 `feature/<설명>`을 사용합니다. Dependabot과 release-please는 자동 생성된 브랜치명을 사용합니다.
+
+`develop` 대상 PR에는 `Refs #59`로 이슈를 참조합니다. 해결분을 포함한 `master` 대상 PR에는 `Closes #59`를 적어 병합 시 이슈가 닫히도록 합니다.
 
 `master`는 기본·배포 브랜치이고 `develop`은 다음 변경을 통합합니다. 별도 release 브랜치는 현재 사용하지 않습니다. PR에는 문제·변경 후 동작·실제로 수행한 검증·기존 사용자에게 미치는 영향을 적습니다.
 

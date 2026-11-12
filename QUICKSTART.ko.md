@@ -7,6 +7,7 @@ JDK 21과 [운영체제에 맞는 ZIP](docs/ko/installation.md)을 설치한 뒤
 ```sh
 scouterctl --version
 scouterctl --help
+scouterctl capture --help
 ```
 
 여러 줄로 적은 명령은 Bash 예시입니다. Windows에서는 각 명령을 한 줄로 입력하면 같은 옵션을 사용할 수 있습니다.
@@ -40,6 +41,8 @@ scouterctl counter get --object-hash 123456 --counter HeapUsed --no-input
 
 ## 3. 트랜잭션과 프로파일 저장
 
+Collector를 재시작한 뒤에도 `scouterctl object list --date 20261107 --no-input`으로 해당 저장 날짜에 기록된 `objHash`를 찾을 수 있습니다. 저장된 목록에는 실시간 상태가 없어 날짜를 지정하면 `alive: false`로 표시합니다. 현재 상태는 날짜를 빼고 `object list`로 확인하세요.
+
 조회할 자료가 저장된 날짜와 Collector의 시간대를 사용합니다. 아래는 UTC 예시입니다. `captures`가 없으면 먼저 만들고, 캡처마다 새 하위 디렉터리를 지정하세요.
 
 ```sh
@@ -49,7 +52,11 @@ scouterctl capture --object-hash 123456 --date 20261107 \
   --include-profiles --directory captures/incident-001 --no-input
 ```
 
+캡처 결과의 `storageDateVerification: "unverified"`는 입력한 저장 날짜를 Collector에서 확인하지 않았다는 뜻입니다. 조회가 완료됐는데 결과가 비어 있으면 저장 날짜를 확인하세요.
+
 중단되거나 일부만 저장됐으면 같은 명령에 `--resume`을 붙여 재개합니다. 서비스명·SQL·오류 원문을 저장하려는 경우에만 캡처할 때 `--include-text`를 추가하세요. 민감한 애플리케이션 정보가 포함될 수 있습니다. 자세한 사용법은 [캡처와 오프라인 분석(영문)](docs/captures.md)에 있습니다.
+
+Windows에서는 일시적인 파일 교체 거부를 짧게 재시도합니다. 로컬 파일 오류가 계속되면 캡처를 사용하는 프로그램을 닫고 권한과 디스크 여유 공간을 확인하세요. 정상적으로 저장된 manifest가 있을 때만 재개하고, 없으면 실패한 디렉터리를 보존한 뒤 새 경로로 캡처합니다. 자세한 절차는 [캡처 복구 안내(영문)](docs/capture-recovery.md)를 참고하세요.
 
 ## 4. Collector 없이 분석
 

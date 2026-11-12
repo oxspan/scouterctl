@@ -4,6 +4,7 @@ import dev.scouterctl.core.*
 import dev.scouterctl.application.ObservationSource
 import dev.scouterctl.application.collectorSettingValueIsVisible
 import dev.scouterctl.application.agentSettingValueIsVisible
+import dev.scouterctl.application.agentTextSettingValueIsVisible
 
 import scouter.io.DataInputX
 import scouter.io.DataOutputX
@@ -11,8 +12,6 @@ import scouter.lang.pack.*
 import scouter.lang.TextTypes
 import scouter.lang.step.Step
 import scouter.lang.step.StepControl
-import scouter.lang.step.SqlStep
-import scouter.lang.step.SqlStep3
 import scouter.lang.value.BooleanValue
 import scouter.lang.value.ListValue
 import scouter.lang.value.TextValue
@@ -40,6 +39,11 @@ class CollectorSource private constructor(private val socket: Socket, private va
     private var session = 0L
     override lateinit var info: ServerInfo
         private set
+    private val reportedTimezone by lazy {
+        collectorOperation { decodeCollectorTimezone(exchange(RequestCmd.SERVER_ENV), exchange(RequestCmd.SERVER_TIME)) }
+    }
+
+    override fun timezone(): CollectorTimezone? = reportedTimezone
 
     companion object {
         fun connect(endpoint: Endpoint, password: String, clientVersion: String): CollectorSource = collectorOperation {
@@ -137,12 +141,11 @@ class CollectorSource private constructor(private val socket: Socket, private va
         if (!agent.alive) throw OperationFailure(ErrorCode.NOT_FOUND, "Agent is not alive")
         val response = exchange(RequestCmd.LIST_CONFIGURE_WAS, MapPack().apply { put("objHash", objHash.toLong()) })
         if (response.isEmpty()) throw OperationFailure(ErrorCode.NOT_FOUND, "Agent settings are unavailable")
-        AgentConfiguration(agent, parseSettings(response, ::agentSettingValueIsVisible))
+        AgentConfiguration(agent, parseSettings(response, ::agentSettingValueIsVisible, ::agentTextSettingValueIsVisible))
     }
 
     override fun counterHistory(query: CounterHistoryQuery): CounterHistory = collectorOperation {
-        val targets = exchange(RequestCmd.OBJECT_LIST_LOAD_DATE, MapPack().apply { put("date", query.date) })
-        val target = decodeCounterTarget(query.objHash, targets)
+        val target = decodeCounterTarget(query.objHash, datedObjects(query.date))
         val metadata = exchange(RequestCmd.GET_XML_COUNTER)
         val response = exchange(RequestCmd.COUNTER_PAST_TIME, MapPack().apply {
             put("objHash", query.objHash.toLong()); put("counter", query.counter)
@@ -168,7 +171,11 @@ class CollectorSource private constructor(private val socket: Socket, private va
         return AgentIdentity(agent.objHash, agent.objName ?: "", agent.objType ?: "", agent.alive, agent.version ?: "unknown")
     }
 
-    private fun parseSettings(response: List<Pack>, valueIsVisible: (String) -> Boolean): List<RuntimeSetting> {
+    private fun parseSettings(
+        response: List<Pack>,
+        valueIsVisible: (String) -> Boolean,
+        textValueIsVisible: (String) -> Boolean = { false },
+    ): List<RuntimeSetting> {
         val pack = response.singleOrNull() as? MapPack
             ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one runtime settings response")
         fun items(key: String): ListValue = pack.get(key) as? ListValue
@@ -180,10 +187,14 @@ class CollectorSource private constructor(private val socket: Socket, private va
             throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Inconsistent runtime settings lists")
         }
         val seen = mutableSetOf<String>()
-        fun visibleValue(value: Value): String = when (value) {
-            is DecimalValue -> value.value.toString()
-            is BooleanValue -> value.value.toString()
-            else -> throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid operational setting value")
+        fun invalidValue(): Nothing = throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid operational setting value")
+        fun visibleValue(key: String, value: Value): String {
+            if (textValueIsVisible(key)) return (value as? TextValue)?.value ?: invalidValue()
+            return when (value) {
+                is DecimalValue -> value.value.toString()
+                is BooleanValue -> value.value.toString()
+                else -> invalidValue()
+            }
         }
         return (0 until keys.size()).map { index ->
             val key = (keys.get(index) as? TextValue)?.value
@@ -192,19 +203,25 @@ class CollectorSource private constructor(private val socket: Socket, private va
                 throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid or duplicate runtime setting key")
             }
             val visible = valueIsVisible(key)
-            RuntimeSetting(key, if (visible) visibleValue(values.get(index)) else null,
-                if (visible) visibleValue(defaults.get(index)) else null, !visible)
+            RuntimeSetting(key, if (visible) visibleValue(key, values.get(index)) else null,
+                if (visible) visibleValue(key, defaults.get(index)) else null, !visible)
         }
     }
 
-    override fun objects(): List<ObjectRecord> = collectorOperation {
+    private fun datedObjects(date: String): List<CounterTarget> =
+        decodeDatedObjects(exchange(RequestCmd.OBJECT_LIST_LOAD_DATE, MapPack().apply { put("date", date) }))
+
+    override fun objects(date: String?): List<ObjectRecord> = collectorOperation {
+        if (date != null) return@collectorOperation datedObjects(date).map {
+            ObjectRecord(info.serverId, it.objHash, it.objName, it.objType, alive = false)
+        }
         exchange(RequestCmd.OBJECT_LIST_REAL_TIME).map {
             val p = it as? ObjectPack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected object pack")
             ObjectRecord(info.serverId, p.objHash, p.objName ?: "", p.objType ?: "", p.alive)
         }
     }
 
-    override fun page(query: Query, cursor: Cursor): XLogPage = collectorOperation {
+    override fun page(query: Query, cursor: Cursor, includeText: Boolean): XLogPage = collectorOperation {
         query.validate()
         val request = MapPack().apply {
             put("date", query.date); put("stime", query.from); put("etime", query.to - 1)
@@ -232,10 +249,14 @@ class CollectorSource private constructor(private val socket: Socket, private va
         if (more && (records.isEmpty() || next.bucketTime == 0L || next.txid == "0" || next == cursor)) {
             throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Non-advancing XLog cursor")
         }
-        XLogPage(records, next, more)
+        val text = if (includeText) XLogPageText(
+            dictionary(query.date, TextTypes.SERVICE, records.map { it.serviceHash }),
+            dictionary(query.date, TextTypes.ERROR, records.map { it.errorHash }.filter { it != 0 }),
+        ) else null
+        XLogPage(records, next, more, text)
     }
 
-    override fun profile(date: String, txid: Long, includeText: Boolean): ProfileRecord = collectorOperation {
+    override fun profile(date: String, txid: Long, includeText: Boolean, includeStepDetails: Boolean): ProfileRecord = collectorOperation {
         val request = MapPack().apply { put("date", date); put("txid", txid); put("max", 1000) }
         val packs = exchange(RequestCmd.TRANX_PROFILE, request)
         if (packs.isEmpty()) throw OperationFailure(ErrorCode.NOT_FOUND, "Profile unavailable")
@@ -244,9 +265,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
             val p = it as? XLogProfilePack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected profile pack")
             (Step.toObjects(p.profile) ?: emptyArray()).map { step ->
                 if (step is StepControl && step.code == 0 && step.message == " ** Profile Truncated ** ") truncated = true
-                val sql = if (step is SqlStep) SqlProfile(step.hash, step.elapsed, step.error,
-                    (step as? SqlStep3)?.updated) else null
-                ProfileStep(step.stepTypeName, step.order, sql)
+                step.toProfileStep(includeStepDetails = includeStepDetails, includeText = includeText)
             }
         }
         val profile = ProfileRecord(txid.toString(), steps, completeness =
@@ -271,6 +290,9 @@ class CollectorSource private constructor(private val socket: Socket, private va
         val errors = dictionary(date, TextTypes.ERROR,
             (sql.map { it.errorHash } + listOfNotNull(transaction?.error)).filter { it != 0 })
         val service = transaction?.let { dictionary(date, TextTypes.SERVICE, listOf(it.service)) }
+        val targetNotice = if (profile.steps.any { it.details?.target != null })
+            " Socket and API call targets are included when recorded and may contain sensitive addresses."
+            else ""
         return profile.copy(
             steps = profile.steps.map { step -> step.copy(sql = step.sql?.let {
                 it.copy(statement = DictionaryText(it.hash, statements[it.hash]),
@@ -279,7 +301,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
             transaction = if (transaction == null) ProfileTransaction("unavailable") else ProfileTransaction(
                 "available", DictionaryText(transaction.service, service?.get(transaction.service)),
                 if (transaction.error == 0) null else DictionaryText(transaction.error, errors[transaction.error])),
-            detail = "service, SQL and error dictionary text included; bind fields and other free text omitted; dictionary text may contain sensitive values",
+            detail = "Service, SQL and error dictionary text included.$targetNotice Bind fields and other free text omitted. Dictionary text may contain sensitive values. Error text can include bound values or stored row values.",
         )
     }
 

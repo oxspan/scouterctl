@@ -27,9 +27,13 @@ scouterctl capture \
   --include-profiles --directory captures/incident-001
 ```
 
-The destination directory must not exist for a new capture. If the export is interrupted or partially completes, add `--resume` to the same capture command. Each query covers one date and one object over `[from,to)`. Set `--timezone` to the Collector's actual time zone.
+Add `--include-text` to `xlog search` to resolve service names and error text without downloading profiles. Error text can contain sensitive values, including bound values or values from existing database rows.
+
+For a new transaction capture, choose an unused destination under an existing parent directory. An occupied destination or a missing or invalid parent returns `INVALID_ARGUMENT` (exit 2). If the export is interrupted or partially completes, add `--resume` to the same capture command. Each query covers one date and one object over `[from,to)`. Set `--timezone` to the Collector's actual time zone.
 
 The example saves profiles in a v3 bundle. Add `--include-text` to the capture command only when you intend to store potentially sensitive service, SQL and error text; the default page size is 25 and the maximum is 100. Resume v3 with the same flags and query. Existing v2 bundles remain readable but cannot be resumed by this version; see [Capture compatibility](capture-compatibility.md). Missing profiles are recorded and retried on resume; connection failures preserve earlier page checkpoints. See [Capture recovery](capture-recovery.md) for interruption handling and the limits of recovery.
+
+Live `profile get` steps include `startTimeMs` relative to the transaction start and the recorded `parent` step index when the Collector provides them. Compare step start times to identify gaps. `SOCKET`, `APICALL` and `APICALL2` steps also report `elapsedMs` and `errorHash` (zero means no recorded error). When `--include-text` is set, `target` can include the recorded address and socket port. Treat those addresses as sensitive. Capture files retain the existing v3 step layout.
 
 Profile results include `completeness`: `truncated` means the Collector explicitly reported omitted blocks; `unknown` does not certify completeness. Known truncation makes `profile get` and `inspect` return exit 8 with the available data. See [Profile completeness](profile-completeness.md), including compatibility with older capture readers.
 
@@ -41,7 +45,7 @@ scouterctl inspect --directory captures/incident-001 \
   --txid 9223372036854775806
 ```
 
-Use `--include-text` when the capture was created with stored text and you want to display it. Requesting text that was not stored returns `2`. Inspect verifies all referenced pages and returns `8` with data for partial captures or unavailable profiles. A missing transaction returns `7`; damaged files return `10`. It supports v2 and v3, with no implicit v1 migration.
+Use `--include-text` when the capture was created with stored text and you want to display it. Requesting text that was not stored returns `2`. Inspect verifies all referenced pages and returns `8` with data for partial captures or unavailable profiles. A missing transaction returns `7`. A missing capture directory or a path to a file returns `INVALID_ARGUMENT` (exit 2). Damaged capture files return `10`. It supports v2 and v3, with no implicit v1 migration.
 
 To find a transaction ID first, search the same bundle offline:
 

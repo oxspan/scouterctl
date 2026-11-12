@@ -3,6 +3,10 @@ package dev.scouterctl
 import scouter.io.DataInputX
 import scouter.io.DataOutputX
 import scouter.lang.pack.*
+import scouter.lang.step.ApiCallStep
+import scouter.lang.step.ApiCallStep2
+import scouter.lang.step.HashedMessageStep
+import scouter.lang.step.SocketStep
 import scouter.lang.step.MessageStep
 import scouter.lang.step.SqlStep3
 import scouter.lang.step.Step
@@ -21,18 +25,19 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 enum class Fault {
+    TIMEZONE_SEOUL, TIMEZONE_MISSING, TIMEZONE_INVALID, TIMEZONE_TYPE, TIMEZONE_TIME_TYPE,
     COUNTER_EXPORT,
     HISTORY_EMPTY, HISTORY_MALFORMED, HISTORY_TIME_TYPE, HISTORY_OUTSIDE, HISTORY_NAN, HISTORY_TARGET_DUPLICATE,
     COUNTER_MALFORMED, COUNTER_DUPLICATE, COUNTER_NAN, COUNTER_XML_DTD, COUNTER_EMPTY, COUNTER_CUSTOM,
     AGENT_OFFLINE, AGENT_NO_RESPONSE, AGENT_JVM_MALFORMED, AGENT_DUPLICATE,
-    NONE, STATUS_MALFORMED, CONFIG_MALFORMED, CONFIG_DUPLICATE, CONFIG_INVALID_VISIBLE, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
+    NONE, STATUS_MALFORMED, CONFIG_MALFORMED, CONFIG_DUPLICATE, CONFIG_INVALID_VISIBLE, CONFIG_INVALID_AGENT_TEXT, VERSION, AUTH, SESSION, MISSING_META, INVALID_META, STALLED_CURSOR, DISCONNECT, EMPTY_OBJECTS,
     STRUCTURAL_ONLY, MISSING_TEXT, EMPTY_TEXT, MANY_SQL, TEXT_WRONG_TYPE, TEXT_WRONG_HASH, TEXT_DUPLICATE,
     TEXT_PACK, TEXT_DISCONNECT, TEXT_SESSION, XLOG_MISSING, XLOG_WRONG_ID,
-    PROFILE_TRUNCATED, PROFILE_OTHER_CONTROL, PROFILE_MANY_STEPS, PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
+    PROFILE_NETWORK, PROFILE_TRUNCATED, PROFILE_OTHER_CONTROL, PROFILE_MANY_STEPS, PROFILE_REPEATED_SQL, PROFILE_MISSING, PROFILE_MISSING_ONCE, PROFILE_DISCONNECT, PROFILE_MALFORMED, TEXT_TIMEOUT,
 }
 
 class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPassword: String? = null,
-    private val collectorVersion: String = "2.21.3 test") : AutoCloseable {
+    private val collectorVersion: String = "2.21.3 test", private val xlogErrorHash: Int = 0) : AutoCloseable {
     private val server = ServerSocket(0, 8, InetAddress.getLoopbackAddress())
     val port: Int = server.localPort
     private val executor = Executors.newSingleThreadExecutor()
@@ -125,6 +130,19 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 put("used", 1024L); put("total", 4096L); put("time", baseTime)
                                 if (fault == Fault.STATUS_MALFORMED) put("used", "private-status-value")
                             })
+                            RequestCmd.SERVER_ENV -> send(output, MapPack().apply {
+                                if (fault != Fault.TIMEZONE_MISSING) put("user.timezone", when (fault) {
+                                    Fault.TIMEZONE_SEOUL -> "Asia/Seoul"
+                                    Fault.TIMEZONE_INVALID -> "private-invalid-zone"
+                                    else -> "UTC"
+                                })
+                                if (fault == Fault.TIMEZONE_TYPE) put("user.timezone", 42L)
+                                put("private.password", "private-zone-env-token")
+                            })
+                            RequestCmd.SERVER_TIME -> send(output, MapPack().apply {
+                                put("time", baseTime)
+                                if (fault == Fault.TIMEZONE_TIME_TYPE) put("time", "private-time-value")
+                            })
                             RequestCmd.GET_XML_COUNTER -> send(output, MapPack().apply {
                                 val xml = if (fault == Fault.COUNTER_XML_DTD)
                                     """<!DOCTYPE Counters [<!ENTITY secret SYSTEM "file:///private/counter-secret">]><Counters>&secret;</Counters>"""
@@ -206,16 +224,28 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 newList("key").apply {
                                     add("smtp_password"); add(if (agent) "net_collector_tcp_port" else "net_tcp_listen_port"); add("db_dir")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("db_dir")
+                                    if (agent) {
+                                        add("trace_sql_parameter_max_length"); add("profile_http_parameter_enabled")
+                                        add("profile_http_querystring_enabled"); add("net_collector_ip"); add("obj_name"); add("obj_type")
+                                    }
                                 }
                                 newList("value").apply {
                                     add("private-config-marker"); add(6100L); add("/private/collector/data")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("duplicate-private-marker")
                                     if (fault == Fault.CONFIG_INVALID_VISIBLE) set(1, scouter.lang.value.TextValue("private-visible-marker"))
+                                    if (agent) {
+                                        add(0L); add(true); add(true); add("collector.example.test")
+                                        if (fault == Fault.CONFIG_INVALID_AGENT_TEXT) add(42L) else add("fixture")
+                                        add("java")
+                                    }
                                 }
                                 newList("default").apply {
                                     add("private-default-marker"); add(6100L)
                                     if (fault != Fault.CONFIG_MALFORMED) add("/private/default")
                                     if (fault == Fault.CONFIG_DUPLICATE) add("duplicate-private-default")
+                                    if (agent) {
+                                        add(20L); add(false); add(false); add("127.0.0.1"); add(""); add("")
+                                    }
                                 }
                                 })
                             }
@@ -241,6 +271,7 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 for (index in start until end) send(output, XLogPack().apply {
                                     this.txid = ids[index]; gxid = Long.MIN_VALUE + 1; caller = 9007199254740993L
                                     objHash = 42; endTime = baseTime + index; elapsed = 30; service = 10
+                                    if (index == 0) error = xlogErrorHash
                                     text1 = "secret-token"; ipaddr = byteArrayOf(127, 0, 0, 1)
                                 })
                                 if (fault != Fault.MISSING_META) send(output, MapPack().apply {
@@ -259,7 +290,26 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                 val missing = request.getLong("txid") == ids[1] &&
                                     (fault == Fault.PROFILE_MISSING || (fault == Fault.PROFILE_MISSING_ONCE && !profileMissed))
                                 if (missing) profileMissed = true else send(output, XLogProfilePack().apply {
-                                    profile = if (fault == Fault.PROFILE_TRUNCATED || fault == Fault.PROFILE_OTHER_CONTROL) Step.toBytes(arrayOf(
+                                    profile = if (fault == Fault.PROFILE_NETWORK) Step.toBytes(arrayOf(
+                                        HashedMessageStep().apply { index = 0; hash = 77 },
+                                        SqlStep3().apply { index = 1; start_time = 350; hash = 123; elapsed = 7 },
+                                        SocketStep().apply {
+                                            index = 2; parent = 1; start_time = 400; elapsed = 25; error = -510
+                                            ipaddr = byteArrayOf(192.toByte(), 0, 2, 17); port = 443
+                                        },
+                                        ApiCallStep().apply {
+                                            index = 3; parent = 1; start_time = 430; elapsed = 180; error = -519
+                                            opt = 1; address = "internal-target.example:9443"
+                                        },
+                                        ApiCallStep2().apply { index = 4; parent = 1; start_time = 650; elapsed = 50 },
+                                        StepControl().apply { code = 7; message = "private-control-message" },
+                                    )) else if (fault == Fault.PROFILE_REPEATED_SQL) Step.toBytes(Array<Step>(3004) { number ->
+                                        if (number < 4) HashedMessageStep().apply { index = number; hash = 77 }
+                                        else SqlStep3().apply {
+                                            index = number; hash = 123; elapsed = 2; error = if (number % 100 == 0) -789 else 0
+                                            param = "password=secret-token"
+                                        }
+                                    }) else if (fault == Fault.PROFILE_TRUNCATED || fault == Fault.PROFILE_OTHER_CONTROL) Step.toBytes(arrayOf(
                                         SqlStep3().apply { index = 1; hash = 123; elapsed = 7 },
                                         StepControl().apply { code = if (fault == Fault.PROFILE_TRUNCATED) 0 else 7; message = " ** Profile Truncated ** " }
                                     )) else if (fault == Fault.PROFILE_MANY_STEPS) Step.toBytes(Array(1001) { number ->

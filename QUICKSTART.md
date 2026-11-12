@@ -7,6 +7,7 @@ Install the [Linux x64 or Windows x64 command package](docs/installation.md) wit
 ```sh
 scouterctl --version
 scouterctl --help
+scouterctl capture --help
 ```
 
 ## 1. Connect to a Collector
@@ -38,6 +39,8 @@ See [status, settings and current counters](docs/inspection.md) for available fi
 
 ## 3. Save transactions and profiles
 
+Use `scouterctl object list --date 20261107 --no-input` to find an `objHash` recorded on that storage date, even after a Collector restart. Dated results use `alive: false` because the stored list has no live status. Use `object list` without a date to check current status.
+
 Use the Collector's storage date and timezone. This example assumes UTC. Create the parent `captures` directory if it does not exist, and use a new capture directory:
 
 ```sh
@@ -47,7 +50,11 @@ scouterctl capture --object-hash 123456 --date 20261107 \
   --include-profiles --directory captures/incident-001 --no-input
 ```
 
+The capture result reports `storageDateVerification: "unverified"`. Check the supplied storage date when a completed query returns no records.
+
 Repeat the same command with `--resume` after interruption or partial completion. Add `--include-text` at capture time only if you intend to store potentially sensitive service names, SQL and error text. See [capture and offline analysis](docs/captures.md).
+
+Windows briefly retries temporary file replacement denial. If a local file error persists, close programs using the capture and check permissions and free disk space. Resume only when a valid committed manifest exists; otherwise preserve the failed directory and choose a new destination. See [capture recovery](docs/capture-recovery.md).
 
 ## 4. Inspect without a Collector
 
