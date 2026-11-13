@@ -21,8 +21,15 @@
 * 🐛 Explain invalid capture directory paths ([53d4c1b](https://github.com/oxspan/scouterctl/commit/53d4c1b5ea2adf9d3d403b552b9ff9f353ebd3da)), closes [#75](https://github.com/oxspan/scouterctl/issues/75)
 * 🐛 Improve command help and option diagnostics ([22c81fa](https://github.com/oxspan/scouterctl/commit/22c81fa3f176a18d825567bfd40293b915052cc3)), closes [#65](https://github.com/oxspan/scouterctl/issues/65)
 * 🐛 Report unverified XLog storage dates ([8d0cbf5](https://github.com/oxspan/scouterctl/commit/8d0cbf5c04ff218f463859847fdc3c86fccaed34))
-* 🐛 Retry denied Windows file replacements ([da33d93](https://github.com/oxspan/scouterctl/commit/da33d93593db66fb2a43cb950c72b8179a3d0523)), closes [#58](https://github.com/oxspan/scouterctl/issues/58)
-* 🐛 Validate reported Collector time zones ([10c2019](https://github.com/oxspan/scouterctl/commit/10c2019d70fe25a8aa7d6e721f85754435b5b6e0)), closes [#57](https://github.com/oxspan/scouterctl/issues/57)
+* 🐛 Retry denied Windows file replacements ([da33d93](https://github.com/oxspan/scouterctl/commit/da33d93593db66fb2a43cb950c72b8179a3d0523)), refs [#58](https://github.com/oxspan/scouterctl/issues/58)
+* 🐛 Validate reported Collector time zones ([10c2019](https://github.com/oxspan/scouterctl/commit/10c2019d70fe25a8aa7d6e721f85754435b5b6e0)), refs [#57](https://github.com/oxspan/scouterctl/issues/57)
+
+### Compatibility and remaining limitations
+
+* Persisted capture formats remain unchanged. Individual profile steps remain the default; live JSON includes additive diagnostics and step fields, so strict consumers need unknown-key tolerance.
+* Time-zone checks use the reported Collector JVM property and client rules; they do not verify storage calendars. [#57](https://github.com/oxspan/scouterctl/issues/57) remains open.
+* Windows retries handle bounded access denial; the original intermittent deployment failure has not been reproduced and its cause remains unconfirmed. [#58](https://github.com/oxspan/scouterctl/issues/58) remains open.
+* Resume validation avoids duplicate page reads but retains cumulative scaling limits across repeated resumes.
 
 ## [1.0.0](https://github.com/oxspan/scouterctl/compare/v0.3.0...v1.0.0) (2026-11-07)
 
