@@ -52,7 +52,7 @@ jobs:
         run: |
           case "$BASE_BRANCH:$HEAD_BRANCH" in
             develop:feature/*|develop:hotfix/*|develop:master|develop:dependabot/*) ;;
-            master:develop|master:hotfix/*|master:release-please--branches--master) ;;
+            master:develop|master:hotfix/*|master:release-please--branches--master|master:dependabot/*) ;;
             *) echo "Unsupported PR route: $HEAD_BRANCH -> $BASE_BRANCH" >&2; exit 1 ;;
           esac
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0

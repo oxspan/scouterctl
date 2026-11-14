@@ -9,6 +9,10 @@
 3. Review its version, changelog, release notes and checks. Merging the release PR is the publication decision: the workflow creates the tag/release and attaches the command packages.
 4. Merge `master` back into `develop` so the next feature starts from the released metadata.
 
+Both branches require pull requests, resolved review conversations, and an up-to-date branch. The required GitHub Actions checks are `Build and test` and `Windows command package`; Windows is intentionally skipped on PRs into `develop`. The single-maintainer policy requires no additional approving reviewer and grants no ruleset bypass.
+
+Release-please uses `GITHUB_TOKEN`. Its PR workflows may require a maintainer to select **Approve workflows to run** before CI starts; see [GitHub's token trigger rules](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs). If no PR check run exists, close and reopen the PR as the maintainer to trigger it. Wait for the required checks to pass before merging. Do not bypass checks to publish. Dependabot security PRs may target `master` directly; merge their fixes back into `develop` afterwards.
+
 `feat` requests a minor release, `fix` a patch, and a breaking-change marker requests a major release. Documentation, test and CI changes alone do not request a release. For an intentional version override, preserve a one-time `Release-As: X.Y.Z` footer in the promotion commit; do not pin a permanent override in the config.
 
 ## Packages and checks
