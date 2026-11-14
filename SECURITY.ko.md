@@ -12,6 +12,14 @@
 
 보안 수정은 최신 배포 버전을 대상으로 합니다. 이전 버전의 별도 유지보수는 보장하지 않습니다. 재현할 수 있도록 정확한 버전과 알고 있는 커밋을 알려주세요.
 
+## 저장소 보호 정책
+
+- Secret scanning과 푸시 보호로 지원되는 자격증명 패턴을 탐지합니다. 캡처·SQL 원문 등 민감정보는 공개 전에 별도로 검토해야 합니다.
+- `master`와 `develop` 변경은 PR을 거치며, 리뷰 대화 해결, 최신 기준 브랜치 반영, GitHub Actions의 `Build and test` 및 `Windows command package` 체크를 요구합니다. Windows 검사는 `master` 대상 PR에서 실행하며 `develop` 대상 PR에서는 의도적으로 건너뜁니다. 규칙 우회는 허용하지 않습니다. 운영자가 한 명인 동안 필수 승인 수는 0명입니다.
+- Dependabot 버전 업데이트는 `develop`의 GitHub Actions와 Gradle을 대상으로 합니다. 보안 업데이트 대상은 기본 브랜치인 `master`입니다. 의존성 제출 workflow는 `master` 푸시 후, 매주, 또는 `master`에서 수동 실행할 때 Gradle 의존성을 해석해 제출합니다. 저장소에 포함된 Scouter JAR은 교체할 때 출처·체크섬·취약점을 별도로 검토해야 합니다.
+- CodeQL 기본 설정으로 GitHub Actions, Java/Kotlin, C/C++을 검사하며 로컬·원격 입력을 모두 분석 대상으로 삼습니다. 발견된 항목은 운영자가 검토합니다.
+- Actions는 전체 커밋 SHA로 고정합니다. GitHub 소유 Actions, `gradle/actions/*`, `googleapis/release-please-action`을 허용합니다. 기본 workflow 토큰은 읽기 전용이며 필요한 작업에 추가 권한을 지정합니다.
+
 ## 사용할 때 주의할 점
 
 - Collector TCP는 신뢰할 수 있는 네트워크나 별도로 보안 처리한 터널에서 사용합니다. CLI가 TLS를 추가하지는 않습니다.
