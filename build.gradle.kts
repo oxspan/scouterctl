@@ -1,8 +1,8 @@
 import java.security.MessageDigest
 
 plugins {
-    kotlin("jvm") version "2.4.10"
-    kotlin("plugin.serialization") version "2.4.10"
+    kotlin("jvm") version "2.4.21"
+    kotlin("plugin.serialization") version "2.4.21"
     application
     jacoco
 }
@@ -63,6 +63,11 @@ dependencies {
     testImplementation("org.jetbrains.pty4j:pty4j:0.13.12")
     testImplementation("com.h2database:h2:2.3.232")
     testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.5.16"))
+    testImplementation(platform("com.fasterxml.jackson:jackson-bom:2.21.7"))
+    testImplementation(platform("org.apache.logging.log4j:log4j-bom:2.25.5"))
+    listOf("core", "el", "websocket").forEach { module ->
+        testImplementation("org.apache.tomcat.embed:tomcat-embed-$module:10.1.61")
+    }
     testImplementation("org.springframework.boot:spring-boot-starter-web")
     testImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     testImplementation(kotlin("reflect"))
@@ -200,7 +205,7 @@ val legacyFixture = sourceSets.create("legacyFixture")
 configurations.named(legacyFixture.implementationConfigurationName) {
     extendsFrom(configurations.implementation.get())
 }
-dependencies { add(legacyFixture.implementationConfigurationName, "com.h2database:h2:1.4.200") }
+dependencies { add(legacyFixture.implementationConfigurationName, "com.h2database:h2:2.2.224") }
 tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>("compileLegacyFixtureKotlin") {
     setSource(files("src/test/kotlin/dev/scouterctl/fixture/TestService.kt"))
     compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
