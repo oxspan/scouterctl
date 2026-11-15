@@ -1,8 +1,8 @@
 import java.security.MessageDigest
 
 plugins {
-    kotlin("jvm") version "2.4.10"
-    kotlin("plugin.serialization") version "2.4.10"
+    kotlin("jvm") version "2.4.21"
+    kotlin("plugin.serialization") version "2.4.21"
     application
     jacoco
 }
@@ -57,12 +57,12 @@ distributions {
 dependencies {
     implementation(files("vendor/scouter-common-2.21.3.jar"))
     implementation("info.picocli:picocli:4.7.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    testImplementation("io.kotest:kotest-runner-junit5:6.2.6")
-    testImplementation("io.kotest:kotest-assertions-core:6.2.6")
-    testImplementation("org.jetbrains.pty4j:pty4j:0.13.12")
-    testImplementation("com.h2database:h2:2.3.232")
-    testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.5.16"))
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
+    testImplementation("io.kotest:kotest-runner-junit5:6.2.7")
+    testImplementation("io.kotest:kotest-assertions-core:6.2.7")
+    testImplementation("org.jetbrains.pty4j:pty4j:0.14.0")
+    testImplementation("com.h2database:h2:2.5.252")
+    testImplementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.2"))
     testImplementation("org.springframework.boot:spring-boot-starter-web")
     testImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     testImplementation(kotlin("reflect"))
@@ -200,7 +200,7 @@ val legacyFixture = sourceSets.create("legacyFixture")
 configurations.named(legacyFixture.implementationConfigurationName) {
     extendsFrom(configurations.implementation.get())
 }
-dependencies { add(legacyFixture.implementationConfigurationName, "com.h2database:h2:1.4.200") }
+dependencies { add(legacyFixture.implementationConfigurationName, "com.h2database:h2:2.5.252") }
 tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>("compileLegacyFixtureKotlin") {
     setSource(files("src/test/kotlin/dev/scouterctl/fixture/TestService.kt"))
     compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
