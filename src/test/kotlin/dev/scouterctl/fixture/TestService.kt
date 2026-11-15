@@ -6,6 +6,8 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.sql.DriverManager
 import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** Real HTTP service. Scouter instruments execute/work/JDBC; no telemetry packs are constructed here. */
 fun main(args: Array<String>) {
@@ -15,6 +17,8 @@ fun main(args: Array<String>) {
     server.createContext("/") { exchange ->
         val (status, body) = try {
             if (exchange.requestURI.path == "/health") 200 to "ready"
+            else if (exchange.requestURI.path == "/diagnostics/hold-state") 200 to service.holdState()
+            else if (exchange.requestURI.path == "/diagnostics/release") { service.releaseHold(); 200 to "released" }
             else 200 to service.execute(exchange.requestURI.path)
         } catch (_: IllegalStateException) {
             500 to "expected test failure"
@@ -30,11 +34,21 @@ fun main(args: Array<String>) {
 }
 
 class TestService {
+    private val holding = CountDownLatch(1)
+    private val released = CountDownLatch(1)
+    fun holdState(): String = if (holding.count == 0L) "waiting" else "not-started"
+    fun releaseHold() { released.countDown() }
+
     fun execute(name: String): String {
         val result = TestWork().work()
         return when (name) {
             "/poc/ok" -> "ok:$result"
             "/poc/slow" -> { Thread.sleep(180); "slow:$result" }
+            "/poc/hold" -> {
+                holding.countDown()
+                check(released.await(45, TimeUnit.SECONDS)) { "Diagnostic hold timed out" }
+                "released:$result"
+            }
             "/poc/error" -> throw IllegalStateException("fixture-error-marker")
             "/poc/sql" -> DriverManager.getConnection("jdbc:h2:mem:poc;DB_CLOSE_DELAY=-1").use { connection ->
                 connection.prepareStatement("select ? as marker").use { statement ->

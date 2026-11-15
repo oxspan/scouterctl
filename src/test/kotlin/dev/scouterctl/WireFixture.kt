@@ -25,6 +25,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 enum class Fault {
+    ACTIVE_EMPTY, ACTIVE_PARTIAL, DIAGNOSTIC_ERROR,
     TIMEZONE_SEOUL, TIMEZONE_MISSING, TIMEZONE_INVALID, TIMEZONE_TYPE, TIMEZONE_TIME_TYPE,
     COUNTER_EXPORT,
     HISTORY_EMPTY, HISTORY_MALFORMED, HISTORY_TIME_TYPE, HISTORY_OUTSIDE, HISTORY_NAN, HISTORY_TARGET_DUPLICATE,
@@ -200,6 +201,40 @@ class WireFixture(private val fault: Fault = Fault.NONE, private val expectedPas
                                         if (fault == Fault.COUNTER_DUPLICATE) { keys.add("HeapUsed"); values.add(7L) }
                                         if (fault == Fault.COUNTER_MALFORMED) keys.add("extra")
                                         if (fault == Fault.COUNTER_NAN) values.set(1, scouter.lang.value.DoubleValue(Double.NaN))
+                                    }
+                                })
+                            }
+                            RequestCmd.OBJECT_ACTIVE_SERVICE_LIST -> {
+                                check(input.readMapPack().getInt("objHash") == 42)
+                                check(fault != Fault.AGENT_OFFLINE)
+                                send(output, MapPack().apply {
+                                    put("objHash", 42L)
+                                    if (fault != Fault.AGENT_NO_RESPONSE) {
+                                        val fields = listOf("id", "elapsed", "stat", "cpu", "txid", "service", "name", "ip", "sql", "login", "desc")
+                                            .associateWith { newList(it) }
+                                        if (fault != Fault.ACTIVE_EMPTY) {
+                                            fields.getValue("id").add(9007199254740993L)
+                                            fields.getValue("elapsed").add(1250L)
+                                            fields.getValue("stat").add("WAITING")
+                                            fields.getValue("cpu").add(37L)
+                                            fields.getValue("txid").add(scouter.util.Hexa32.toString32(Long.MIN_VALUE))
+                                            fields.getValue("service").add("/diagnostic/service")
+                                            fields.getValue("name").add("diagnostic-worker")
+                                            for (key in listOf("ip", "sql", "login", "desc")) fields.getValue(key).add("private-$key")
+                                        }
+                                        put("complete", fault != Fault.ACTIVE_PARTIAL)
+                                    }
+                                })
+                            }
+                            RequestCmd.OBJECT_THREAD_DUMP -> {
+                                check(input.readMapPack().getInt("objHash") == 42)
+                                check(fault != Fault.AGENT_OFFLINE)
+                                if (fault != Fault.AGENT_NO_RESPONSE) send(output, MapPack().apply {
+                                    if (fault == Fault.DIAGNOSTIC_ERROR) put("error", "private-attachment-error")
+                                    else newList("threadDump").apply {
+                                        add("\"diagnostic-worker\" #42 WAITING")
+                                        add("    at java.lang.Object.wait(Native Method)")
+                                        add("    at example.Worker.await(Worker.java:12)")
                                     }
                                 })
                             }

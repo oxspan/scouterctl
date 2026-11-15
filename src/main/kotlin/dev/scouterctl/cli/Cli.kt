@@ -10,7 +10,7 @@ import java.nio.file.Path
 import java.util.concurrent.Callable
 
 @Command(name = "scouterctl", mixinStandardHelpOptions = true, showAtFileInUsageHelp = true,
-    description = ["Scouter Collector CLI. Commands: counter list, counter get, counter history, counter export, collector status, collector config, agent status, agent config, doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary, inspect compare.",
+    description = ["Scouter Collector CLI. Commands: counter list, counter get, counter history, counter export, collector status, collector config, agent status, agent config, agent active-requests, agent thread-dump, doctor, object list, xlog search, profile get, capture, inspect, inspect search, inspect summary, inspect compare.",
         "Connect: doctor --host HOST --port PORT --user ACCOUNT, then object list with the same options.",
         "Save/select connections: context add/list/use --name NAME. Check credentials: auth login.",
         "Password: SCOUTERCTL_PASSWORD, or --interactive for hidden terminal input. Passwords are never saved.",
@@ -31,6 +31,7 @@ class Cli(private val dispatcher: CommandDispatcher, private val output: JsonOut
     @Option(names = ["--object-hash"]) var objHash: Int? = null
     @Option(names = ["--page-size"], description = ["Default 1000; profile capture default 25, maximum 100"]) var pageSize: Int? = null
     @Option(names = ["--max-pages"], defaultValue = "40") var maxPages: Int = 40
+    @Option(names = ["--max-total-pages"], description = ["Profile capture: continue in one process up to this total page budget (maximum 10000)"]) var maxTotalPages: Int? = null
     @Option(names = ["--txid"]) var txid: Long? = null
     @Option(names = ["--directory"]) var directory: Path? = null
     @Option(names = ["--before"], description = ["inspect compare: baseline v2/v3 capture directory"]) var before: Path? = null

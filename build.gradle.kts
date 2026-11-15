@@ -200,6 +200,27 @@ tasks.register<JavaExec>("resumeReadCheck") {
     args(providers.gradleProperty("resumeReadResults").getOrElse("build/resume-read-results"))
 }
 
+tasks.register<JavaExec>("captureContinuationCheck") {
+    group = "verification"
+    description = "Measure repeated profile-capture resumes against bounded single-process continuation."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.CaptureContinuationCheckKt")
+    maxHeapSize = "512m"
+    args(providers.gradleProperty("continuationResults").getOrElse("build/capture-continuation-results"))
+}
+
+tasks.register<JavaExec>("timezoneStorageCheck") {
+    group = "verification"
+    description = "Verify reported time zones and DST storage-date limits against an isolated Collector (opt-in)."
+    dependsOn(tasks.testClasses, "fatJar")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.TimezoneStorageCheckKt")
+    args(providers.gradleProperty("scouterRoot").getOrElse("../scouter"),
+        providers.gradleProperty("timezoneResults").getOrElse("build/timezone-storage-results"))
+    systemProperty("cli.jar", layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath)
+}
+
 // Opt-in fixture for matching legacy Collector/Agent releases on Java 8.
 val legacyFixture = sourceSets.create("legacyFixture")
 configurations.named(legacyFixture.implementationConfigurationName) {
@@ -233,6 +254,14 @@ tasks.register<JavaExec>("agentInspectionSmoke") {
     args(providers.gradleProperty("scouterRoot").getOrElse("../scouter"), "--inspection-only")
     systemProperty("cli.jar", providers.gradleProperty("cliJar").getOrElse(
         layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath))
+}
+
+tasks.register<JavaExec>("agentDiagnosticsSmoke") {
+    dependsOn(tasks.testClasses, "fatJar")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("dev.scouterctl.AgentSmokeKt")
+    args(providers.gradleProperty("scouterRoot").getOrElse("../scouter"), "--diagnostics-only")
+    systemProperty("cli.jar", layout.buildDirectory.file("libs/scouterctl-${project.version}-all.jar").get().asFile.absolutePath)
 }
 
 

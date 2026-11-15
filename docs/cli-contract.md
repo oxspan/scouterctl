@@ -73,6 +73,8 @@ A consumer should accept the stream schema, process records, then require both t
 
 Online window queries reject offset mismatches against the reported Collector JVM zone before streaming or writing captures. `doctor` and `collector status` expose the property's ID and a client-rule offset with explicit provenance; unavailable metadata remains `null`. These checks do not verify the storage calendar. See [Collector time zones](collector-timezone.md).
 
+`xlog search` and `counter history` repeat `timezoneCheck` in both `start` and `complete`; `capture` and `counter export` include it in the outer result envelope. Its `status` is `reported-offset-match` when the interval comparison succeeds, or `unavailable` when no usable Collector zone was supplied. `collectorTimezone` contains the reported ID and client-derived offset with provenance, or `null`. All four commands retain `storageDateVerification: "unverified"`: neither a reported-zone match nor exit 0 proves that an empty result means no data existed. Saved manifest formats remain unchanged.
+
 `counter history` uses its own `scouterctl.counter-stream/v1` schema with the same start/record/complete lifecycle. Its start includes the dated target and counter metadata, and records contain stored timestamps and numeric strings. See [counter history](counter-history.md) for missing values, units and query limits.
 
 `counter export` returns a single manifest result and writes JSONL chunk files. Its `scouterctl.counter-capture/v1` format is separate from XLog captures. See [resumable counter export](counter-export.md) for budgets, checkpoints and completion semantics.

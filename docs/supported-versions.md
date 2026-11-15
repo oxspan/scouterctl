@@ -26,9 +26,12 @@ The matching-Agent column covers a Java 8 HTTP/JDBC application with explicit se
 | Collector/Agent inspection and real-time counters | All releases above |
 | Stored counter history and checkpointed multi-day export | All releases above |
 | Full Collector restart recovery and native Windows client checks | 2.8.1 and 2.21.3 |
+| Active-request snapshots and live thread dumps | 2.8.1 with matching Agent on Java 8; 2.21.3 with Java 21 Agent |
 | Host/process CPU, memory and I/O | [Separate Host Agent combinations](host-counters.md) |
 
 Windows client checks connect to Linux-hosted Collectors and Agents. They do not establish Windows-hosted Agent support. The CLI uses a pinned 2.21.3 protocol library; that library version is independent of the supported server list.
+
+The live-diagnostics checks held a real instrumented request, read its active-request row and thread-dump stack, then matched the same transaction ID in stored XLogs after completion. They ran Linux Collectors on Java 8: the official 2.8.1 distribution with its matching Java 8 Agent, and a locally built 2.21.3 Collector/Agent combination with a Java 21 application. Self-attachment was enabled for the diagnostic fixture. They do not establish support for all listed releases, every JVM vendor, virtual-thread visibility or Windows-hosted Agents. Unavailable diagnostics fail explicitly; see [live diagnostics](inspection.md#active-requests-and-thread-dumps).
 
 These results do not cover every Java distribution/update, Agent integration, Collector configuration or operating system. Collector 2.21.3 passed on Java 8 in these checks; running the CLI on JDK 21 does not establish Collector-on-JDK-21 support. Support for new commands or additional versions needs separate validation.
 

@@ -40,6 +40,11 @@ class CollectorTimezoneTest : FunSpec({
             alias.exit shouldBe 0
             alias.events.count { it["type"] == JsonPrimitive("record") } shouldBe 3
             alias.events.first()["storageDateVerification"] shouldBe JsonPrimitive("unverified")
+            for (event in listOf(alias.events.first(), alias.events.last())) {
+                val check = event["timezoneCheck"]!!.jsonObject
+                check["status"] shouldBe JsonPrimitive("reported-offset-match")
+                check["collectorTimezone"]!!.jsonObject["id"] shouldBe JsonPrimitive("Asia/Seoul")
+            }
         }
     }
 
@@ -86,6 +91,40 @@ class CollectorTimezoneTest : FunSpec({
                 search.exit shouldBe 0
                 search.events.count { it["type"] == JsonPrimitive("record") } shouldBe 3
                 search.events.first()["storageDateVerification"] shouldBe JsonPrimitive("unverified")
+                for (event in listOf(search.events.first(), search.events.last())) {
+                    val check = event["timezoneCheck"]!!.jsonObject
+                    check["status"] shouldBe JsonPrimitive("unavailable")
+                    check["collectorTimezone"] shouldBe JsonNull
+                    event["storageDateVerification"] shouldBe JsonPrimitive("unverified")
+                }
+            }
+        }
+    }
+
+    for (command in listOf("capture", "profile capture", "counter history", "counter export")) {
+        test("$command reports unavailable timezone verification without changing saved formats") {
+            val work = tempdir().toPath()
+            val destination = work.resolve("capture")
+            WireFixture(Fault.TIMEZONE_MISSING).use { server ->
+                val window = listOf("--date", "20260101", "--from", "2026-01-01T00:00:00Z",
+                    "--to", "2026-01-01T00:01:00Z", "--timezone", "UTC", "--object-hash", "42")
+                val args = when (command) {
+                    "capture" -> listOf("capture", "--directory", destination.toString()) + evidenceWindow
+                    "profile capture" -> listOf("capture", "--include-profiles", "--directory", destination.toString()) + evidenceWindow
+                    "counter history" -> listOf("counter", "history", "--counter", "HeapUsed") + window
+                    else -> listOf("counter", "export", "--counter", "HeapUsed", "--directory", destination.toString()) + window.drop(2)
+                }
+                val result = ContractCli(work).run(server, args)
+                result.exit shouldBe 0
+                for (event in if (command == "counter history") listOf(result.events.first(), result.events.last()) else result.events) {
+                    event["timezoneCheck"]!!.jsonObject["status"] shouldBe JsonPrimitive("unavailable")
+                    event["storageDateVerification"] shouldBe JsonPrimitive("unverified")
+                }
+                if (command != "counter history") {
+                    val manifest = Json.parseToJsonElement(Files.readString(destination.resolve("manifest.json"))).jsonObject
+                    manifest.containsKey("timezoneCheck") shouldBe false
+                    manifest["timezoneVerification"] shouldBe JsonPrimitive("operator-declared")
+                }
             }
         }
     }

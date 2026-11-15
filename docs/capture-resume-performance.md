@@ -34,4 +34,24 @@ For an ordinary incomplete capture with no unavailable profiles, the existing-pa
 
 Combining the passes halves these prefix scans; it does not eliminate their cumulative growth. With B new pages per invocation and P = mB total pages, ordinary repeated resumes scan Bm(m-1)/2 = (P²/B - P)/2 existing pages. Each individual resume remains linear in the committed prefix. Transaction-ID membership still requires memory proportional to committed records. Collecting through the existing validated callback retains the application's ID set while the store's uniqueness set is live, increasing simultaneous set storage; peak heap was not measured here.
 
-The CLI still allows `--max-pages` 1..40 and profile page sizes up to 100, with the existing capture limit of 10,000 pages. A bounded single-process continuation could retain IDs between batches and avoid repeated prefix validation, but it would need an explicit total-work budget, cancellation/checkpoint behavior and rules for on-disk changes between batches. Changing the current per-invocation budget contract is outside this fix. Persisting an unchecked ID cache or skipping validation on later invocations would weaken integrity guarantees and is not a substitute.
+The default invocation still allows `--max-pages` 1..40 and profile page sizes up to 100, with the existing capture limit of 10,000 pages. Repeated separate invocations retain the cumulative cost above.
+
+## Bounded single-process continuation
+
+Profile captures can opt into `--max-total-pages N` to continue beyond the ordinary `--max-pages` budget in the same process. N must be between `--max-pages` and 10,000 and counts **new pages in this invocation**, including after `--resume`; it is not the final capture size. Defaults and behavior without this option are unchanged. This option requires `capture --include-profiles`.
+
+```sh
+scouterctl capture --include-profiles --resume --directory captures/incident \
+  --date 20261101 --from 2026-11-01T00:00:00Z --to 2026-11-01T01:00:00Z \
+  --timezone UTC --object-hash 42 --max-total-pages 1000 --no-input
+```
+
+The process validates the existing prefix once, retains transaction IDs in memory and checkpoints each new page before requesting the next. Reaching the budget without finishing returns the ordinary incomplete capture result (exit 8). Resume still fully validates all committed pages; no persistent unchecked ID cache or format change is introduced. Profile recovery can reread pages whose profiles were unavailable.
+
+Profile writers hold an exclusive `.writer.lock` for the invocation: a file lock on Unix and an exclusive file handle on Windows, including Windows access to WSL UNC paths where byte-range locking is unavailable. Concurrent writers using the same platform fail with `IO_ERROR`; readers remain available. Do not mix Windows and Linux writers on a WSL-shared directory: these platform mechanisms do not establish cross-platform coordination. A changed or removed manifest is detected before checkpoint replacement and is not overwritten. Atomic moves and advisory locks do not defend against an external process editing immutable page files, replacing lock files, or racing the final compare-and-replace. Do not modify a live capture directory. Stop the writer and use a fresh full validation/resume after external edits. This restriction also applies between ordinary page-budget boundaries inside a continued invocation.
+
+Cancellation is checked before each page and profile request and before committing a new page. A cooperative cancellation reports `PARTIAL_RESULT` with the last committed cursor intact; retry with `--resume`. On terminal termination the CLI allows up to five seconds for in-flight work to notice cancellation and release its writer lock. An uninterruptible network call or forced termination can outlive that grace period; already committed pages remain recoverable and unreferenced partial/page files are ignored. Cancellation does not guarantee upstream cancellation.
+
+ID storage is still O(committed records). Continuation removes repeated prefix scans between separately launched invocations, but it does not bound record memory independently of capture size. Choose a finite total budget for the available heap and workload.
+
+Run `./gradlew captureContinuationCheck -PcontinuationResults=NEW_DIRECTORY` for a file-backed comparison of repeated 40-page resumes and one continued invocation after a common 40-page seed. It measures 120 and 400 pages with 100 records and 20 structural SQL steps per profile, under a 512 MiB heap. The JSON report includes positive existing-page read bytes from JFR, measured capture elapsed time, per-heap-pool peak usage and post-operation heap usage. Pool peaks can occur at different instants, include measurement overhead and are not simultaneous peak heap or process RSS. GC timing and shared-JVM warmup affect memory and time observations; no universal speedup or memory reduction follows from these synthetic local runs.

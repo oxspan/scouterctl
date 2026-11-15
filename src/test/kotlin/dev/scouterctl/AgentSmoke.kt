@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit
 fun main(args: Array<String>) {
     val upstream = Path.of(args.first()).toAbsolutePath().normalize()
     val hostCounters = args.drop(1) == listOf("--host-counters")
+    val diagnostics = args.drop(1) == listOf("--diagnostics-only")
     val work = Files.createTempDirectory("scouterctl-agent-smoke-")
     Files.createDirectory(work.resolve("conf"))
     val port = ServerSocket(0).use { it.localPort }
@@ -97,12 +98,13 @@ fun main(args: Array<String>) {
                 "-cp", hostJar, "scouter.boot.Boot", home.resolve("lib").toString())
                 .directory(home.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("host.log").toFile()).start()
         }
-        val agent = System.getenv("SCOUTER_AGENT_JAR")?.let(Path::of)
+        val agentSource = System.getenv("SCOUTER_AGENT_JAR")?.let(Path::of)
             ?: upstream.resolve("scouter.agent.java/target/scouter.agent.jar")
-        check(Files.isRegularFile(agent)) { "Build Java 21 agent first: $agent" }
+        check(Files.isRegularFile(agentSource)) { "Build Java 21 agent first: $agentSource" }
+        val agent = Files.copy(agentSource, work.resolve("scouter.agent.jar"))
         val serviceJava = System.getenv("SCOUTER_SERVICE_JAVA") ?: java
         val serviceClasspath = System.getenv("SCOUTER_SERVICE_CLASSPATH") ?: System.getProperty("java.class.path")
-        service = ProcessBuilder(serviceJava, "-Xmx128m", "-Duser.timezone=UTC", "-javaagent:$agent",
+        service = ProcessBuilder(serviceJava, "-Xmx128m", "-Duser.timezone=UTC", "-Djdk.attach.allowAttachSelf=$diagnostics", "-javaagent:$agent",
             "-Dscouter.config=${work.resolve("agent.conf")}", "-cp", serviceClasspath,
             "dev.scouterctl.fixture.TestServiceKt", work.resolve("http-port").toString())
             .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("service.log").toFile()).start()
@@ -150,6 +152,10 @@ fun main(args: Array<String>) {
                     }
                 }
                 verifyAgentInspection(work, endpoint, password, objectHash)
+                return
+            }
+            if (diagnostics) {
+                verifyAgentDiagnostics(work, endpoint, password, objectHash, httpPort)
                 return
             }
             val from = System.currentTimeMillis()
@@ -240,7 +246,7 @@ fun main(args: Array<String>) {
     }
 }
 
-private fun eventually(label: String, predicate: () -> Boolean) {
+internal fun eventually(label: String, predicate: () -> Boolean) {
     val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45)
     var lastFailure: Exception? = null
     while (System.nanoTime() < deadline) {

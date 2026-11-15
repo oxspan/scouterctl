@@ -45,6 +45,8 @@ internal class MemorySource(
     override fun settings(): List<RuntimeSetting> = emptyList()
     override fun agentStatus(objHash: Int): AgentStatus = throw OperationFailure(ErrorCode.NOT_FOUND, "No Agent in memory fixture")
     override fun agentSettings(objHash: Int): AgentConfiguration = throw OperationFailure(ErrorCode.NOT_FOUND, "No Agent in memory fixture")
+    override fun activeRequests(objHash: Int, includeText: Boolean): ActiveRequests = throw OperationFailure(ErrorCode.NOT_FOUND, "No Agent in memory fixture")
+    override fun threadDump(objHash: Int): AgentThreadDump = throw OperationFailure(ErrorCode.NOT_FOUND, "No Agent in memory fixture")
     override fun counterHistory(query: CounterHistoryQuery): CounterHistory = throw OperationFailure(ErrorCode.NOT_FOUND, "No history in memory fixture")
     override fun realtimeCounters(objHash: Int): RealtimeCounters = throw OperationFailure(ErrorCode.NOT_FOUND, "No Agent in memory fixture")
     override fun objects(date: String?): List<ObjectRecord> = emptyList()
