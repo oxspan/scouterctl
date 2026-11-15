@@ -22,6 +22,8 @@ sealed interface OnlineRequest : CommandRequest {
     data class CollectorConfig(val key: String?) : OnlineRequest
     data class AgentStatus(val objHash: Int) : OnlineRequest
     data class AgentConfig(val objHash: Int, val key: String?) : OnlineRequest
+    data class AgentActiveRequests(val objHash: Int, val includeText: Boolean) : OnlineRequest
+    data class AgentThreadDump(val objHash: Int) : OnlineRequest
     data class CounterExport(val query: CounterExportQuery, val directory: Path, val resume: Boolean, val maxChunks: Int) : OnlineRequest
     data class CounterHistory(val query: CounterHistoryQuery) : OnlineRequest
     data class Counters(val objHash: Int, val name: String?) : OnlineRequest
@@ -29,5 +31,6 @@ sealed interface OnlineRequest : CommandRequest {
     data class Profile(val date: String, val txid: Long, val includeText: Boolean, val groupSql: Boolean = false) : OnlineRequest
     data class Search(val query: Query, val maxPages: Int, val includeText: Boolean = false) : OnlineRequest
     data class Capture(val query: Query, val directory: Path, val resume: Boolean,
-        val maxPages: Int, val includeProfiles: Boolean, val includeText: Boolean) : OnlineRequest
+        val maxPages: Int, val includeProfiles: Boolean, val includeText: Boolean,
+        val maxTotalPages: Int? = null) : OnlineRequest
 }

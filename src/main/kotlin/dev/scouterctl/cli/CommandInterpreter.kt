@@ -8,11 +8,26 @@ import java.time.format.DateTimeFormatter
 
 internal fun Cli.interpret(): CommandRequest {
     val command = words.joinToString(" ")
+    if (maxTotalPages != null && (command != "capture" || !includeProfiles)) {
+        invalid("--max-total-pages requires capture --include-profiles")
+    }
+    if (maxTotalPages != null && maxTotalPages !in maxPages..10000) {
+        invalid("Use --max-total-pages between --max-pages and 10000")
+    }
     if (spec.commandLine().parseResult.hasMatchedOption("--group-sql") && command !in setOf("profile get", "inspect")) {
         invalid("--group-sql requires profile get or inspect")
     }
     if (command in setOf("context add", "context list", "context use")) return contextRequest(command)
     if (name != null) invalid("--name requires context add/use")
+    if (command in setOf("agent active-requests", "agent thread-dump")) {
+        allowedOptions()
+        val hash = required(objHash, "--object-hash")
+        if (hash == 0) invalid("Diagnostics require a nonzero --object-hash")
+        return when (command) {
+            "agent active-requests" -> OnlineRequest.AgentActiveRequests(hash, includeText)
+            else -> OnlineRequest.AgentThreadDump(hash)
+        }
+    }
     if (command == "inspect compare") {
         allowedOptions()
         return OfflineRequest.Compare(required(before, "--before"), required(after, "--after"), ComparisonOptions(limit ?: 20, includeText))
@@ -117,6 +132,7 @@ private fun Cli.onlineRequest(command: String): OnlineRequest {
         "xlog search" -> OnlineRequest.Search(required(query, "query"), maxPages, includeText)
         "capture" -> OnlineRequest.Capture(
             required(query, "query"), required(directory, "--directory"), resume, maxPages, includeProfiles, includeText,
+            maxTotalPages,
         )
         else -> invalid("Unknown command")
     }

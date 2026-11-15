@@ -34,24 +34,27 @@ class JsonOutput(private val stream: PrintStream) {
             return failure(OperationFailure(ErrorCode.PROTOCOL_ERROR, "Response could not be decoded"))
         }
     }
-    fun result(data: JsonElement, complete: Boolean = true, xlogCapture: Boolean = false): Int {
+    fun result(data: JsonElement, complete: Boolean = true, xlogCapture: Boolean = false,
+        timezoneCheck: QueryTimezoneCheck? = null): Int {
         emit(buildJsonObject {
             put("schemaVersion", "scouterctl.result/v1")
             put("ok", true)
             put("data", data)
             put("executionComplete", complete)
             if (xlogCapture) put("storageDateVerification", STORAGE_DATE_UNVERIFIED)
+            putTimezoneCheck(timezoneCheck)
         })
         return if (complete) 0 else 8
     }
 
-    fun event(event: XLogEvent) = when (event) {
+    fun event(event: XLogEvent, timezoneCheck: QueryTimezoneCheck? = null) = when (event) {
         is XLogEvent.Start -> emit(buildJsonObject {
             put("type", "start")
             put("schemaVersion", "scouterctl.stream/v1")
             put("source", json.encodeToJsonElement(event.source.toDto()))
             put("query", json.encodeToJsonElement(event.query.toDto()))
             put("storageDateVerification", STORAGE_DATE_UNVERIFIED)
+            putTimezoneCheck(timezoneCheck)
         })
         is XLogEvent.Record -> emit(buildJsonObject {
             put("type", "record")
@@ -70,10 +73,11 @@ class JsonOutput(private val stream: PrintStream) {
             put("executionComplete", true)
             put("upstreamCoverage", "unknown")
             put("sampling", "unknown")
+            putTimezoneCheck(timezoneCheck)
         })
     }
 
-    fun counterHistoryEvent(event: CounterHistoryEvent) = when (event) {
+    fun counterHistoryEvent(event: CounterHistoryEvent, timezoneCheck: QueryTimezoneCheck? = null) = when (event) {
         is CounterHistoryEvent.Start -> emit(buildJsonObject {
             put("type", "start")
             put("schemaVersion", "scouterctl.counter-stream/v1")
@@ -85,6 +89,7 @@ class JsonOutput(private val stream: PrintStream) {
             put("intervalMs", JsonNull)
             put("missingValues", "omitted")
             put("metadataScope", "current-collector-definition")
+            putTimezoneCheck(timezoneCheck)
         })
         is CounterHistoryEvent.Record -> emit(buildJsonObject {
             put("type", "record")
@@ -96,7 +101,15 @@ class JsonOutput(private val stream: PrintStream) {
             put("records", event.records)
             put("upstreamCoverage", "unknown")
             put("sampling", "unknown")
+            putTimezoneCheck(timezoneCheck)
         })
+    }
+
+    private fun JsonObjectBuilder.putTimezoneCheck(check: QueryTimezoneCheck?) {
+        if (check != null) {
+            put("timezoneCheck", check.toJson())
+            put("storageDateVerification", STORAGE_DATE_UNVERIFIED)
+        }
     }
 
     private fun emit(value: JsonElement) {

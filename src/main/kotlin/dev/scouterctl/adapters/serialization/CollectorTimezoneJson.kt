@@ -14,6 +14,11 @@ private fun CollectorTimezone?.toJson(): JsonElement = this?.let {
     json.encodeToJsonElement(CollectorTimezoneDto(it.id, it.utcOffsetSeconds, it.referenceTimeEpochMs))
 } ?: JsonNull
 
+fun QueryTimezoneCheck.toJson(): JsonObject = buildJsonObject {
+    put("status", if (collectorTimezone == null) "unavailable" else "reported-offset-match")
+    put("collectorTimezone", collectorTimezone.toJson())
+}
+
 fun ServerInfo.toLiveJson(timezone: CollectorTimezone?): JsonObject =
     JsonObject(json.encodeToJsonElement(toDto()).jsonObject + ("timezone" to timezone.toJson()))
 

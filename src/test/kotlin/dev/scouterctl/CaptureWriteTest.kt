@@ -43,7 +43,7 @@ class CaptureWriteTest : FunSpec({
             val checkFailure = {
                 val failure = shouldThrow<OperationFailure> { save() }
                 failure.code shouldBe ErrorCode.IO_ERROR
-                failure.message shouldBe "Local file I/O failed; check the path, permissions and available disk space"
+                failure.message shouldBe "Local file I/O failed (AccessDeniedException); check the path, permissions and available disk space"
                 Files.readString(manifest) shouldBe before
                 Files.exists(partial) shouldBe true
             }

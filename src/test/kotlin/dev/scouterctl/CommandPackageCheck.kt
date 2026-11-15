@@ -53,7 +53,9 @@ internal fun readCommandArchive(file: Path, version: String, libraries: Set<Stri
     val prefix = "scouterctl-$version/"
     val files = linkedMapOf<String, ByteArray>()
     for (entry in zip.entries().asSequence()) {
-        check(entry.name.startsWith(prefix) && '\\' !in entry.name && entry.name.split('/').none { it == ".." || it == "." }) { "Unsafe package entry" }
+        check(entry.name.startsWith(prefix) && '\\' !in entry.name && ':' !in entry.name &&
+            !entry.name.removePrefix(prefix).startsWith('/') &&
+            entry.name.split('/').none { it == ".." || it == "." }) { "Unsafe package entry" }
         if (entry.isDirectory) continue
         val name = entry.name.removePrefix(prefix)
         check(name.isNotEmpty() && files.put(name, zip.getInputStream(entry).use { it.readBytes() }) == null) { "Duplicate package entry" }

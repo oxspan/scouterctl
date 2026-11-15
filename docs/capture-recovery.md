@@ -24,7 +24,9 @@ Pages that were already committed are validated before resume. An incomplete pag
 
 Windows can deny an atomic file replacement while another program holds the destination open. The CLI briefly retries access-denied replacements, preserving the committed file and the atomic replacement operation. Persistent denial still returns `IO_ERROR` (exit 10); other filesystem failures are not retried. An access-denied error can also mean insufficient permissions.
 
-The message distinguishes local file I/O from Collector transport I/O. Close programs using the capture and check its path, permissions and available disk space. If the directory contains a valid committed manifest, rerun the original command with `--resume` after correcting the cause. If the first manifest could not be committed, preserve that directory and start a new capture in an unused directory. Do not promote a `.partial` file to a manifest or remove referenced pages to force recovery.
+The message distinguishes local file I/O from Collector transport I/O and includes a safe exception category, for example `Local file I/O failed (AccessDeniedException)`. The category identifies the failure reported by Java; it does not establish which process denied access or prove an antivirus cause. Raw paths and operating-system error messages are excluded. Other categories are `NoSuchFileException`, `FileAlreadyExistsException`, `AtomicMoveNotSupportedException`, `FileSystemException`, and `IOException`. Error codes and exit codes are unchanged; scripts should use the error code rather than matching message text.
+
+Close programs using the capture and check its path, permissions and available disk space. If the directory contains a valid committed manifest, rerun the original command with `--resume` after correcting the cause. If the first manifest could not be committed, preserve that directory and start a new capture in an unused directory. Do not promote a `.partial` file to a manifest or remove referenced pages to force recovery.
 
 ## Recovery limits
 

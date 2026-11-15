@@ -3,8 +3,6 @@ package dev.scouterctl.adapters.collector
 import dev.scouterctl.core.*
 import dev.scouterctl.application.ObservationSource
 import dev.scouterctl.application.collectorSettingValueIsVisible
-import dev.scouterctl.application.agentSettingValueIsVisible
-import dev.scouterctl.application.agentTextSettingValueIsVisible
 
 import scouter.io.DataInputX
 import scouter.io.DataOutputX
@@ -13,9 +11,6 @@ import scouter.lang.TextTypes
 import scouter.lang.step.Step
 import scouter.lang.step.StepControl
 import scouter.lang.value.BooleanValue
-import scouter.lang.value.ListValue
-import scouter.lang.value.TextValue
-import scouter.lang.value.Value
 import scouter.lang.value.DecimalValue
 import scouter.net.NetCafe
 import scouter.net.RequestCmd
@@ -36,6 +31,7 @@ class CollectorSource private constructor(private val socket: Socket, private va
         }
     }
     private val output = DataOutputX(BufferedOutputStream(socket.getOutputStream()))
+    private val agents = AgentRequests(::exchange)
     private var session = 0L
     override lateinit var info: ServerInfo
         private set
@@ -114,35 +110,17 @@ class CollectorSource private constructor(private val socket: Socket, private va
     }
 
     override fun settings(): List<RuntimeSetting> = collectorOperation {
-        parseSettings(exchange(RequestCmd.LIST_CONFIGURE_SERVER), ::collectorSettingValueIsVisible)
+        decodeRuntimeSettings(exchange(RequestCmd.LIST_CONFIGURE_SERVER), ::collectorSettingValueIsVisible)
     }
 
-    override fun agentStatus(objHash: Int): AgentStatus = collectorOperation {
-        val agent = agent(objHash)
-        if (!agent.alive) return@collectorOperation AgentStatus(agent, AgentJvmAvailability.OFFLINE, null)
-        val response = exchange(RequestCmd.OBJECT_ENV, MapPack().apply { put("objHash", objHash.toLong()) })
-        if (response.isEmpty()) return@collectorOperation AgentStatus(agent, AgentJvmAvailability.UNAVAILABLE, null)
-        val pack = response.singleOrNull() as? MapPack
-            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one Agent JVM response")
-        fun text(key: String): String? {
-            val value = pack.get(key) ?: return null
-            return (value as? TextValue)?.value
-                ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid Agent JVM field")
-        }
-        val javaVersion = text("java.version")
-            ?: return@collectorOperation AgentStatus(agent, AgentJvmAvailability.UNAVAILABLE, null)
-        if (javaVersion.isBlank()) throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid Agent Java version")
-        AgentStatus(agent, AgentJvmAvailability.AVAILABLE, AgentJvm(javaVersion, text("java.runtime.version"),
-            text("java.vm.name"), text("java.vm.version"), text("java.vendor"), text("os.name"), text("os.arch")))
-    }
+    override fun agentStatus(objHash: Int): AgentStatus = collectorOperation { agents.status(objHash) }
 
-    override fun agentSettings(objHash: Int): AgentConfiguration = collectorOperation {
-        val agent = agent(objHash)
-        if (!agent.alive) throw OperationFailure(ErrorCode.NOT_FOUND, "Agent is not alive")
-        val response = exchange(RequestCmd.LIST_CONFIGURE_WAS, MapPack().apply { put("objHash", objHash.toLong()) })
-        if (response.isEmpty()) throw OperationFailure(ErrorCode.NOT_FOUND, "Agent settings are unavailable")
-        AgentConfiguration(agent, parseSettings(response, ::agentSettingValueIsVisible, ::agentTextSettingValueIsVisible))
-    }
+    override fun agentSettings(objHash: Int): AgentConfiguration = collectorOperation { agents.settings(objHash) }
+
+    override fun activeRequests(objHash: Int, includeText: Boolean): ActiveRequests =
+        collectorOperation { agents.activeRequests(objHash, includeText) }
+
+    override fun threadDump(objHash: Int): AgentThreadDump = collectorOperation { agents.threadDump(objHash) }
 
     override fun counterHistory(query: CounterHistoryQuery): CounterHistory = collectorOperation {
         val target = decodeCounterTarget(query.objHash, datedObjects(query.date))
@@ -155,57 +133,11 @@ class CollectorSource private constructor(private val socket: Socket, private va
     }
 
     override fun realtimeCounters(objHash: Int): RealtimeCounters = collectorOperation {
-        val agent = agent(objHash)
+        val agent = agents.identity(objHash)
         val metadata = exchange(RequestCmd.GET_XML_COUNTER)
         val values = if (agent.alive) exchange(RequestCmd.COUNTER_REAL_TIME_OBJECT_ALL,
             MapPack().apply { put("objHash", objHash.toLong()) }) else emptyList()
         decodeCounters(agent, metadata, values)
-    }
-
-    private fun agent(objHash: Int): AgentIdentity {
-        val agents = exchange(RequestCmd.OBJECT_LIST_REAL_TIME).map {
-            it as? ObjectPack ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected object pack")
-        }.filter { it.objHash == objHash }
-        if (agents.size > 1) throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Duplicate Agent identity")
-        val agent = agents.singleOrNull() ?: throw OperationFailure(ErrorCode.NOT_FOUND, "Agent was not found")
-        return AgentIdentity(agent.objHash, agent.objName ?: "", agent.objType ?: "", agent.alive, agent.version ?: "unknown")
-    }
-
-    private fun parseSettings(
-        response: List<Pack>,
-        valueIsVisible: (String) -> Boolean,
-        textValueIsVisible: (String) -> Boolean = { false },
-    ): List<RuntimeSetting> {
-        val pack = response.singleOrNull() as? MapPack
-            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Expected one runtime settings response")
-        fun items(key: String): ListValue = pack.get(key) as? ListValue
-            ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid runtime settings fields")
-        val keys = items("key")
-        val values = items("value")
-        val defaults = items("default")
-        if (keys.size() > 5000 || keys.size() != values.size() || keys.size() != defaults.size()) {
-            throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Inconsistent runtime settings lists")
-        }
-        val seen = mutableSetOf<String>()
-        fun invalidValue(): Nothing = throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid operational setting value")
-        fun visibleValue(key: String, value: Value): String {
-            if (textValueIsVisible(key)) return (value as? TextValue)?.value ?: invalidValue()
-            return when (value) {
-                is DecimalValue -> value.value.toString()
-                is BooleanValue -> value.value.toString()
-                else -> invalidValue()
-            }
-        }
-        return (0 until keys.size()).map { index ->
-            val key = (keys.get(index) as? TextValue)?.value
-                ?: throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid runtime setting key")
-            if (key.isEmpty() || key.length > 256 || !seen.add(key)) {
-                throw OperationFailure(ErrorCode.PROTOCOL_ERROR, "Invalid or duplicate runtime setting key")
-            }
-            val visible = valueIsVisible(key)
-            RuntimeSetting(key, if (visible) visibleValue(key, values.get(index)) else null,
-                if (visible) visibleValue(key, defaults.get(index)) else null, !visible)
-        }
     }
 
     private fun datedObjects(date: String): List<CounterTarget> =
