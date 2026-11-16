@@ -33,6 +33,7 @@ jobs:
       version: ${{ steps.package.outputs.version }}
       sha: ${{ steps.package.outputs.sha }}
       format: ${{ steps.package.outputs.format }}
+      npm: ${{ steps.package.outputs.npm }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ !env.ACT }}
@@ -52,7 +53,7 @@ jobs:
         run: |
           case "$BASE_BRANCH:$HEAD_BRANCH" in
             develop:feature/*|develop:hotfix/*|develop:master|develop:dependabot/*) ;;
-            master:develop|master:hotfix/*|master:release-please--branches--master|master:dependabot/*) ;;
+            master:develop|master:hotfix/*|master:release-please--branches--master|master:dependabot/*|master:automation/packages-v*) ;;
             *) echo "Unsupported PR route: $HEAD_BRANCH -> $BASE_BRANCH" >&2; exit 1 ;;
           esac
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
@@ -62,6 +63,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-disabled: ${{ env.ACT == 'true' }}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
       - name: Build, test, and verify packages
         id: package
         env:
@@ -72,6 +76,12 @@ jobs:
             coverage_args=(-Pcoverage=true coverageCheck)
           fi
           if [[ -f .github/scripts/verify-release-files.sh ]]; then
+            if [[ -f gradle/package-managers.gradle.kts ]]; then
+              ./gradlew --no-daemon releaseInputs -PcandidateVersion=0.0.0
+              mkdir -p build/npm-fixture-inputs
+              cp build/release-inputs/scouterctl-0.0.0.zip build/npm-fixture-inputs/
+              printf 'npm=true\n' >> "$GITHUB_OUTPUT"
+            fi
             ./gradlew --no-daemon test "${coverage_args[@]}" verifyReleaseInputs
             printf 'format=commands\n' >> "$GITHUB_OUTPUT"
             printf 'package_path=build/release-inputs\n' >> "$GITHUB_OUTPUT"
@@ -87,6 +97,13 @@ jobs:
           [[ -z "${EXPECTED_TAG:-}" || "$EXPECTED_TAG" == "v$version" ]]
           printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
           printf 'sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: hashFiles('build/npm-fixture-inputs/*.zip') != ''
+        with:
+          name: npm-fixture-inputs
+          path: build/npm-fixture-inputs/*.zip
+          if-no-files-found: error
+          retention-days: 14
       - name: Summarize tests and coverage
         if: ${{ always() && inputs.release_tag == '' }}
         run: |
@@ -201,7 +218,7 @@ jobs:
     needs: build
     if: >-
       needs.build.outputs.format == 'commands' &&
-      (github.event_name != 'pull_request' || github.base_ref == 'master')
+      (github.event_name != 'pull_request' || github.base_ref == 'master' || needs.build.outputs.npm == 'true')
     runs-on: windows-latest
     timeout-minutes: 20
     defaults:
@@ -217,6 +234,9 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-package
@@ -224,9 +244,26 @@ jobs:
       - name: Install pinned native toolchain
         id: zig
         run: ./.github/scripts/install-zig.ps1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: hashFiles('gradle/package-managers.gradle.kts') != ''
+        with:
+          name: npm-fixture-inputs
+          path: build/npm-fixture-inputs
       - name: Verify inputs and command release
         run: |
           ./gradlew.bat --no-daemon verifyReleaseInputs verifyCommandRelease "-PreleaseInputDirectory=build/release-inputs" "-PzigHome=${{ steps.zig.outputs.zig_home }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Pack and verify npm on Windows
+        if: hashFiles('gradle/package-managers.gradle.kts') != ''
+        env:
+          PACKAGE_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          $windows = (Resolve-Path "build/release/scouterctl-$env:PACKAGE_VERSION-windows-x64.zip").Path
+          $previous = (Resolve-Path "build/npm-fixture-inputs/scouterctl-0.0.0.zip").Path
+          $current = (Resolve-Path "build/release-inputs/scouterctl-$env:PACKAGE_VERSION.zip").Path
+          ./gradlew.bat --no-daemon npmPackage '-PcandidateVersion=0.0.0' "-PnpmDistribution=$previous" "-PnpmWindowsDistribution=$windows"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./gradlew.bat --no-daemon npmPackage verifyNpmPackage "-PnpmDistribution=$current" "-PnpmWindowsDistribution=$windows"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run Kotest against the canonical JAR and native command
         env:
@@ -236,10 +273,29 @@ jobs:
           $archive = (Resolve-Path "build/release/scouterctl-$env:PACKAGE_VERSION-windows-x64.zip").Path
           ./gradlew.bat --no-daemon test "-PcliJar=$jar" "-PwindowsDistribution=$archive"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify Scoop with default directory junctions
+        if: hashFiles('.github/scripts/verify-scoop-installation.ps1') != ''
+        env:
+          PACKAGE_VERSION: ${{ needs.build.outputs.version }}
+        run: ./.github/scripts/verify-scoop-installation.ps1 -Archive "build/release/scouterctl-$env:PACKAGE_VERSION-windows-x64.zip" -Version $env:PACKAGE_VERSION
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && hashFiles('build/scoop-qa/scoop.log') != ''
+        with:
+          name: scoop-installation-log
+          path: build/scoop-qa/scoop.log
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-commands
           path: build/release
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: hashFiles('build/npm/*.tgz') != ''
+        with:
+          name: npm-packages
+          path: build/npm/*.tgz
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -250,6 +306,32 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  npm-linux:
+    name: Linux npm installation
+    needs: [build, portable]
+    if: needs.build.outputs.npm == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release_tag || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-packages
+          path: build/npm
+      - name: Verify the same npm archives on Linux
+        run: ./gradlew --no-daemon verifyNpmPackage
+
   scale:
     name: Optional capture scale validation
     if: github.event_name == 'workflow_dispatch' && inputs.scale_validation
@@ -257,9 +339,12 @@ jobs:
 
   release:
     name: Manage release
-    needs: [build, portable]
+    outputs:
+      tag: ${{ (steps.release.outputs.release_created == 'true' && steps.release.outputs.tag_name) || inputs.release_tag }}
+    needs: [build, portable, npm-linux]
     if: >-
       !cancelled() && needs.build.result == 'success' &&
+      (needs.npm-linux.result == 'success' || needs.build.outputs.npm != 'true') &&
       (needs.portable.result == 'success' ||
        (needs.build.outputs.format == 'poc' && github.event_name == 'workflow_dispatch' && inputs.release_tag != '')) &&
       github.ref == 'refs/heads/master' &&
@@ -300,3 +385,52 @@ jobs:
           PACKAGE_VERSION: ${{ needs.build.outputs.version }}
           PACKAGE_SHA: ${{ needs.build.outputs.sha }}
         run: bash .github/scripts/upload-release.sh
+      - name: Open package index update
+        if: (steps.release.outputs.release_created == 'true' || inputs.release_tag != '') && hashFiles('packaging/scoop.json.in') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name || inputs.release_tag }}
+          PACKAGE_VERSION: ${{ needs.build.outputs.version }}
+        run: bash .github/scripts/update-package-index.sh
+
+  npm-publish:
+    name: Publish npm package
+    needs: [build, portable, release]
+    if: >-
+      needs.release.result == 'success' && vars.NPM_PUBLISH_ENABLED == 'true' &&
+      needs.build.outputs.npm == 'true' &&
+      needs.release.outputs.tag != '' &&
+      github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-packages
+          path: build/npm
+      - name: Publish verified version with provenance
+        env:
+          PACKAGE_VERSION: ${{ needs.build.outputs.version }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "v$PACKAGE_VERSION" --repo "$GH_REPO" --json isDraft --jq 'select(.isDraft == false)' | grep -q .
+          npm install --global npm@11.21.1
+          archive="build/npm/scouterctl-$PACKAGE_VERSION.tgz"
+          local_integrity=$(node -e 'const fs=require("node:fs"),c=require("node:crypto"); console.log("sha512-"+c.createHash("sha512").update(fs.readFileSync(process.argv[1])).digest("base64"))' "$archive")
+          if npm view "scouterctl@$PACKAGE_VERSION" dist.integrity --json > existing.json 2> registry-error.txt; then
+            [[ "$(jq -r . existing.json)" == "$local_integrity" ]]
+            echo 'Already published and identical'
+          elif grep -q E404 registry-error.txt; then
+            npm publish "$archive" --access public --provenance
+          else
+            cat registry-error.txt >&2
+            exit 1
+          fi

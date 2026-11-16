@@ -2,6 +2,56 @@
 
 [English](../installation.md) | 한국어
 
+## 패키지매니저로 설치
+
+Scoop과 Homebrew도 직접 다운로드할 때와 같은 ZIP과 SHA-256 체크섬을 사용합니다.
+현재 Homebrew 지원 대상은 **Linux x64**입니다. npm은 첫 게시 전에
+[관리자 설정](../releasing.md#package-managers)이 필요합니다. 게시 전에는 직접
+빌드한 npm 파일이나 아래 ZIP 설치 방법을 사용하세요.
+
+```sh
+# npm: Node.js 22 이상과 Java 21 이상이 필요합니다.
+npm install --global scouterctl
+npm install --global scouterctl@<version>  # 버전 고정·변경
+npm uninstall --global scouterctl
+
+# 프로젝트에 설치하면 package.json과 잠금 파일을 함께 커밋합니다.
+npm install --save-dev --save-exact scouterctl@<version>
+npx --no-install scouterctl --version
+
+# Homebrew는 openjdk@21도 설치합니다.
+brew tap oxspan/scouterctl https://github.com/oxspan/scouterctl
+brew install oxspan/scouterctl/scouterctl
+brew upgrade scouterctl
+brew uninstall scouterctl
+```
+
+```powershell
+# Scoop은 Java 버킷에서 필요한 Java도 설치합니다.
+scoop bucket add java
+scoop bucket add scouterctl https://github.com/oxspan/scouterctl
+scoop install scouterctl/scouterctl
+scoop update scouterctl
+scoop uninstall scouterctl
+```
+
+npm 파일에는 필요한 JAR이 모두 들어 있습니다. `--ignore-scripts`로 설치할 수
+있으며, 설치하거나 처음 실행할 때 추가로 다운로드하지 않습니다. `JAVA_HOME`을
+먼저 확인하고, 없으면 PATH에서 Java를 찾습니다. JVM 옵션은 `JAVA_TOOL_OPTIONS`로
+지정합니다. Windows npm에는 ZIP과 같은 실행 파일을 넣어 한글·이모지 인자가
+손상되지 않게 했습니다. Windows npm과 ZIP 실행 파일은 `JAVA_OPTS`와
+`SCOUTERCTL_OPTS`도 지원합니다. Windows 실행 파일에서는 `JDK_JAVA_OPTIONS`를
+사용할 수 없습니다.
+직접 빌드한 파일은 `npm install --global /경로/scouterctl-<version>.tgz`로 설치합니다.
+
+업데이트와 삭제는 설치할 때 사용한 패키지매니저로 진행하세요. 설정·캡처·내보낸
+파일은 설치 폴더 밖에 저장되므로 유지됩니다. 여러 방식으로 설치했다면 Linux의
+`command -v scouterctl` 또는 Windows의 `Get-Command scouterctl -All`로 실제 실행
+경로를 확인하세요. Scoop과 Homebrew의 버전은 이 저장소의 파일을 따르며, GitHub
+릴리스 후 갱신 PR을 만듭니다.
+
+## ZIP으로 설치
+
 같은 [GitHub 릴리스](https://github.com/oxspan/scouterctl/releases)에서 운영체제에 맞는 ZIP과 `SHA256SUMS`를 받습니다.
 
 | 운영체제 | 파일 | 실행 환경 |

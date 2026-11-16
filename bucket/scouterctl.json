@@ -1,0 +1,27 @@
+{
+    "version": "1.1.0",
+    "description": "Command-line access to Scouter Collectors and Agents",
+    "homepage": "https://github.com/oxspan/scouterctl",
+    "license": "Apache-2.0",
+    "depends": "java/temurin21-jre",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/oxspan/scouterctl/releases/download/v1.1.0/scouterctl-1.1.0-windows-x64.zip",
+            "hash": "03b129536719d8928e09c9e1028be8f4a18030352d8b5a2714a648b751e7b879"
+        }
+    },
+    "extract_dir": "scouterctl-1.1.0",
+    "bin": "bin/scouterctl.exe",
+    "checkver": "github",
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/oxspan/scouterctl/releases/download/v$version/scouterctl-$version-windows-x64.zip"
+            }
+        },
+        "extract_dir": "scouterctl-$version",
+        "hash": {
+            "url": "$baseurl/SHA256SUMS"
+        }
+    }
+}

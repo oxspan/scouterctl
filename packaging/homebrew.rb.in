@@ -1,0 +1,25 @@
+class Scouterctl < Formula
+  desc "Command-line access to Scouter Collectors and Agents"
+  homepage "https://github.com/oxspan/scouterctl"
+  url "https://github.com/oxspan/scouterctl/releases/download/v@VERSION@/scouterctl-@VERSION@-linux-x64.zip"
+  version "@VERSION@"
+  sha256 "@LINUX_SHA256@"
+  license "Apache-2.0"
+
+  depends_on :linux
+  depends_on arch: :x86_64
+  depends_on "openjdk@21"
+
+  def install
+    libexec.install Dir["*"]
+    (bin/"scouterctl").write_env_script libexec/"bin/scouterctl",
+      Language::Java.overridable_java_home_env("21")
+  end
+
+  test do
+    assert_equal "scouterctl @VERSION@\n", shell_output("#{bin}/scouterctl --version")
+    ENV["SCOUTERCTL_CONFIG"] = testpath/"config.json"
+    system bin/"scouterctl", "context", "add", "--name", "test", "--user", "guest"
+    assert_match '"test"', shell_output("#{bin}/scouterctl context list")
+  end
+end

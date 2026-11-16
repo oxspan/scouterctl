@@ -422,3 +422,5 @@ tasks.register<JavaExec>("installLifecycleSmoke") {
         args("lifecycle", project.version.toString(), file(current.get()).absolutePath, file(previous.get()).absolutePath)
     }
 }
+
+apply(from = "gradle/package-managers.gradle.kts")
