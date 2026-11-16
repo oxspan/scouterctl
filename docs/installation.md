@@ -2,6 +2,57 @@
 
 English | [한국어](ko/installation.md)
 
+## Package managers
+
+Scoop and Homebrew definitions are kept in this repository and use the same
+versioned ZIPs and SHA-256 checksums as direct downloads. Homebrew currently
+supports **Linux x64 only**. The first npm publication requires the maintainer
+setup described in [releasing](releasing.md#package-managers); until then, use a
+locally built npm archive or one of the ZIP-based methods below.
+
+```sh
+# npm: Node.js 22+ and Java 21+ must already be installed.
+npm install --global scouterctl
+npm install --global scouterctl@<version>  # pin or change version
+npm uninstall --global scouterctl
+
+# Project installation: commit package.json and the lockfile.
+npm install --save-dev --save-exact scouterctl@<version>
+npx --no-install scouterctl --version
+
+# Homebrew: installs openjdk@21 as a dependency.
+brew tap oxspan/scouterctl https://github.com/oxspan/scouterctl
+brew install oxspan/scouterctl/scouterctl
+brew upgrade scouterctl
+brew uninstall scouterctl
+```
+
+```powershell
+# Scoop: installs the Java dependency from Scoop's Java bucket.
+scoop bucket add java
+scoop bucket add scouterctl https://github.com/oxspan/scouterctl
+scoop install scouterctl/scouterctl
+scoop update scouterctl
+scoop uninstall scouterctl
+```
+
+npm includes all JARs and works with `--ignore-scripts`, without additional
+downloads at installation or first execution. It selects Java from `JAVA_HOME`,
+then `PATH`; use `JAVA_TOOL_OPTIONS` for JVM options. Windows npm includes the
+same native launcher as the ZIP to preserve Unicode arguments. Windows npm and
+the ZIP launchers also accept `JAVA_OPTS` and `SCOUTERCTL_OPTS`; the Windows
+launcher rejects `JDK_JAVA_OPTIONS`. A local archive can be installed with
+`npm install --global /path/to/scouterctl-<version>.tgz`.
+
+Use the package manager that installed scouterctl to update or remove it.
+Configuration, captures and exports remain outside the installation and survive
+updates and removal. Multiple installations can coexist; check `command -v
+scouterctl` on Linux or `Get-Command scouterctl -All` on Windows to see which runs.
+Scoop and Homebrew follow the version in their manifest/formula; those files are
+updated through a PR after the GitHub release.
+
+## Direct download
+
 Download the ZIP for your platform and `SHA256SUMS` from the same [GitHub Release](https://github.com/oxspan/scouterctl/releases):
 
 | Platform | Archive | Runtime |

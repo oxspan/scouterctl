@@ -8,14 +8,49 @@ import kotlinx.serialization.encodeToString
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
+import java.nio.file.OpenOption
+import java.nio.file.FileSystemException
+import java.nio.channels.FileChannel
+import java.nio.channels.OverlappingFileLockException
+import java.nio.file.StandardOpenOption.CREATE
+import java.nio.file.StandardOpenOption.WRITE
+import com.sun.nio.file.ExtendedOpenOption.NOSHARE_READ
+import com.sun.nio.file.ExtendedOpenOption.NOSHARE_WRITE
+import com.sun.nio.file.ExtendedOpenOption.NOSHARE_DELETE
 import java.security.MessageDigest
 
 class EvidenceStore(private val directory: Path) : EvidenceRepository {
+    private var writing = false
+    private var expectedManifest: String? = null
+
+    override fun <T> withWriter(resume: Boolean, action: () -> T): T = fileOperation {
+        if (resume) requireCaptureDirectory(directory) else create()
+        val windows = System.getProperty("os.name").startsWith("Windows")
+        val options = mutableSetOf<OpenOption>(CREATE, WRITE, NOFOLLOW_LINKS)
+        if (windows) options.addAll(listOf(NOSHARE_READ, NOSHARE_WRITE, NOSHARE_DELETE))
+        val opened = try { FileChannel.open(directory.resolve(".writer.lock"), options) }
+            catch (_: FileSystemException) { writerUnavailable() }
+        opened.use { channel ->
+            if (!windows) try {
+                if (channel.tryLock() == null) writerUnavailable()
+            } catch (_: OverlappingFileLockException) {
+                writerUnavailable()
+            }
+            writing = true
+            expectedManifest = null
+            try { action() } finally {
+                writing = false
+                expectedManifest = null
+            }
+        }
+    }
+
     override fun create() = createCaptureDirectory(directory)
 
     override fun load(): EvidenceManifest = fileOperation {
         requireCaptureDirectory(directory)
         val content = read("manifest.json", 8_388_608)
+        if (writing) expectedManifest = content
         requireCaptureSchema(content, "scouterctl.capture/v2", "scouterctl.capture/v3")
         val manifest = json.decodeFromString<EvidenceManifestDto>(content).toModel()
         manifest.query.validate()
@@ -25,7 +60,16 @@ class EvidenceStore(private val directory: Path) : EvidenceRepository {
     }
 
     override fun save(manifest: EvidenceManifest) = fileOperation {
-        write("manifest.json", json.encodeToString(manifest.toDto()))
+        if (writing) {
+            val exists = Files.exists(directory.resolve("manifest.json"), NOFOLLOW_LINKS)
+            if ((expectedManifest == null && exists) || (expectedManifest != null &&
+                    (!exists || read("manifest.json", 8_388_608) != expectedManifest))) {
+                throw OperationFailure(ErrorCode.IO_ERROR, "Capture checkpoint changed during this invocation; stop other writers and validate before resuming")
+            }
+        }
+        val content = json.encodeToString(manifest.toDto())
+        write("manifest.json", content)
+        if (writing) expectedManifest = content
     }
 
     override fun writePage(index: Int, records: List<EvidenceRecord>): EvidencePage = fileOperation {
@@ -93,4 +137,6 @@ class EvidenceStore(private val directory: Path) : EvidenceRepository {
     private fun digest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
         .digest(bytes).joinToString("") { "%02x".format(it) }
     private fun damaged(): Nothing = throw OperationFailure(ErrorCode.IO_ERROR, "Capture integrity or record validation failed")
+    private fun writerUnavailable(): Nothing = throw OperationFailure(ErrorCode.IO_ERROR,
+        "Profile capture writer lock is unavailable; stop other writers and check write permissions")
 }

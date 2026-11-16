@@ -14,7 +14,7 @@
 
 ## 시작하기
 
-[릴리스](https://github.com/oxspan/scouterctl/releases)에서 Linux x64 또는 Windows x64 ZIP을 받아 [설치 안내](docs/ko/installation.md)에 따라 설치합니다.
+npm, Scoop, Homebrew(Linux x64) 또는 Linux·Windows x64 ZIP으로 설치합니다. 명령어와 npm 게시 상태는 [설치 안내](docs/ko/installation.md)를 확인하세요.
 
 JDK 21이 필요합니다. Scouter 2.x 중 검증한 [지원 버전 목록(영문)](docs/supported-versions.md)을 확인하세요.
 

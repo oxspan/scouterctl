@@ -13,6 +13,8 @@ The following integration tasks start isolated Collector/Agent/application proce
 
 ## Coverage
 
+Linux release-script tests also require Bash, `jq`, `unzip` and `sha256sum` on PATH. A missing utility is an environment failure; retain the failing output and fix PATH rather than weakening the release tests.
+
 Run the complete suite, generate JaCoCo HTML/XML reports, and enforce minimum coverage:
 
 ```sh
@@ -53,6 +55,8 @@ export SCOUTER_SERVICE_CLASSPATH="$(./gradlew -q legacyFixtureClasspath)"
 ./gradlew agentSmoke -PscouterRoot="$SCOUTER_SOURCE"
 # Run only Agent status/settings checks:
 ./gradlew agentInspectionSmoke -PscouterRoot="$SCOUTER_SOURCE"
+# Active request snapshot, live thread dump, then stored XLog correlation:
+./gradlew agentDiagnosticsSmoke -PscouterRoot="$SCOUTER_SOURCE"
 # Counter reads, optionally with real HTTP load:
 SCOUTER_COUNTER_LOAD=true ./gradlew counterSmoke -PscouterRoot="$SCOUTER_SOURCE"
 # Stored counter history, units, boundaries and checkpointed multi-day export:
@@ -62,6 +66,8 @@ SCOUTER_COUNTER_RECOVERY=true ./gradlew counterHistorySmoke
 ```
 
 `JAVA8`, `SCOUTER_DIST` and `SCOUTER_SOURCE` refer to your Java 8 installation, extracted distribution and built Scouter source checkout. The legacy JDBC dependency is test-only and is excluded from the CLI package. Build/run Gradle with JDK 21.
+
+`agentDiagnosticsSmoke` holds one real instrumented HTTP request on a latch, observes the active request with and without names, finds the held request in a live thread dump, releases it and matches the same transaction ID in stored XLogs. It also checks empty snapshots, authentication, missing targets and unchanged Collector/account/Agent configuration. It enables self-attachment only for its isolated fixture JVM and stops its processes in `finally`. The printed evidence directory contains raw CLI JSON/stderr, `diagnostics-summary.json` and `teardown.json`. As with the other Agent checks, use `SCOUTER_COLLECTOR_*`, `SCOUTER_AGENT_JAR` and `SCOUTER_SERVICE_*` for a chosen distribution; the ordinary test suite uses protocol fixtures and cannot establish actual Agent/JVM support.
 
 For Servlet checks, unset the legacy `SCOUTER_AGENT_JAR`, `SCOUTER_SERVICE_JAVA` and `SCOUTER_SERVICE_CLASSPATH` overrides. Use `springSmoke` with a built Java 21-capable Agent from the source checkout. `recoverySmoke` adds actual Collector stop/restart to that scenario. `collectorInspectionSmoke` starts only the Collector and checks status, settings, authentication and unchanged configuration/account files; it does not start an Agent or application. The optional `SCOUTER_SERVICE_*` and `SCOUTER_AGENT_JAR` overrides apply to `agentSmoke`, `agentInspectionSmoke`, `counterSmoke` and `counterHistorySmoke`, not `springSmoke`.
 
@@ -101,6 +107,12 @@ SCOUTER_COLLECTOR_JAVA=/path/to/collector/java \
 Optionally pass `-PcliJar=/path/to/extracted/scouterctl-VERSION-all.jar` to verify an extracted package. The helper starts isolated, loopback-only Collector and instrumented Spring processes. A test-only TCP relay pauses an actual request after a committed page, then the helper stops and restarts the Collector against the same database. It checks v1 XLog-page interruption and v3 interruption partway through profile retrieval, exact recovered records/profiles, unchanged committed pages, and repeated-resume stability. Requests sent during the outage are outside the fixed query and are not asserted recoverable.
 
 The task prints its temporary evidence directory, including `recovery-summary.json` and process teardown results. It stops all started services and deletes the temporary account file; retain the evidence needed for review and remove the directory afterward. This real Collector/Servlet check runs separately from the portable Kotest suite. Release checks run protocol fixtures on Linux and Windows; these do not establish real Collector instrumentation on either platform.
+
+## Verification dependency security
+
+The HTTP/JDBC and Spring services are test-only, loopback-bound fixtures and are excluded from command packages. The Java8 fixture uses H2 2.2.224; modern fixture tests use H2 2.3.232, which requires Java11 or later. Keep the Java8 bytecode check and real JDBC smoke when changing the legacy dependency.
+
+Spring Boot remains on the public 3.5 line. Test dependency platforms explicitly select patched Jackson/Log4j versions, and all embedded Tomcat modules share one patch version. These overrides require the real Spring instrumentation smoke after updates. The Spring MVC advisories [CVE-2026-47884](https://spring.io/security/cve-2026-47884) and [CVE-2026-47890](https://spring.io/security/cve-2026-47890) have no public Framework 6.2 patch as of 2026-11-15; this fixture does not configure XsltView or SSE fragments. Do not suppress the alerts or claim an unavailable public fix. Reassess when a compatible public patch is available.
 
 ## Offline scale measurements
 

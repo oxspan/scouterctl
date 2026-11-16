@@ -114,8 +114,10 @@ internal fun readRecoveryCapture(directory: Path, withProfiles: Boolean): Recove
     RecoveryCapture(rows, manifest.executionComplete, manifest.cursor)
 }
 
-internal fun snapshotRecoveryPages(directory: Path): Map<String, String> = snapshotRecoveryFiles(directory)
-    .filterKeys { it.endsWith(".jsonl") }
+internal fun snapshotRecoveryPages(directory: Path): Map<String, String> = Files.list(directory).use { files ->
+    files.filter { it.fileName.toString().endsWith(".jsonl") && Files.isRegularFile(it) }.toList()
+        .associate { it.fileName.toString() to Files.readString(it) }
+}
 
 internal fun snapshotRecoveryFiles(directory: Path): Map<String, String> = Files.list(directory).use { files ->
     files.filter { Files.isRegularFile(it) }.toList().associate { it.fileName.toString() to Files.readString(it) }

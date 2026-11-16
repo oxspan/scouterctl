@@ -33,8 +33,31 @@ scouterctl xlog search --object-hash 42 --date 20261109 --timezone Asia/Seoul \
 
 The same instants declared as `America/Los_Angeles` with date `20261108` are rejected. A UTC timestamp suffix is still valid input with `--timezone Asia/Seoul`; the timestamp syntax itself is not required to use the Collector's offset.
 
+## Query verification in live output
+
+Window queries include a `timezoneCheck` object in live output: the `start` and `complete` events of `xlog search` and `counter history`, and the outer result envelope of `capture` and `counter export`.
+
+```json
+{"timezoneCheck":{"status":"unavailable","collectorTimezone":null},"storageDateVerification":"unverified"}
+```
+
+`status: "reported-offset-match"` means the declared zone matched the reported JVM zone throughout the requested interval under the client's rules. `collectorTimezone` contains the same ID, reference time, offset and provenance fields as `doctor`; its offset is for that reference time, not necessarily the historical query. `status: "unavailable"` means the Collector supplied no usable zone metadata, so no comparison was possible. Transport and malformed-protocol failures still fail the command instead of producing this status.
+
+The check is repeated in the terminal stream event so a consumer retaining only the completion receipt can distinguish the two states. Neither state verifies the storage calendar, and `storageDateVerification` remains `"unverified"` for all four commands. Treat an empty successful result as a completed extraction from an unverified partition, not proof that no traffic or counter samples existed. These are additive live fields; saved manifest schemas and `timezoneVerification: "operator-declared"` do not change.
+
 ## Storage dates remain unverified
 
 This is a comparison with a **reported JVM zone**, not confirmation of the storage partition. XLog `storageDateVerification: "unverified"` and capture `timezoneVerification: "operator-declared"` remain unchanged. Capture formats and strict-reader compatibility are unchanged; the new diagnostic fields are live output only.
 
 Scouter's `DateTimeHelper` in 2.8.1 and 2.21.3 builds a calendar from local `20000101` with fixed 86,400,000-ms days. That calendar can differ from civil time around DST. For example, in `America/Chicago`, `2026-07-01T05:30:00Z` is July 1 by current zone rules but June 30 in that storage calendar. A matching zone check cannot certify the correct partition or prove that an empty result means no traffic. Confirm storage dates with the Collector operator when results are unexpected. This change does not repair that upstream calendar behavior or verify the server's cached calendar through the protocol.
+
+## Reproduce the storage-calendar check
+
+With a built Scouter 2.21.3 checkout used read-only and an installed Java 8 runtime:
+
+```sh
+SCOUTER_COLLECTOR_JAVA=/path/to/java8/bin/java ./gradlew timezoneStorageCheck \
+  -PscouterRoot=/path/to/scouter -PtimezoneResults=build/timezone-storage-trial
+```
+
+The result directory must not exist. The opt-in check starts isolated UTC and `America/Chicago` Collectors, writes synthetic XLogs at the same fixed instant, reads the stored partition, and runs the packaged CLI. It retains JSON output, command arguments, Collector logs and teardown receipts. It stops its processes and removes temporary account files. This verifies the 2.21.3 calendar behavior with synthetic telemetry, not every supported Collector or Agent combination.

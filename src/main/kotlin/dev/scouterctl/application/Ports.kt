@@ -9,6 +9,8 @@ interface ObservationSource : AutoCloseable {
     fun settings(): List<RuntimeSetting>
     fun agentStatus(objHash: Int): AgentStatus
     fun agentSettings(objHash: Int): AgentConfiguration
+    fun activeRequests(objHash: Int, includeText: Boolean = false): ActiveRequests
+    fun threadDump(objHash: Int): AgentThreadDump
     fun counterHistory(query: CounterHistoryQuery): CounterHistory
     fun realtimeCounters(objHash: Int): RealtimeCounters
     fun objects(date: String? = null): List<ObjectRecord>
@@ -25,6 +27,10 @@ interface CaptureRepository {
 }
 
 interface EvidenceRepository {
+    fun <T> withWriter(resume: Boolean, action: () -> T): T {
+        if (!resume) create()
+        return action()
+    }
     fun create()
     fun load(): EvidenceManifest
     fun save(manifest: EvidenceManifest)

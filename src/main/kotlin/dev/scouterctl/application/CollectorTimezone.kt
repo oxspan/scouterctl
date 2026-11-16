@@ -11,8 +11,8 @@ fun describeCollectorTimezone(id: String, referenceTimeEpochMs: Long): Collector
     return CollectorTimezone(zone.id, offset.totalSeconds, referenceTimeEpochMs)
 }
 
-fun validateCollectorTimezone(declared: String, from: Long, to: Long, collector: CollectorTimezone?) {
-    if (collector == null) return
+fun validateCollectorTimezone(declared: String, from: Long, to: Long, collector: CollectorTimezone?): QueryTimezoneCheck {
+    if (collector == null) return QueryTimezoneCheck(null)
     val requested = ZoneId.of(declared).rules
     val reported = ZoneId.of(collector.id).rules
     val start = Instant.ofEpochMilli(from)
@@ -31,4 +31,5 @@ fun validateCollectorTimezone(declared: String, from: Long, to: Long, collector:
             transition = rules.nextTransition(transition.instant)
         }
     }
+    return QueryTimezoneCheck(collector)
 }

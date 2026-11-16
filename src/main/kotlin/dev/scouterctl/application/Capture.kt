@@ -3,7 +3,15 @@ package dev.scouterctl.application
 import dev.scouterctl.core.*
 
 data class CaptureOptions(val resume: Boolean, val maxPages: Int, val endpoint: String,
-    val includeText: Boolean = false)
+    val includeText: Boolean = false, val maxTotalPages: Int? = null,
+    val cancelled: () -> Boolean = { false }) {
+    fun pageBudget(): Int {
+        if (maxTotalPages != null && maxTotalPages !in maxPages..10000) {
+            throw OperationFailure(ErrorCode.INVALID_ARGUMENT, "Use max-total-pages between max-pages and 10000")
+        }
+        return maxTotalPages ?: maxPages
+    }
+}
 
 fun capture(source: ObservationSource, query: Query, request: CaptureOptions, store: CaptureRepository): CaptureManifest {
     query.validate()

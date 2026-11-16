@@ -14,7 +14,7 @@ Starting with diagnostics and data capture, the project aims to cover configurat
 
 ## Quick start
 
-Install the Linux x64 or Windows x64 command package from [Releases](https://github.com/oxspan/scouterctl/releases), following the [installation guide](docs/installation.md).
+Install with npm, Scoop, Homebrew (Linux x64), or a Linux/Windows x64 ZIP. See the [installation guide](docs/installation.md) for commands and npm publication status.
 
 Requires JDK 21. See the [verified Scouter 2.x releases](docs/supported-versions.md).
 
