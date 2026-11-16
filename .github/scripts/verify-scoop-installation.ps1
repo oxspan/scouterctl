@@ -61,7 +61,8 @@ try {
     $manifest.architecture.'64bit'.hash = (Get-FileHash "$work/previous.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
     $manifest | ConvertTo-Json -Depth 10 | Set-Content "$bucket/scouterctl.json" -Encoding utf8
     Invoke-Scoop -Arguments @('install', 'scouterctl/scouterctl', '--no-update-scoop')
-    if ($env:JAVA_HOME -notlike "$env:SCOOP*temurin21-jre*") { throw 'Scoop did not select its Java dependency.' }
+    $expectedJava = (Resolve-Path "$env:SCOOP/apps/temurin21-jre/current").Path
+    if ([IO.Path]::GetFullPath($env:JAVA_HOME) -ine $expectedJava) { throw 'Scoop did not select its Java dependency.' }
     foreach ($app in @('scouterctl', 'temurin21-jre')) {
         if ((Get-Item "$env:SCOOP/apps/$app/current").LinkType -ne 'Junction') { throw "Missing default junction: $app" }
     }
