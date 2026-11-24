@@ -110,7 +110,7 @@ jobs:
           retention-days: 14
       - name: Save local coverage reports
         if: ${{ always() && env.ACT == 'true' && hashFiles('build/reports/jacoco/**') != '' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v4.6.2; act artifact API
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2; act artifact API
         with:
           name: coverage-reports
           path: build/reports/jacoco/
@@ -124,7 +124,7 @@ jobs:
           retention-days: 14
       - name: Save local test results
         if: ${{ always() && env.ACT == 'true' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v4.6.2; act artifact API
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2; act artifact API
         with:
           name: test-results-ubuntu-latest
           path: build/test-results/test/*.xml
@@ -138,7 +138,7 @@ jobs:
           retention-days: 14
       - name: Save local package
         if: ${{ env.ACT == 'true' }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v4.6.2; act artifact API
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2; act artifact API
         with:
           name: release-package
           path: ${{ steps.package.outputs.package_path }}
