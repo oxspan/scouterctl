@@ -16,6 +16,8 @@ The first run downloads runner images, actions, JDK and Gradle dependencies. `--
 
 The local workflow uses the current working tree instead of checking out GitHub source. GitHub Gradle caching is disabled under act. Local artifact steps pin `upload-artifact v4.6.2`, which act v0.2.97 supports; hosted uploads keep v7. The wrapper does not load `.env`, `.secrets` or `.vars`, and does not pass a GitHub token. The Docker socket is not mounted into the job container. On WSL with Docker Desktop, the artifact server binds to WSL loopback and the container reaches it through `host.docker.internal` and Windows localhost forwarding. Other environments use act's bridge-network address. If uploads fail, check this connection before rerunning the build.
 
+Dependabot ignores major updates for `actions/upload-artifact` to preserve the local v4 pin. Hosted v7 patch and minor updates remain eligible. Review major upgrades manually with an actual local artifact upload before changing the pin.
+
 ## Validation boundaries
 
 - Linux: act exercises the actual workflow build job in a Docker container. Use local Gradle directly for fast targeted tests; do not repeat both full suites for every edit.

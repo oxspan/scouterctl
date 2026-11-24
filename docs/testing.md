@@ -102,6 +102,12 @@ Optionally pass `-PcliJar=/path/to/extracted/scouterctl-VERSION-all.jar` to veri
 
 The task prints its temporary evidence directory, including `recovery-summary.json` and process teardown results. It stops all started services and deletes the temporary account file; retain the evidence needed for review and remove the directory afterward. This real Collector/Servlet check runs separately from the portable Kotest suite. Release checks run protocol fixtures on Linux and Windows; these do not establish real Collector instrumentation on either platform.
 
+## Verification dependency security
+
+The HTTP/JDBC and Spring services are test-only, loopback-bound fixtures and are excluded from command packages. The Java8 fixture uses H2 2.2.224; modern fixture tests use H2 2.5.252, which requires Java11 or later. Keep the Java8 bytecode check and real JDBC smoke when changing the legacy dependency. Dependabot ignores H2 version updates because it updates both declarations together; maintain their versions manually. Spring Boot major updates use a separate Dependabot group so fixture migrations can be validated independently of the other dependency updates.
+
+Spring Boot remains on the 3.5 line. Test dependency platforms pin Jackson 2.21.7, Log4j 2.25.5 and embedded Tomcat 10.1.61. Run the real Spring instrumentation smoke when changing these overrides.
+
 ## Offline scale measurements
 
 The optional [capture scale workflow](capture-scale-validation.md) uses synthetic captures and reports timing/memory measurements. Its macOS diagnostic job is separate from the supported release-platform checks.
