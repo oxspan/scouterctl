@@ -8,6 +8,10 @@ updates:
     groups:
       actions:
         patterns: ['*']
+    ignore:
+      # Local act uploads require v4; hosted uploads can still receive v7 patches/minors.
+      - dependency-name: actions/upload-artifact
+        update-types: ['version-update:semver-major']
     open-pull-requests-limit: 1
     commit-message:
       prefix: ci
@@ -17,8 +21,14 @@ updates:
     schedule:
       interval: weekly
     groups:
+      spring-boot-major:
+        patterns: ['org.springframework.boot:*']
+        update-types: [major]
       gradle:
         patterns: ['*']
-    open-pull-requests-limit: 1
+    ignore:
+      # Dependabot updates both H2 declarations together; maintain the Java 8 pin manually.
+      - dependency-name: com.h2database:h2
+    open-pull-requests-limit: 2
     commit-message:
       prefix: chore
